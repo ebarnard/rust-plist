@@ -1,0 +1,10 @@
+[package]
+name = "plist"
+version = "0.0.1"
+authors = ["Ed Barnard <eabarnard@gmail.com>"]
+description = "A rusty plist parser. Very much a work in progress."
+license = "MIT"
+
+[dependencies]
+rustc-serialize = "0.3.15"
+xml-rs = "0.1.25"
