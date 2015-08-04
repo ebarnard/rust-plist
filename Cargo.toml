@@ -1,10 +1,11 @@
 [package]
 name = "plist"
-version = "0.0.2"
+version = "0.0.3"
 authors = ["Ed Barnard <eabarnard@gmail.com>"]
 description = "A rusty plist parser. Very much a work in progress."
 license = "MIT"
 repository = "https://github.com/ebarnard/rust-plist"
+documentation = "https://ebarnard.github.io/rust-plist/doc/plist/"
 
 [dependencies]
 rustc-serialize = "0.3.15"
