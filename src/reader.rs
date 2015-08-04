@@ -49,8 +49,12 @@ impl<R: Read> EventReader<R> {
 			_ => PlistEvent::Error(())
 		}
 	}
+}
 
-	pub fn next(&mut self) -> Option<PlistEvent> {
+impl<R: Read> Iterator for EventReader<R> {
+	type Item = PlistEvent;
+
+	fn next(&mut self) -> Option<PlistEvent> {
 		loop {
 			let first_event = self.xml_reader.next();
 			match first_event {
@@ -107,15 +111,8 @@ mod tests {
 		use reader::PlistEvent::*;
 
 		let reader = File::open(&Path::new("./tests/data/simple.plist")).unwrap();
-		let mut event_reader = EventReader::new(reader);
-		let mut events = Vec::new();
-		loop {
-			if let Some(event) = event_reader.next() {
-				events.push(event);
-			} else {
-				break;
-			}
-		}
+		let event_reader = EventReader::new(reader);
+		let events: Vec<PlistEvent> = event_reader.collect();
 
 		let comparison = &[
 			StartDictionary,
