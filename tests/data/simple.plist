@@ -11,5 +11,7 @@
     </array>
     <key>Birthdate</key>
     <integer>1564</integer>
+    <key>Height</key>
+    <real>1.60</real>
 </dict>
 </plist>
