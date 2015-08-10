@@ -1,10 +1,14 @@
+extern crate byteorder;
+extern crate encoding;
+extern crate itertools;
 extern crate rustc_serialize;
 extern crate xml as xml_rs;
 
+pub mod binary;
 pub mod xml;
 
 use std::collections::HashMap;
-use std::io::Read;
+use std::io::{Read, Seek};
 
 #[derive(Clone, Debug, PartialEq)]
 pub enum Plist {
@@ -25,7 +29,6 @@ pub enum PlistEvent {
 
 	StartDictionary,
 	EndDictionary,
-	DictionaryKey(String),
 
 	BooleanValue(bool),
 	DataValue(Vec<u8>),
@@ -37,23 +40,24 @@ pub enum PlistEvent {
 	Error(())
 }
 
-
-pub enum StreamingParser<R: Read> {
-	Xml(xml::StreamingParser<R>)
+pub enum StreamingParser<R: Read+Seek> {
+	Xml(xml::StreamingParser<R>),
+	Binary(binary::StreamingParser<R>)
 }
 
-impl<R:Read> StreamingParser<R> {
+impl<R: Read+Seek> StreamingParser<R> {
 	pub fn new() -> StreamingParser<R> {
 		panic!()
 	}
 }
 
-impl<R:Read> Iterator for StreamingParser<R> {
+impl<R: Read+Seek> Iterator for StreamingParser<R> {
 	type Item = PlistEvent;
 
 	fn next(&mut self) -> Option<PlistEvent> {
 		match *self {
-			StreamingParser::Xml(ref mut parser) => parser.next()
+			StreamingParser::Xml(ref mut parser) => parser.next(),
+			StreamingParser::Binary(ref mut parser) => parser.next()
 		}
 	}
 }
@@ -63,7 +67,7 @@ pub struct Parser<T> {
 	token: Option<PlistEvent>,
 }
 
-impl<R:Read> Parser<StreamingParser<R>> {
+impl<R: Read + Seek> Parser<StreamingParser<R>> {
 	pub fn new(reader: R) -> Parser<StreamingParser<R>> {
 		Parser::from_event_stream(StreamingParser::Xml(xml::StreamingParser::new(reader)))
 	}
@@ -106,7 +110,6 @@ impl<T:Iterator<Item=PlistEvent>> Parser<T> {
 
 			Some(PlistEvent::EndArray) => Err(()),
 			Some(PlistEvent::EndDictionary) => Err(()),
-			Some(PlistEvent::DictionaryKey(_)) => Err(()),
 			Some(PlistEvent::Error(_)) => Err(()),
 			None => Err(())
 		}
@@ -133,11 +136,12 @@ impl<T:Iterator<Item=PlistEvent>> Parser<T> {
 			self.bump();
 			match self.token.take() {
 				Some(PlistEvent::EndDictionary) => return Ok(values),
-				Some(PlistEvent::DictionaryKey(s)) => {
+				Some(PlistEvent::StringValue(s)) => {
 					self.bump();
 					values.insert(s, try!(self.build_value()));
 				},
 				_ => {
+					// Only string keys are supported in plists
 					return Err(())
 				}
 			}
@@ -159,16 +163,16 @@ mod tests {
 
 		let events = &[
 			StartDictionary,
-			DictionaryKey("Author".to_owned()),
+			StringValue("Author".to_owned()),
 			StringValue("William Shakespeare".to_owned()),
-			DictionaryKey("Lines".to_owned()),
+			StringValue("Lines".to_owned()),
 			StartArray,
 			StringValue("It is a tale told by an idiot,".to_owned()),
 			StringValue("Full of sound and fury, signifying nothing.".to_owned()),
 			EndArray,
-			DictionaryKey("Birthdate".to_owned()),
+			StringValue("Birthdate".to_owned()),
 			IntegerValue(1564),
-			DictionaryKey("Height".to_owned()),
+			StringValue("Height".to_owned()),
 			RealValue(1.60),
 			EndDictionary
 		];

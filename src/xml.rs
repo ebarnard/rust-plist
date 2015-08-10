@@ -49,7 +49,7 @@ impl<R: Read> Iterator for StreamingParser<R> {
 						"plist" => (),
 						"array" => return Some(PlistEvent::StartArray),
 						"dict" => return Some(PlistEvent::StartDictionary),
-						"key" => return Some(self.read_content(|s| PlistEvent::DictionaryKey(s))),
+						"key" => return Some(self.read_content(|s| PlistEvent::StringValue(s))),
 						"true" => return Some(PlistEvent::BooleanValue(true)),
 						"false" => return Some(PlistEvent::BooleanValue(false)),
 						"data" => return Some(self.read_content(|s| {
@@ -114,18 +114,18 @@ mod tests {
 
 		let comparison = &[
 			StartDictionary,
-			DictionaryKey("Author".to_owned()),
+			StringValue("Author".to_owned()),
 			StringValue("William Shakespeare".to_owned()),
-			DictionaryKey("Lines".to_owned()),
+			StringValue("Lines".to_owned()),
 			StartArray,
 			StringValue("It is a tale told by an idiot,".to_owned()),
 			StringValue("Full of sound and fury, signifying nothing.".to_owned()),
 			EndArray,
-			DictionaryKey("Birthdate".to_owned()),
+			StringValue("Birthdate".to_owned()),
 			IntegerValue(1564),
-			DictionaryKey("Height".to_owned()),
+			StringValue("Height".to_owned()),
 			RealValue(1.60),
-			DictionaryKey("Data".to_owned()),
+			StringValue("Data".to_owned()),
 			DataValue(vec![0, 0, 0, 190, 0, 0, 0, 3, 0, 0, 0, 30, 0, 0, 0]),
 			EndDictionary
 		];
