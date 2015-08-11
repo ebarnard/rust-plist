@@ -4,7 +4,7 @@ use std::str::FromStr;
 use xml_rs::reader::{EventReader, ParserConfig};
 use xml_rs::reader::events::XmlEvent;
 
-use super::PlistEvent;
+use super::{ParserError, PlistEvent};
 
 pub struct StreamingParser<R: Read> {
 	xml_reader: EventReader<R>,
@@ -30,7 +30,7 @@ impl<R: Read> StreamingParser<R> {
 	fn read_content<F>(&mut self, f: F) -> PlistEvent where F:FnOnce(String) -> PlistEvent {
 		match self.xml_reader.next() {
 			XmlEvent::Characters(s) => f(s),
-			_ => PlistEvent::Error(())
+			_ => PlistEvent::Error(ParserError::InvalidData)
 		}
 	}
 }
@@ -55,32 +55,32 @@ impl<R: Read> Iterator for StreamingParser<R> {
 						"data" => return Some(self.read_content(|s| {
 							match FromBase64::from_base64(&s[..]) {
 								Ok(b) => PlistEvent::DataValue(b),
-								Err(_) => PlistEvent::Error(())
+								Err(_) => PlistEvent::Error(ParserError::InvalidData)
 							}
 						})),
 						"date" => return Some(self.read_content(|s| PlistEvent::DateValue(s))),
 						"integer" => return Some(self.read_content(|s| {
 							match FromStr::from_str(&s)	{
 								Ok(i) => PlistEvent::IntegerValue(i),
-								Err(_) => PlistEvent::Error(())
+								Err(_) => PlistEvent::Error(ParserError::InvalidData)
 							}
 						})),
 						"real" => return Some(self.read_content(|s| {
 							match FromStr::from_str(&s)	{
 								Ok(f) => PlistEvent::RealValue(f),
-								Err(_) => PlistEvent::Error(())
+								Err(_) => PlistEvent::Error(ParserError::InvalidData)
 							}
 						})),
 						"string" => return Some(self.read_content(|s| PlistEvent::StringValue(s))),
-						_ => return Some(PlistEvent::Error(()))
+						_ => return Some(PlistEvent::Error(ParserError::InvalidData))
 					}
 				},
 				XmlEvent::EndElement { name, .. } => {
 					// Check the corrent element is being closed
 					match self.element_stack.pop() {
 						Some(ref open_name) if &name.local_name == open_name => (),
-						Some(ref open_name) => return Some(PlistEvent::Error(())),
-						None => return Some(PlistEvent::Error(()))
+						Some(ref open_name) => return Some(PlistEvent::Error(ParserError::InvalidData)),
+						None => return Some(PlistEvent::Error(ParserError::InvalidData))
 					}
 
 					match &name.local_name[..] {
@@ -89,7 +89,12 @@ impl<R: Read> Iterator for StreamingParser<R> {
 						_ => ()
 					}
 				},
-				XmlEvent::EndDocument => return None,
+				XmlEvent::EndDocument => {
+					match self.element_stack.is_empty() {
+						true => return None,
+						false => return Some(PlistEvent::Error(ParserError::UnexpectedEof))
+					}
+				}
 				_ => ()
 			}
 		}
