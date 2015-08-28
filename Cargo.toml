@@ -8,7 +8,7 @@ repository = "https://github.com/ebarnard/rust-plist"
 documentation = "https://ebarnard.github.io/rust-plist/doc/plist/"
 
 [dependencies]
-rustc-serialize = "0.3.15"
-xml-rs = "0.1.25"
+rustc-serialize = "0.3.16"
+xml-rs = "0.1.26"
 byteorder = "0.3.11"
-itertools = "0.3.23"
+itertools = "0.3.25"
