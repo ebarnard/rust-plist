@@ -26,10 +26,10 @@ pub enum Plist {
 
 #[derive(Debug, PartialEq)]
 pub enum PlistEvent {
-	StartArray,
+	StartArray(Option<u64>),
 	EndArray,
 
-	StartDictionary,
+	StartDictionary(Option<u64>),
 	EndDictionary,
 
 	BooleanValue(bool),
@@ -169,8 +169,8 @@ impl<T:Iterator<Item=PlistEvent>> Builder<T> {
 
 	fn build_value(&mut self) -> BuilderResult<Plist> {
 		match self.token.take() {
-			Some(PlistEvent::StartArray) => Ok(Plist::Array(try!(self.build_array()))),
-			Some(PlistEvent::StartDictionary) => Ok(Plist::Dictionary(try!(self.build_dict()))),
+			Some(PlistEvent::StartArray(len)) => Ok(Plist::Array(try!(self.build_array(len)))),
+			Some(PlistEvent::StartDictionary(len)) => Ok(Plist::Dictionary(try!(self.build_dict(len)))),
 
 			Some(PlistEvent::BooleanValue(b)) => Ok(Plist::Boolean(b)),
 			Some(PlistEvent::DataValue(d)) => Ok(Plist::Data(d)),
@@ -187,8 +187,11 @@ impl<T:Iterator<Item=PlistEvent>> Builder<T> {
 		}
 	}
 
-	fn build_array(&mut self) -> Result<Vec<Plist>, BuilderError> {	
-		let mut values = Vec::new();
+	fn build_array(&mut self, len: Option<u64>) -> Result<Vec<Plist>, BuilderError> {	
+		let mut values = match len {
+			Some(len) => Vec::with_capacity(len as usize),
+			None => Vec::new()
+		};
 
 		loop {
 			self.bump();
@@ -200,8 +203,11 @@ impl<T:Iterator<Item=PlistEvent>> Builder<T> {
 		}
 	}
 
-	fn build_dict(&mut self) -> Result<HashMap<String, Plist>, BuilderError> {
-		let mut values = HashMap::new();
+	fn build_dict(&mut self, len: Option<u64>) -> Result<HashMap<String, Plist>, BuilderError> {
+		let mut values = match len {
+			Some(len) => HashMap::with_capacity(len as usize),
+			None => HashMap::new()
+		};
 
 		loop {
 			
@@ -234,11 +240,11 @@ mod tests {
 		// Input
 
 		let events = vec![
-			StartDictionary,
+			StartDictionary(None),
 			StringValue("Author".to_owned()),
 			StringValue("William Shakespeare".to_owned()),
 			StringValue("Lines".to_owned()),
-			StartArray,
+			StartArray(None),
 			StringValue("It is a tale told by an idiot,".to_owned()),
 			StringValue("Full of sound and fury, signifying nothing.".to_owned()),
 			EndArray,

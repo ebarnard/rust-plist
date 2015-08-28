@@ -47,8 +47,8 @@ impl<R: Read> Iterator for StreamingParser<R> {
 					
 					match &name.local_name[..] {
 						"plist" => (),
-						"array" => return Some(PlistEvent::StartArray),
-						"dict" => return Some(PlistEvent::StartDictionary),
+						"array" => return Some(PlistEvent::StartArray(None)),
+						"dict" => return Some(PlistEvent::StartDictionary(None)),
 						"key" => return Some(self.read_content(|s| PlistEvent::StringValue(s))),
 						"true" => return Some(PlistEvent::BooleanValue(true)),
 						"false" => return Some(PlistEvent::BooleanValue(false)),
@@ -118,11 +118,11 @@ mod tests {
 		let events: Vec<PlistEvent> = streaming_parser.collect();
 
 		let comparison = &[
-			StartDictionary,
+			StartDictionary(None),
 			StringValue("Author".to_owned()),
 			StringValue("William Shakespeare".to_owned()),
 			StringValue("Lines".to_owned()),
-			StartArray,
+			StartArray(None),
 			StringValue("It is a tale told by an idiot,".to_owned()),
 			StringValue("Full of sound and fury, signifying nothing.".to_owned()),
 			EndArray,

@@ -198,7 +198,7 @@ impl<R: Read+Seek> StreamingParser<R> {
 					object_refs: object_refs
 				});
 
-				Some(PlistEvent::StartArray)
+				Some(PlistEvent::StartArray(Some(len)))
 			},
 			(0xd, n) => { // Dict
 				let len = try!(self.read_object_len(n));
@@ -214,7 +214,7 @@ impl<R: Read+Seek> StreamingParser<R> {
 					object_refs: object_refs
 				});
 
-				Some(PlistEvent::StartDictionary)
+				Some(PlistEvent::StartDictionary(Some(len)))
 			},
 			(_, _) => return Err(ParserError::InvalidData)
 		};
@@ -251,9 +251,9 @@ mod tests {
 		let events: Vec<PlistEvent> = streaming_parser.collect();
 
 		let comparison = &[
-			StartDictionary,
+			StartDictionary(Some(5)),
 			StringValue("Lines".to_owned()),
-			StartArray,
+			StartArray(Some(2)),
 			StringValue("It is a tale told by an idiot,".to_owned()),
 			StringValue("Full of sound and fury, signifying nothing.".to_owned()),
 			EndArray,
