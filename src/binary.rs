@@ -1,8 +1,6 @@
 use byteorder::{BigEndian, ReadBytesExt};
-use encoding::all::UTF_16BE;
-use encoding::types::{DecoderTrap, Encoding};
 use itertools::Interleave;
-use std::io::{Read, Seek, SeekFrom};
+use std::io::{Cursor, Read, Seek, SeekFrom};
 
 use super::{ParserError, ParserResult, PlistEvent};
 
@@ -179,7 +177,14 @@ impl<R: Read+Seek> StreamingParser<R> {
 			(0x6, n) => { // UTF-16 string
 				let len = try!(self.read_object_len(n));
 				let raw = try!(self.read_data(len));
-				let string = UTF_16BE.decode(&raw, DecoderTrap::Strict).unwrap();
+				let mut cursor = Cursor::new(raw);
+
+				let mut raw_utf16 = Vec::with_capacity(len as usize / 2);
+				while cursor.position() < len {
+					raw_utf16.push(try!(cursor.read_u16::<BigEndian>()))
+				}
+
+				let string = try!(String::from_utf16(&raw_utf16));
 				Some(PlistEvent::StringValue(string))
 			},
 			(0xa, n) => { // Array

@@ -1,5 +1,4 @@
 extern crate byteorder;
-extern crate encoding;
 extern crate itertools;
 extern crate rustc_serialize;
 extern crate xml as xml_rs;
@@ -11,6 +10,7 @@ use byteorder::Error as ByteorderError;
 use std::collections::HashMap;
 use std::io::{Read, Seek, SeekFrom};
 use std::io::Error as IoError;
+use std::string::FromUtf16Error;
 
 #[derive(Clone, Debug, PartialEq)]
 pub enum Plist {
@@ -71,6 +71,12 @@ impl From<ByteorderError> for ParserError {
 			ByteorderError::UnexpectedEOF => ParserError::UnexpectedEof,
 			ByteorderError::Io(err) => ParserError::Io(err)
 		}
+	}
+}
+
+impl From<FromUtf16Error> for ParserError {
+	fn from(_: FromUtf16Error) -> ParserError {
+		ParserError::InvalidData
 	}
 }
 
