@@ -1,8 +1,25 @@
 use byteorder::{BigEndian, ReadBytesExt};
+use byteorder::Error as ByteorderError;
 use itertools::Interleave;
 use std::io::{Cursor, Read, Seek, SeekFrom};
+use std::string::FromUtf16Error;
 
-use super::{ParserError, ParserResult, PlistEvent};
+use {ParserError, ParserResult, PlistEvent};
+
+impl From<ByteorderError> for ParserError {
+	fn from(err: ByteorderError) -> ParserError {
+		match err {
+			ByteorderError::UnexpectedEOF => ParserError::UnexpectedEof,
+			ByteorderError::Io(err) => ParserError::Io(err)
+		}
+	}
+}
+
+impl From<FromUtf16Error> for ParserError {
+	fn from(_: FromUtf16Error) -> ParserError {
+		ParserError::InvalidData
+	}
+}
 
 struct StackItem {
 	object_refs: Vec<u64>,
@@ -242,11 +259,11 @@ mod tests {
 	use std::path::Path;
 
 	use super::*;
-	use super::super::PlistEvent;
+	use PlistEvent;
 
 	#[test]
 	fn streaming_parser() {
-		use super::super::PlistEvent::*;
+		use PlistEvent::*;
 
 		let reader = File::open(&Path::new("./tests/data/binary.plist")).unwrap();
 		let streaming_parser = StreamingParser::new(reader);
