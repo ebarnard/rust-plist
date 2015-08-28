@@ -7,7 +7,7 @@ use xml_rs::reader::events::XmlEvent;
 use xml_rs::writer::{EventWriter, EmitterConfig};
 use xml_rs::writer::events::XmlEvent as WriteXmlEvent;
 
-use super::{ParserError, PlistEvent};
+use super::{ParserError, ParserResult, PlistEvent};
 
 pub struct Writer<W: Write> {
 	xml_writer: EventWriter<W>,
@@ -98,8 +98,6 @@ impl<W: Write> Writer<W> {
 			PlistEvent::IntegerValue(value) => try!(self.write_element_and_value("integer", &value.to_string())),
 			PlistEvent::RealValue(value) => try!(self.write_element_and_value("real", &value.to_string())),
 			PlistEvent::StringValue(value) => try!(self.write_element_and_value("string", &value)),
-
-			PlistEvent::Error(_) => return Err(())
 		})
 	}
 }
@@ -126,18 +124,18 @@ impl<R: Read> StreamingParser<R> {
 		}
 	}
 
-	fn read_content<F>(&mut self, f: F) -> PlistEvent where F:FnOnce(String) -> PlistEvent {
+	fn read_content<F>(&mut self, f: F) -> ParserResult<PlistEvent> where F:FnOnce(String) -> ParserResult<PlistEvent> {
 		match self.xml_reader.next() {
 			XmlEvent::Characters(s) => f(s),
-			_ => PlistEvent::Error(ParserError::InvalidData)
+			_ => Err(ParserError::InvalidData)
 		}
 	}
 }
 
 impl<R: Read> Iterator for StreamingParser<R> {
-	type Item = PlistEvent;
+	type Item = ParserResult<PlistEvent>;
 
-	fn next(&mut self) -> Option<PlistEvent> {
+	fn next(&mut self) -> Option<ParserResult<PlistEvent>> {
 		loop {
 			match self.xml_reader.next() {
 				XmlEvent::StartElement { name, .. } => {
@@ -145,54 +143,54 @@ impl<R: Read> Iterator for StreamingParser<R> {
 					self.element_stack.push(name.local_name.clone());
 					
 					match &name.local_name[..] {
-						"plist" => return Some(PlistEvent::StartPlist),
-						"array" => return Some(PlistEvent::StartArray(None)),
-						"dict" => return Some(PlistEvent::StartDictionary(None)),
-						"key" => return Some(self.read_content(|s| PlistEvent::StringValue(s))),
-						"true" => return Some(PlistEvent::BooleanValue(true)),
-						"false" => return Some(PlistEvent::BooleanValue(false)),
+						"plist" => return Some(Ok(PlistEvent::StartPlist)),
+						"array" => return Some(Ok(PlistEvent::StartArray(None))),
+						"dict" => return Some(Ok(PlistEvent::StartDictionary(None))),
+						"key" => return Some(self.read_content(|s| Ok(PlistEvent::StringValue(s)))),
+						"true" => return Some(Ok(PlistEvent::BooleanValue(true))),
+						"false" => return Some(Ok(PlistEvent::BooleanValue(false))),
 						"data" => return Some(self.read_content(|s| {
 							match FromBase64::from_base64(&s[..]) {
-								Ok(b) => PlistEvent::DataValue(b),
-								Err(_) => PlistEvent::Error(ParserError::InvalidData)
+								Ok(b) => Ok(PlistEvent::DataValue(b)),
+								Err(_) => Err(ParserError::InvalidData)
 							}
 						})),
-						"date" => return Some(self.read_content(|s| PlistEvent::DateValue(s))),
+						"date" => return Some(self.read_content(|s| Ok(PlistEvent::DateValue(s)))),
 						"integer" => return Some(self.read_content(|s| {
 							match FromStr::from_str(&s)	{
-								Ok(i) => PlistEvent::IntegerValue(i),
-								Err(_) => PlistEvent::Error(ParserError::InvalidData)
+								Ok(i) => Ok(PlistEvent::IntegerValue(i)),
+								Err(_) => Err(ParserError::InvalidData)
 							}
 						})),
 						"real" => return Some(self.read_content(|s| {
 							match FromStr::from_str(&s)	{
-								Ok(f) => PlistEvent::RealValue(f),
-								Err(_) => PlistEvent::Error(ParserError::InvalidData)
+								Ok(f) => Ok(PlistEvent::RealValue(f)),
+								Err(_) => Err(ParserError::InvalidData)
 							}
 						})),
-						"string" => return Some(self.read_content(|s| PlistEvent::StringValue(s))),
-						_ => return Some(PlistEvent::Error(ParserError::InvalidData))
+						"string" => return Some(self.read_content(|s| Ok(PlistEvent::StringValue(s)))),
+						_ => return Some(Err(ParserError::InvalidData))
 					}
 				},
 				XmlEvent::EndElement { name, .. } => {
 					// Check the corrent element is being closed
 					match self.element_stack.pop() {
 						Some(ref open_name) if &name.local_name == open_name => (),
-						Some(ref open_name) => return Some(PlistEvent::Error(ParserError::InvalidData)),
-						None => return Some(PlistEvent::Error(ParserError::InvalidData))
+						Some(ref open_name) => return Some(Err(ParserError::InvalidData)),
+						None => return Some(Err(ParserError::InvalidData))
 					}
 
 					match &name.local_name[..] {
-						"array" => return Some(PlistEvent::EndArray),
-						"dict" => return Some(PlistEvent::EndDictionary),
-						"plist" => return Some(PlistEvent::EndPlist),
+						"array" => return Some(Ok(PlistEvent::EndArray)),
+						"dict" => return Some(Ok(PlistEvent::EndDictionary)),
+						"plist" => return Some(Ok(PlistEvent::EndPlist)),
 						_ => ()
 					}
 				},
 				XmlEvent::EndDocument => {
 					match self.element_stack.is_empty() {
 						true => return None,
-						false => return Some(PlistEvent::Error(ParserError::UnexpectedEof))
+						false => return Some(Err(ParserError::UnexpectedEof))
 					}
 				}
 				_ => ()
@@ -215,7 +213,7 @@ mod tests {
 
 		let reader = File::open(&Path::new("./tests/data/xml.plist")).unwrap();
 		let streaming_parser = StreamingParser::new(reader);
-		let events: Vec<PlistEvent> = streaming_parser.collect();
+		let events: Vec<PlistEvent> = streaming_parser.map(|e| e.unwrap()).collect();
 
 		let comparison = &[
 			StartPlist,

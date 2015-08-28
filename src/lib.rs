@@ -41,11 +41,9 @@ pub enum PlistEvent {
 	IntegerValue(i64),
 	RealValue(f64),
 	StringValue(String),
-
-	Error(ParserError)
 }
 
-type ParserResult<T> = Result<T, ParserError>;
+pub type ParserResult<T> = Result<T, ParserError>;
 
 #[derive(Debug)]
 pub enum ParserError {
@@ -53,13 +51,6 @@ pub enum ParserError {
 	UnexpectedEof,
 	UnsupportedType,
 	Io(IoError)
-}
-
-// No two errors are the same - this is a bit annoying though
-impl PartialEq for ParserError {
-	fn eq(&self, other: &ParserError) -> bool {
-		false
-	}
 }
 
 impl From<IoError> for ParserError {
@@ -110,9 +101,9 @@ impl<R: Read+Seek> StreamingParser<R> {
 }
 
 impl<R: Read+Seek> Iterator for StreamingParser<R> {
-	type Item = PlistEvent;
+	type Item = ParserResult<PlistEvent>;
 
-	fn next(&mut self) -> Option<PlistEvent> {
+	fn next(&mut self) -> Option<ParserResult<PlistEvent>> {
 		match *self {
 			StreamingParser::Xml(ref mut parser) => parser.next(),
 			StreamingParser::Binary(ref mut parser) => parser.next()
@@ -122,7 +113,7 @@ impl<R: Read+Seek> Iterator for StreamingParser<R> {
 
 pub type BuilderResult<T> = Result<T, BuilderError>;
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug)]
 pub enum BuilderError {
 	InvalidEvent,
 	UnsupportedDictionaryKey,
@@ -146,7 +137,7 @@ impl<R: Read + Seek> Builder<StreamingParser<R>> {
 	}
 }
 
-impl<T:Iterator<Item=PlistEvent>> Builder<T> {
+impl<T:Iterator<Item=ParserResult<PlistEvent>>> Builder<T> {
 	pub fn from_event_stream(stream: T) -> Builder<T> {
 		Builder {
 			stream: stream,
@@ -155,24 +146,29 @@ impl<T:Iterator<Item=PlistEvent>> Builder<T> {
 	}
 
 	pub fn build(mut self) -> BuilderResult<Plist> {
-		self.bump();
+		try!(self.bump());
 		if let Some(PlistEvent::StartPlist) = self.token {
-			self.bump();
+			try!(self.bump());
 		}
 
 		let plist = try!(self.build_value());
-		self.bump();
+		try!(self.bump());
 		match self.token {
 			None => (),
-			Some(PlistEvent::EndPlist) => self.bump(),
+			Some(PlistEvent::EndPlist) => try!(self.bump()),
 			// The stream should have finished
 			_ => return Err(BuilderError::InvalidEvent)
 		};
 		Ok(plist)
 	}
 
-	fn bump(&mut self) {
-		self.token = self.stream.next();
+	fn bump(&mut self) -> BuilderResult<()> {
+		self.token = match self.stream.next() {
+			Some(Ok(token)) => Some(token),
+			Some(Err(err)) => return Err(BuilderError::ParserError(err)),
+			None => None,
+		};
+		Ok(())
 	}
 
 	fn build_value(&mut self) -> BuilderResult<Plist> {
@@ -192,7 +188,7 @@ impl<T:Iterator<Item=PlistEvent>> Builder<T> {
 
 			Some(PlistEvent::EndArray) => Err(BuilderError::InvalidEvent),
 			Some(PlistEvent::EndDictionary) => Err(BuilderError::InvalidEvent),
-			Some(PlistEvent::Error(_)) => Err(BuilderError::InvalidEvent),
+
 			// The stream should not have ended here
 			None => Err(BuilderError::InvalidEvent)
 		}
@@ -205,7 +201,7 @@ impl<T:Iterator<Item=PlistEvent>> Builder<T> {
 		};
 
 		loop {
-			self.bump();
+			try!(self.bump());
 			if let Some(PlistEvent::EndArray) = self.token {
 				self.token.take();
 				return Ok(values);
@@ -221,12 +217,11 @@ impl<T:Iterator<Item=PlistEvent>> Builder<T> {
 		};
 
 		loop {
-			
-			self.bump();
+			try!(self.bump());
 			match self.token.take() {
 				Some(PlistEvent::EndDictionary) => return Ok(values),
 				Some(PlistEvent::StringValue(s)) => {
-					self.bump();
+					try!(self.bump());
 					values.insert(s, try!(self.build_value()));
 				},
 				_ => {
@@ -268,7 +263,7 @@ mod tests {
 			EndPlist,
 		];
 
-		let builder = Builder::from_event_stream(events.into_iter());
+		let builder = Builder::from_event_stream(events.into_iter().map(|e| Ok(e)));
 		let plist = builder.build();
 
 		// Expected output
@@ -283,6 +278,6 @@ mod tests {
 		dict.insert("Birthdate".to_owned(), Plist::Integer(1564));
 		dict.insert("Height".to_owned(), Plist::Real(1.60));
 
-		assert_eq!(plist, Ok(Plist::Dictionary(dict)));
+		assert_eq!(plist.unwrap(), Plist::Dictionary(dict));
 	}
 }

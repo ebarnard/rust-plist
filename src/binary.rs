@@ -225,12 +225,13 @@ impl<R: Read+Seek> StreamingParser<R> {
 }
 
 impl<R: Read+Seek> Iterator for StreamingParser<R> {
-	type Item = PlistEvent;
+	type Item = ParserResult<PlistEvent>;
 
-	fn next(&mut self) -> Option<PlistEvent> {
+	fn next(&mut self) -> Option<ParserResult<PlistEvent>> {
 		match self.read_next() {
-			Ok(result) => result,
-			Err(err) => Some(PlistEvent::Error(err))
+			Ok(Some(result)) => Some(Ok(result)),
+			Err(err) => Some(Err(err)),
+			Ok(None) => None
 		}
 	}
 }
@@ -249,7 +250,7 @@ mod tests {
 
 		let reader = File::open(&Path::new("./tests/data/binary.plist")).unwrap();
 		let streaming_parser = StreamingParser::new(reader);
-		let events: Vec<PlistEvent> = streaming_parser.collect();
+		let events: Vec<PlistEvent> = streaming_parser.map(|e| e.unwrap()).collect();
 
 		let comparison = &[
 			StartPlist,
