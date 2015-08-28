@@ -119,9 +119,10 @@ impl<R: Read+Seek> StreamingParser<R> {
 	}
 
 	fn read_next(&mut self) -> ParserResult<Option<PlistEvent>> {
-		// Initialise here rather than in new
 		if self.ref_size == 0 {
+			// Initialise here rather than in new
 			try!(self.read_trailer());
+			return Ok(Some(PlistEvent::StartPlist))
 		}
 
 		let object_ref = match self.stack.last_mut() {
@@ -140,7 +141,7 @@ impl<R: Read+Seek> StreamingParser<R> {
 				match item.ty {
 					StackType::Array => return Ok(Some(PlistEvent::EndArray)),
 					StackType::Dict => return Ok(Some(PlistEvent::EndDictionary)),
-					StackType::Root => return Ok(None) // Reached the end of the plist
+					StackType::Root => return Ok(Some(PlistEvent::EndPlist))
 				}
 			}
 		}
@@ -251,6 +252,7 @@ mod tests {
 		let events: Vec<PlistEvent> = streaming_parser.collect();
 
 		let comparison = &[
+			StartPlist,
 			StartDictionary(Some(5)),
 			StringValue("Lines".to_owned()),
 			StartArray(Some(2)),
@@ -265,7 +267,8 @@ mod tests {
 			StringValue("William Shakespeare".to_owned()),
 			StringValue("Data".to_owned()),
 			DataValue(vec![0, 0, 0, 190, 0, 0, 0, 3, 0, 0, 0, 30, 0, 0, 0]),
-			EndDictionary
+			EndDictionary,
+			EndPlist
 		];
 
 		assert_eq!(events, comparison);

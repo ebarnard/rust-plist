@@ -46,7 +46,7 @@ impl<R: Read> Iterator for StreamingParser<R> {
 					self.element_stack.push(name.local_name.clone());
 					
 					match &name.local_name[..] {
-						"plist" => (),
+						"plist" => return Some(PlistEvent::StartPlist),
 						"array" => return Some(PlistEvent::StartArray(None)),
 						"dict" => return Some(PlistEvent::StartDictionary(None)),
 						"key" => return Some(self.read_content(|s| PlistEvent::StringValue(s))),
@@ -86,6 +86,7 @@ impl<R: Read> Iterator for StreamingParser<R> {
 					match &name.local_name[..] {
 						"array" => return Some(PlistEvent::EndArray),
 						"dict" => return Some(PlistEvent::EndDictionary),
+						"plist" => return Some(PlistEvent::EndPlist),
 						_ => ()
 					}
 				},
@@ -118,6 +119,7 @@ mod tests {
 		let events: Vec<PlistEvent> = streaming_parser.collect();
 
 		let comparison = &[
+			StartPlist,
 			StartDictionary(None),
 			StringValue("Author".to_owned()),
 			StringValue("William Shakespeare".to_owned()),
@@ -132,7 +134,8 @@ mod tests {
 			RealValue(1.60),
 			StringValue("Data".to_owned()),
 			DataValue(vec![0, 0, 0, 190, 0, 0, 0, 3, 0, 0, 0, 30, 0, 0, 0]),
-			EndDictionary
+			EndDictionary,
+			EndPlist
 		];
 
 		assert_eq!(events, comparison);

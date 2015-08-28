@@ -26,6 +26,9 @@ pub enum Plist {
 
 #[derive(Debug, PartialEq)]
 pub enum PlistEvent {
+	StartPlist,
+	EndPlist,
+
 	StartArray(Option<u64>),
 	EndArray,
 
@@ -153,10 +156,15 @@ impl<T:Iterator<Item=PlistEvent>> Builder<T> {
 
 	pub fn build(mut self) -> BuilderResult<Plist> {
 		self.bump();
+		if let Some(PlistEvent::StartPlist) = self.token {
+			self.bump();
+		}
+
 		let plist = try!(self.build_value());
 		self.bump();
 		match self.token {
 			None => (),
+			Some(PlistEvent::EndPlist) => self.bump(),
 			// The stream should have finished
 			_ => return Err(BuilderError::InvalidEvent)
 		};
@@ -169,6 +177,9 @@ impl<T:Iterator<Item=PlistEvent>> Builder<T> {
 
 	fn build_value(&mut self) -> BuilderResult<Plist> {
 		match self.token.take() {
+			Some(PlistEvent::StartPlist) => Err(BuilderError::InvalidEvent),
+			Some(PlistEvent::EndPlist) => Err(BuilderError::InvalidEvent),
+
 			Some(PlistEvent::StartArray(len)) => Ok(Plist::Array(try!(self.build_array(len)))),
 			Some(PlistEvent::StartDictionary(len)) => Ok(Plist::Dictionary(try!(self.build_dict(len)))),
 
@@ -240,6 +251,7 @@ mod tests {
 		// Input
 
 		let events = vec![
+			StartPlist,
 			StartDictionary(None),
 			StringValue("Author".to_owned()),
 			StringValue("William Shakespeare".to_owned()),
@@ -252,7 +264,8 @@ mod tests {
 			IntegerValue(1564),
 			StringValue("Height".to_owned()),
 			RealValue(1.60),
-			EndDictionary
+			EndDictionary,
+			EndPlist,
 		];
 
 		let builder = Builder::from_event_stream(events.into_iter());
