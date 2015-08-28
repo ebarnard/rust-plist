@@ -1,3 +1,4 @@
+use chrono::{DateTime, UTC};
 use rustc_serialize::base64::FromBase64;
 use std::io::Read;
 use std::str::FromStr;
@@ -58,7 +59,10 @@ impl<R: Read> Iterator for StreamingParser<R> {
 								Err(_) => Err(ParserError::InvalidData)
 							}
 						})),
-						"date" => return Some(self.read_content(|s| Ok(PlistEvent::DateValue(s)))),
+						"date" => return Some(self.read_content(|s| {
+							let date = try!(DateTime::parse_from_rfc3339(&s));
+							Ok(PlistEvent::DateValue(date.with_timezone(&UTC)))
+						})),
 						"integer" => return Some(self.read_content(|s| {
 							match FromStr::from_str(&s)	{
 								Ok(i) => Ok(PlistEvent::IntegerValue(i)),
@@ -104,6 +108,7 @@ impl<R: Read> Iterator for StreamingParser<R> {
 
 #[cfg(test)]
 mod tests {
+	use chrono::{TimeZone, UTC};
 	use std::fs::File;
 	use std::path::Path;
 
@@ -128,12 +133,14 @@ mod tests {
 			StringValue("It is a tale told by an idiot,".to_owned()),
 			StringValue("Full of sound and fury, signifying nothing.".to_owned()),
 			EndArray,
-			StringValue("Birthdate".to_owned()),
+			StringValue("Death".to_owned()),
 			IntegerValue(1564),
 			StringValue("Height".to_owned()),
 			RealValue(1.60),
 			StringValue("Data".to_owned()),
 			DataValue(vec![0, 0, 0, 190, 0, 0, 0, 3, 0, 0, 0, 30, 0, 0, 0]),
+			StringValue("Birthdate".to_owned()),
+			DateValue(UTC.ymd(1981, 05, 16).and_hms(11, 32, 06)),
 			EndDictionary,
 			EndPlist
 		];

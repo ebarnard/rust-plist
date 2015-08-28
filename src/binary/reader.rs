@@ -1,5 +1,6 @@
 use byteorder::{BigEndian, ReadBytesExt};
 use byteorder::Error as ByteorderError;
+use chrono::{TimeZone, UTC};
 use itertools::Interleave;
 use std::io::{Cursor, Read, Seek, SeekFrom};
 use std::string::FromUtf16Error;
@@ -181,7 +182,18 @@ impl<R: Read+Seek> StreamingParser<R> {
 			(0x2, 2) => Some(PlistEvent::RealValue(try!(self.reader.read_f32::<BigEndian>()) as f64)),
 			(0x2, 3) => Some(PlistEvent::RealValue(try!(self.reader.read_f64::<BigEndian>()))),
 			(0x2, _) => return Err(ParserError::UnsupportedType), // odd length float
-			(0x3, 3) => return Err(ParserError::UnsupportedType), // date
+			(0x3, 3) => { // Date
+				// Seconds since 1/1/2001 00:00:00
+				let timestamp = try!(self.reader.read_f64::<BigEndian>());
+
+				let secs = timestamp.floor();
+				let subsecs = timestamp - secs;
+
+				let int_secs = (secs as i64) + (31 * 365 + 8) * 86400;
+				let int_nanos = (subsecs * 1_000_000_000f64) as u32;
+
+				Some(PlistEvent::DateValue(UTC.timestamp(int_secs, int_nanos)))
+			}
 			(0x4, n) => { // Data
 				let len = try!(self.read_object_len(n));
 				Some(PlistEvent::DataValue(try!(self.read_data(len))))
@@ -255,6 +267,7 @@ impl<R: Read+Seek> Iterator for StreamingParser<R> {
 
 #[cfg(test)]
 mod tests {
+	use chrono::{TimeZone, UTC};
 	use std::fs::File;
 	use std::path::Path;
 
@@ -271,16 +284,18 @@ mod tests {
 
 		let comparison = &[
 			StartPlist,
-			StartDictionary(Some(5)),
+			StartDictionary(Some(6)),
 			StringValue("Lines".to_owned()),
 			StartArray(Some(2)),
 			StringValue("It is a tale told by an idiot,".to_owned()),
 			StringValue("Full of sound and fury, signifying nothing.".to_owned()),
 			EndArray,
+			StringValue("Death".to_owned()),
+			IntegerValue(1564),
 			StringValue("Height".to_owned()),
 			RealValue(1.60),
 			StringValue("Birthdate".to_owned()),
-			IntegerValue(1564),
+			DateValue(UTC.ymd(1981, 05, 16).and_hms(11, 32, 06)),
 			StringValue("Author".to_owned()),
 			StringValue("William Shakespeare".to_owned()),
 			StringValue("Data".to_owned()),

@@ -1,4 +1,5 @@
 extern crate byteorder;
+extern crate chrono;
 extern crate itertools;
 extern crate rustc_serialize;
 extern crate xml as xml_rs;
@@ -9,6 +10,8 @@ mod builder;
 
 pub use builder::{Builder, BuilderError, BuilderResult};
 
+use chrono::{DateTime, UTC};
+use chrono::format::ParseError as ChronoParseError;
 use std::collections::HashMap;
 use std::io::{Read, Seek, SeekFrom};
 use std::io::Error as IoError;
@@ -19,7 +22,7 @@ pub enum Plist {
 	Dictionary(HashMap<String, Plist>),
 	Boolean(bool),
 	Data(Vec<u8>),
-	Date(String),
+	Date(DateTime<UTC>),
 	Real(f64),
 	Integer(i64),
 	String(String)
@@ -38,7 +41,7 @@ pub enum PlistEvent {
 
 	BooleanValue(bool),
 	DataValue(Vec<u8>),
-	DateValue(String),
+	DateValue(DateTime<UTC>),
 	IntegerValue(i64),
 	RealValue(f64),
 	StringValue(String),
@@ -57,6 +60,12 @@ pub enum ParserError {
 impl From<IoError> for ParserError {
 	fn from(io_error: IoError) -> ParserError {
 		ParserError::Io(io_error)
+	}
+}
+
+impl From<ChronoParseError> for ParserError {
+	fn from(_: ChronoParseError) -> ParserError {
+		ParserError::InvalidData
 	}
 }
 
