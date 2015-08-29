@@ -28,7 +28,7 @@ pub enum Plist {
 	String(String)
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum PlistEvent {
 	StartPlist,
 	EndPlist,
