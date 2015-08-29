@@ -23,7 +23,7 @@ pub struct Builder<T> {
 	token: Option<PlistEvent>,
 }
 
-impl<R: Read + Seek> Builder<StreamingParser<R>> {
+impl<R: Read+Seek> Builder<StreamingParser<R>> {
 	pub fn new(reader: R) -> Builder<StreamingParser<R>> {
 		Builder::from_event_stream(StreamingParser::new(reader))
 	}
@@ -102,7 +102,7 @@ impl<T:Iterator<Item=ParserResult<PlistEvent>>> Builder<T> {
 		}
 	}
 
-	fn build_dict(&mut self, len: Option<u64>) -> Result<BTreeMap<String, Plist>, BuilderError> {
+	fn build_dict(&mut self, _len: Option<u64>) -> Result<BTreeMap<String, Plist>, BuilderError> {
 		let mut values = BTreeMap::new();
 
 		loop {
