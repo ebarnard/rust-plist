@@ -27,6 +27,25 @@ pub enum Plist {
 	Integer(i64),
 	String(String)
 }
+		
+use rustc_serialize::base64::{STANDARD, ToBase64};
+use rustc_serialize::json::Json;
+
+impl Plist {
+	pub fn into_json(self) -> Json {
+		match self {
+			// TODO: Change to map_in_place once stable
+			Plist::Array(value) => Json::Array(value.into_iter().map(|p| p.into_json()).collect()),
+			Plist::Dictionary(value) => Json::Object(value.into_iter().map(|(k, v)| (k, v.into_json())).collect()),
+			Plist::Boolean(value) => Json::Boolean(value),
+			Plist::Data(value) => Json::String(value.to_base64(STANDARD)),
+			Plist::Date(value) => Json::String(value.to_rfc3339()),
+			Plist::Real(value) => Json::F64(value),
+			Plist::Integer(value) => Json::I64(value),
+			Plist::String(value) => Json::String(value),
+		}
+	}
+}
 
 #[derive(Clone, Debug, PartialEq)]
 pub enum PlistEvent {
