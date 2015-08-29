@@ -12,14 +12,14 @@ pub use builder::{Builder, BuilderError, BuilderResult};
 
 use chrono::{DateTime, UTC};
 use chrono::format::ParseError as ChronoParseError;
-use std::collections::HashMap;
+use std::collections::BTreeMap;
 use std::io::{Read, Seek, SeekFrom};
 use std::io::Error as IoError;
 
 #[derive(Clone, Debug, PartialEq)]
 pub enum Plist {
 	Array(Vec<Plist>),
-	Dictionary(HashMap<String, Plist>),
+	Dictionary(BTreeMap<String, Plist>),
 	Boolean(bool),
 	Data(Vec<u8>),
 	Date(DateTime<UTC>),

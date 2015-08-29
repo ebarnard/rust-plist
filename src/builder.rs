@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::collections::BTreeMap;
 use std::io::{Read, Seek};
 
 use {ParserError, ParserResult, Plist, PlistEvent, StreamingParser};
@@ -102,11 +102,8 @@ impl<T:Iterator<Item=ParserResult<PlistEvent>>> Builder<T> {
 		}
 	}
 
-	fn build_dict(&mut self, len: Option<u64>) -> Result<HashMap<String, Plist>, BuilderError> {
-		let mut values = match len {
-			Some(len) => HashMap::with_capacity(len as usize),
-			None => HashMap::new()
-		};
+	fn build_dict(&mut self, len: Option<u64>) -> Result<BTreeMap<String, Plist>, BuilderError> {
+		let mut values = BTreeMap::new();
 
 		loop {
 			try!(self.bump());
@@ -127,7 +124,7 @@ impl<T:Iterator<Item=ParserResult<PlistEvent>>> Builder<T> {
 
 #[cfg(test)]
 mod tests {
-	use std::collections::HashMap;
+	use std::collections::BTreeMap;
 
 	use super::*;
 	use Plist;
@@ -165,7 +162,7 @@ mod tests {
 		lines.push(Plist::String("It is a tale told by an idiot,".to_owned()));
 		lines.push(Plist::String("Full of sound and fury, signifying nothing.".to_owned()));
 
-		let mut dict = HashMap::new();
+		let mut dict = BTreeMap::new();
 		dict.insert("Author".to_owned(), Plist::String("William Shakespeare".to_owned()));
 		dict.insert("Lines".to_owned(), Plist::Array(lines));
 		dict.insert("Birthdate".to_owned(), Plist::Integer(1564));
