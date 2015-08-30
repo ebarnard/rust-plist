@@ -34,7 +34,6 @@ use rustc_serialize::json::Json;
 impl Plist {
 	pub fn into_json(self) -> Json {
 		match self {
-			// TODO: Change to map_in_place once stable
 			Plist::Array(value) => Json::Array(value.into_iter().map(|p| p.into_json()).collect()),
 			Plist::Dictionary(value) => Json::Object(value.into_iter().map(|(k, v)| (k, v.into_json())).collect()),
 			Plist::Boolean(value) => Json::Boolean(value),
