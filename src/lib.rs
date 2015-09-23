@@ -104,6 +104,7 @@ impl<R: Read+Seek> StreamingParser<R> {
 		try!(reader.seek(SeekFrom::Start(0)));
 		let mut magic = [0; 8];
 		try!(reader.read(&mut magic));
+		try!(reader.seek(SeekFrom::Start(0)));
 
 		Ok(if &magic == b"bplist00" {
 			true
