@@ -29,19 +29,19 @@ pub enum Plist {
 }
 		
 use rustc_serialize::base64::{STANDARD, ToBase64};
-use rustc_serialize::json::Json;
+use rustc_serialize::json::Json as RustcJson;
 
 impl Plist {
-	pub fn into_json(self) -> Json {
+	pub fn into_rustc_serialize_json(self) -> RustcJson {
 		match self {
-			Plist::Array(value) => Json::Array(value.into_iter().map(|p| p.into_json()).collect()),
-			Plist::Dictionary(value) => Json::Object(value.into_iter().map(|(k, v)| (k, v.into_json())).collect()),
-			Plist::Boolean(value) => Json::Boolean(value),
-			Plist::Data(value) => Json::String(value.to_base64(STANDARD)),
-			Plist::Date(value) => Json::String(value.to_rfc3339()),
-			Plist::Real(value) => Json::F64(value),
-			Plist::Integer(value) => Json::I64(value),
-			Plist::String(value) => Json::String(value),
+			Plist::Array(value) => RustcJson::Array(value.into_iter().map(|p| p.into_rustc_serialize_json()).collect()),
+			Plist::Dictionary(value) => RustcJson::Object(value.into_iter().map(|(k, v)| (k, v.into_rustc_serialize_json())).collect()),
+			Plist::Boolean(value) => RustcJson::Boolean(value),
+			Plist::Data(value) => RustcJson::String(value.to_base64(STANDARD)),
+			Plist::Date(value) => RustcJson::String(value.to_rfc3339()),
+			Plist::Real(value) => RustcJson::F64(value),
+			Plist::Integer(value) => RustcJson::I64(value),
+			Plist::String(value) => RustcJson::String(value),
 		}
 	}
 }
