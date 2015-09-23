@@ -9,7 +9,8 @@ use super::super::{ParserError, ParserResult, PlistEvent};
 
 pub struct StreamingParser<R: Read> {
 	xml_reader: EventReader<R>,
-	element_stack: Vec<String>
+	element_stack: Vec<String>,
+	finished: bool
 }
 
 impl<R: Read> StreamingParser<R> {
@@ -24,7 +25,8 @@ impl<R: Read> StreamingParser<R> {
 
 		StreamingParser {
 			xml_reader: EventReader::with_config(reader, config),
-			element_stack: Vec::new()
+			element_stack: Vec::new(),
+			finished: false
 		}
 	}
 
@@ -34,12 +36,8 @@ impl<R: Read> StreamingParser<R> {
 			_ => Err(ParserError::InvalidData)
 		}
 	}
-}
 
-impl<R: Read> Iterator for StreamingParser<R> {
-	type Item = ParserResult<PlistEvent>;
-
-	fn next(&mut self) -> Option<ParserResult<PlistEvent>> {
+	fn next_event(&mut self) -> Option<ParserResult<PlistEvent>> {
 		loop {
 			match self.xml_reader.next() {
 				XmlEvent::StartElement { name, .. } => {
@@ -99,8 +97,31 @@ impl<R: Read> Iterator for StreamingParser<R> {
 						true => return None,
 						false => return Some(Err(ParserError::UnexpectedEof))
 					}
-				}
+				},
+				XmlEvent::Error(_) => return Some(Err(ParserError::InvalidData)),
 				_ => ()
+			}
+		}
+	}
+}
+
+impl<R: Read> Iterator for StreamingParser<R> {
+	type Item = ParserResult<PlistEvent>;
+
+	fn next(&mut self) -> Option<ParserResult<PlistEvent>> {
+		if self.finished {
+			None
+		} else {
+			match self.next_event() {
+				None => {
+					self.finished = true;
+					None
+				},
+				ret @ Some(Err(_)) => {
+					self.finished = true;
+					ret
+				}
+				ret => ret
 			}
 		}
 	}
@@ -146,5 +167,16 @@ mod tests {
 		];
 
 		assert_eq!(events, comparison);
+	}
+
+	#[test]
+	fn bad_data() {
+		use PlistEvent::*;
+
+		let reader = File::open(&Path::new("./tests/data/xml_error.plist")).unwrap();
+		let streaming_parser = StreamingParser::new(reader);
+		let events: Vec<_> = streaming_parser.collect();
+
+		assert!(events.last().unwrap().is_err());
 	}
 }
