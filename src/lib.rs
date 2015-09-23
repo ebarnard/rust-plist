@@ -1,6 +1,5 @@
 extern crate byteorder;
 extern crate chrono;
-extern crate itertools;
 extern crate rustc_serialize;
 extern crate xml as xml_rs;
 

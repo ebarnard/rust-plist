@@ -1,7 +1,6 @@
 use byteorder::{BigEndian, ReadBytesExt};
 use byteorder::Error as ByteorderError;
 use chrono::{TimeZone, UTC};
-use itertools::Interleave;
 use std::io::{Cursor, Read, Seek, SeekFrom};
 use std::string::FromUtf16Error;
 
@@ -235,16 +234,22 @@ impl<R: Read+Seek> StreamingParser<R> {
 				let key_refs = try!(self.read_refs(len));
 				let value_refs = try!(self.read_refs(len));
 
-				let mut object_refs: Vec<_> = Interleave::new(key_refs.into_iter(), value_refs.into_iter()).collect();
-				// Reverse so we can pop off the end of the stack in order
-				object_refs.reverse();
+				let len = len as usize;
+
+				let mut object_refs = Vec::with_capacity(len * 2);
+
+				for i in 1..len+1 {
+					// Reverse so we can pop off the end of the stack in order
+					object_refs.push(value_refs[len - i]);
+					object_refs.push(key_refs[len - i]);
+				}
 
 				self.stack.push(StackItem {
 					ty: StackType::Dict,
 					object_refs: object_refs
 				});
 
-				Some(PlistEvent::StartDictionary(Some(len)))
+				Some(PlistEvent::StartDictionary(Some(len as u64)))
 			},
 			(_, _) => return Err(ParserError::InvalidData)
 		};
