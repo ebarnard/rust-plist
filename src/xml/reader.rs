@@ -9,6 +9,7 @@ use super::super::{ParserError, ParserResult, PlistEvent};
 
 pub struct StreamingParser<R: Read> {
 	xml_reader: EventReader<R>,
+	queued_event: Option<XmlEvent>,
 	element_stack: Vec<String>,
 	finished: bool
 }
@@ -25,6 +26,7 @@ impl<R: Read> StreamingParser<R> {
 
 		StreamingParser {
 			xml_reader: EventReader::with_config(reader, config),
+			queued_event: None,
 			element_stack: Vec::new(),
 			finished: false
 		}
@@ -33,13 +35,25 @@ impl<R: Read> StreamingParser<R> {
 	fn read_content<F>(&mut self, f: F) -> ParserResult<PlistEvent> where F:FnOnce(String) -> ParserResult<PlistEvent> {
 		match self.xml_reader.next() {
 			XmlEvent::Characters(s) => f(s),
+			event @ XmlEvent::EndElement{..} => {
+				self.queued_event = Some(event);
+				f("".to_owned())
+			},
 			_ => Err(ParserError::InvalidData)
 		}
 	}
 
-	fn next_event(&mut self) -> Option<ParserResult<PlistEvent>> {
+	fn next_event(&mut self) -> XmlEvent {
+		if let Some(event) = self.queued_event.take() {
+			event
+		} else {
+			self.xml_reader.next()
+		}
+	}
+
+	fn next_inner(&mut self) -> Option<ParserResult<PlistEvent>> {
 		loop {
-			match self.xml_reader.next() {
+			match self.next_event() {
 				XmlEvent::StartElement { name, .. } => {
 					// Add the current element to the element stack
 					self.element_stack.push(name.local_name.clone());
@@ -113,7 +127,7 @@ impl<R: Read> Iterator for StreamingParser<R> {
 		if self.finished {
 			None
 		} else {
-			match self.next_event() {
+			match self.next_inner() {
 				None => {
 					self.finished = true;
 					None
@@ -163,6 +177,8 @@ mod tests {
 			DataValue(vec![0, 0, 0, 190, 0, 0, 0, 3, 0, 0, 0, 30, 0, 0, 0]),
 			StringValue("Birthdate".to_owned()),
 			DateValue(UTC.ymd(1981, 05, 16).and_hms(11, 32, 06)),
+			StringValue("Blank".to_owned()),
+			StringValue("".to_owned()),
 			EndDictionary,
 			EndPlist
 		];
