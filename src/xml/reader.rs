@@ -52,6 +52,7 @@ impl<R: Read> StreamingParser<R> {
 						"true" => return Some(Ok(PlistEvent::BooleanValue(true))),
 						"false" => return Some(Ok(PlistEvent::BooleanValue(false))),
 						"data" => return Some(self.read_content(|s| {
+							let s: String = s.replace(" ", "").replace("\t", "");
 							match FromBase64::from_base64(&s[..]) {
 								Ok(b) => Ok(PlistEvent::DataValue(b)),
 								Err(_) => Err(ParserError::InvalidData)

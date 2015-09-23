@@ -14,7 +14,10 @@
 	<key>Height</key>
 	<real>1.6</real>
 	<key>Data</key>
-	<data>AAAAvgAAAAMAAAAeAAAA</data>
+	<data>
+		AAAAvgAAAA
+		MAAAAeAAAA
+	</data>
 	<key>Birthdate</key>
 	<date>1981-05-16T11:32:06Z</date>
 </dict>
