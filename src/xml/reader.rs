@@ -51,7 +51,7 @@ impl<R: Read> StreamingParser<R> {
 		}
 	}
 
-	fn next_inner(&mut self) -> Option<ParserResult<PlistEvent>> {
+	fn read_next(&mut self) -> Option<ParserResult<PlistEvent>> {
 		loop {
 			match self.next_event() {
 				XmlEvent::StartElement { name, .. } => {
@@ -127,16 +127,16 @@ impl<R: Read> Iterator for StreamingParser<R> {
 		if self.finished {
 			None
 		} else {
-			match self.next_inner() {
+			match self.read_next() {
+				Some(Ok(event)) => Some(Ok(event)),
+				Some(Err(err)) => {
+					self.finished = true;
+					Some(Err(err))
+				},
 				None => {
 					self.finished = true;
 					None
-				},
-				ret @ Some(Err(_)) => {
-					self.finished = true;
-					ret
 				}
-				ret => ret
 			}
 		}
 	}

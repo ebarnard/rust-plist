@@ -38,7 +38,8 @@ pub struct StreamingParser<R> {
 	stack: Vec<StackItem>,
 	object_offsets: Vec<u64>,
 	reader: R,
-	ref_size: u8
+	ref_size: u8,
+	finished: bool
 }
 
 impl<R: Read+Seek> StreamingParser<R> {
@@ -47,7 +48,8 @@ impl<R: Read+Seek> StreamingParser<R> {
 			stack: Vec::new(),
 			object_offsets: Vec::new(),
 			reader: reader,
-			ref_size: 0
+			ref_size: 0,
+			finished: false
 		}
 	}
 
@@ -262,10 +264,20 @@ impl<R: Read+Seek> Iterator for StreamingParser<R> {
 	type Item = ParserResult<PlistEvent>;
 
 	fn next(&mut self) -> Option<ParserResult<PlistEvent>> {
-		match self.read_next() {
-			Ok(Some(result)) => Some(Ok(result)),
-			Err(err) => Some(Err(err)),
-			Ok(None) => None
+		if self.finished {
+			None
+		} else {
+			match self.read_next() {
+				Ok(Some(event)) => Some(Ok(event)),
+				Err(err) => {
+					self.finished = true;
+					Some(Err(err))
+				},
+				Ok(None) => {
+					self.finished = true;
+					None
+				}
+			}
 		}
 	}
 }
