@@ -24,9 +24,10 @@ pub enum Plist {
 	Date(DateTime<UTC>),
 	Real(f64),
 	Integer(i64),
-	String(String)
+	String(String),
+	Key(String)
 }
-		
+
 use rustc_serialize::base64::{STANDARD, ToBase64};
 use rustc_serialize::json::Json as RustcJson;
 
@@ -41,6 +42,7 @@ impl Plist {
 			Plist::Real(value) => RustcJson::F64(value),
 			Plist::Integer(value) => RustcJson::I64(value),
 			Plist::String(value) => RustcJson::String(value),
+			Plist::Key(value) => RustcJson::String(value),
 		}
 	}
 }
@@ -62,6 +64,7 @@ pub enum PlistEvent {
 	IntegerValue(i64),
 	RealValue(f64),
 	StringValue(String),
+	KeyValue(String),
 }
 
 pub type ParserResult<T> = Result<T, ParserError>;

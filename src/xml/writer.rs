@@ -115,6 +115,7 @@ impl<W: Write> Writer<W> {
 			PlistEvent::IntegerValue(ref value) => try!(self.write_element_and_value("integer", &value.to_string())),
 			PlistEvent::RealValue(ref value) => try!(self.write_element_and_value("real", &value.to_string())),
 			PlistEvent::StringValue(ref value) => try!(self.write_element_and_value("string", &*value)),
+			PlistEvent::KeyValue(ref value) => try!(self.write_element_and_value("key", &*value)),
 		})
 	}
 }
@@ -136,20 +137,20 @@ mod tests {
 		let plist = &[
 			StartPlist,
 			StartDictionary(None),
-			StringValue("Author".to_owned()),
+			KeyValue("Author".to_owned()),
 			StringValue("William Shakespeare".to_owned()),
-			StringValue("Lines".to_owned()),
+			KeyValue("Lines".to_owned()),
 			StartArray(None),
 			StringValue("It is a tale told by an idiot,".to_owned()),
 			StringValue("Full of sound and fury, signifying nothing.".to_owned()),
 			EndArray,
-			StringValue("Death".to_owned()),
+			KeyValue("Death".to_owned()),
 			IntegerValue(1564),
-			StringValue("Height".to_owned()),
+			KeyValue("Height".to_owned()),
 			RealValue(1.60),
-			StringValue("Data".to_owned()),
+			KeyValue("Data".to_owned()),
 			DataValue(vec![0, 0, 0, 190, 0, 0, 0, 3, 0, 0, 0, 30, 0, 0, 0]),
-			StringValue("Birthdate".to_owned()),
+			KeyValue("Birthdate".to_owned()),
 			DateValue(UTC.ymd(1981, 05, 16).and_hms(11, 32, 06)),
 			EndDictionary,
 			EndPlist
@@ -166,18 +167,18 @@ mod tests {
 		}
 
 		let comparison = "<?xml version=\"1.0\" encoding=\"utf-8\"?>
-<plist version=\"1.0\"><dict><string>Author</string>
+<plist version=\"1.0\"><dict><key>Author</key>
 <string>William Shakespeare</string>
-<string>Lines</string>
+<key>Lines</key>
 <array><string>It is a tale told by an idiot,</string>
 <string>Full of sound and fury, signifying nothing.</string></array>
-<string>Death</string>
+<key>Death</key>
 <integer>1564</integer>
-<string>Height</string>
+<key>Height</key>
 <real>1.6</real>
-<string>Data</string>
+<key>Data</key>
 <data>AAAAvgAAAAMAAAAeAAAA</data>
-<string>Birthdate</string>
+<key>Birthdate</key>
 <date>1981-05-16T11:32:06+00:00</date></dict></plist>";
 
 
