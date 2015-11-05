@@ -77,6 +77,7 @@ impl<T:Iterator<Item=ParserResult<PlistEvent>>> Builder<T> {
 			Some(PlistEvent::IntegerValue(i)) => Ok(Plist::Integer(i)),
 			Some(PlistEvent::RealValue(f)) => Ok(Plist::Real(f)),
 			Some(PlistEvent::StringValue(s)) => Ok(Plist::String(s)),
+			Some(PlistEvent::KeyValue(s)) => Ok(Plist::Key(s)),
 
 			Some(PlistEvent::EndArray) => Err(BuilderError::InvalidEvent),
 			Some(PlistEvent::EndDictionary) => Err(BuilderError::InvalidEvent),
@@ -86,7 +87,7 @@ impl<T:Iterator<Item=ParserResult<PlistEvent>>> Builder<T> {
 		}
 	}
 
-	fn build_array(&mut self, len: Option<u64>) -> Result<Vec<Plist>, BuilderError> {	
+	fn build_array(&mut self, len: Option<u64>) -> Result<Vec<Plist>, BuilderError> {
 		let mut values = match len {
 			Some(len) => Vec::with_capacity(len as usize),
 			None => Vec::new()
@@ -109,7 +110,7 @@ impl<T:Iterator<Item=ParserResult<PlistEvent>>> Builder<T> {
 			try!(self.bump());
 			match self.token.take() {
 				Some(PlistEvent::EndDictionary) => return Ok(values),
-				Some(PlistEvent::StringValue(s)) => {
+				Some(PlistEvent::StringValue(s)) | Some(PlistEvent::KeyValue(s)) => {
 					try!(self.bump());
 					values.insert(s, try!(self.build_value()));
 				},
@@ -138,16 +139,16 @@ mod tests {
 		let events = vec![
 			StartPlist,
 			StartDictionary(None),
-			StringValue("Author".to_owned()),
+			KeyValue("Author".to_owned()),
 			StringValue("William Shakespeare".to_owned()),
-			StringValue("Lines".to_owned()),
+			KeyValue("Lines".to_owned()),
 			StartArray(None),
 			StringValue("It is a tale told by an idiot,".to_owned()),
 			StringValue("Full of sound and fury, signifying nothing.".to_owned()),
 			EndArray,
-			StringValue("Birthdate".to_owned()),
+			KeyValue("Birthdate".to_owned()),
 			IntegerValue(1564),
-			StringValue("Height".to_owned()),
+			KeyValue("Height".to_owned()),
 			RealValue(1.60),
 			EndDictionary,
 			EndPlist,

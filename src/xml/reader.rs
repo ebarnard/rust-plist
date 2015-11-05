@@ -57,12 +57,12 @@ impl<R: Read> StreamingParser<R> {
 				XmlEvent::StartElement { name, .. } => {
 					// Add the current element to the element stack
 					self.element_stack.push(name.local_name.clone());
-					
+
 					match &name.local_name[..] {
 						"plist" => return Some(Ok(PlistEvent::StartPlist)),
 						"array" => return Some(Ok(PlistEvent::StartArray(None))),
 						"dict" => return Some(Ok(PlistEvent::StartDictionary(None))),
-						"key" => return Some(self.read_content(|s| Ok(PlistEvent::StringValue(s)))),
+						"key" => return Some(self.read_content(|s| Ok(PlistEvent::KeyValue(s)))),
 						"true" => return Some(Ok(PlistEvent::BooleanValue(true))),
 						"false" => return Some(Ok(PlistEvent::BooleanValue(false))),
 						"data" => return Some(self.read_content(|s| {
@@ -162,22 +162,22 @@ mod tests {
 		let comparison = &[
 			StartPlist,
 			StartDictionary(None),
-			StringValue("Author".to_owned()),
+			KeyValue("Author".to_owned()),
 			StringValue("William Shakespeare".to_owned()),
-			StringValue("Lines".to_owned()),
+			KeyValue("Lines".to_owned()),
 			StartArray(None),
 			StringValue("It is a tale told by an idiot,".to_owned()),
 			StringValue("Full of sound and fury, signifying nothing.".to_owned()),
 			EndArray,
-			StringValue("Death".to_owned()),
+			KeyValue("Death".to_owned()),
 			IntegerValue(1564),
-			StringValue("Height".to_owned()),
+			KeyValue("Height".to_owned()),
 			RealValue(1.60),
-			StringValue("Data".to_owned()),
+			KeyValue("Data".to_owned()),
 			DataValue(vec![0, 0, 0, 190, 0, 0, 0, 3, 0, 0, 0, 30, 0, 0, 0]),
-			StringValue("Birthdate".to_owned()),
+			KeyValue("Birthdate".to_owned()),
 			DateValue(UTC.ymd(1981, 05, 16).and_hms(11, 32, 06)),
-			StringValue("Blank".to_owned()),
+			KeyValue("Blank".to_owned()),
 			StringValue("".to_owned()),
 			EndDictionary,
 			EndPlist
