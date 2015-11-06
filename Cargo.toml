@@ -10,6 +10,6 @@ keywords = ["plist", "parser"]
 
 [dependencies]
 rustc-serialize = "0.3.16"
-xml-rs = "0.1.26"
+xml-rs = "0.2.2"
 byteorder = "0.3.13"
 chrono = "0.2.16"

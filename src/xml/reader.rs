@@ -2,8 +2,7 @@ use chrono::{DateTime, UTC};
 use rustc_serialize::base64::FromBase64;
 use std::io::Read;
 use std::str::FromStr;
-use xml_rs::reader::{EventReader, ParserConfig};
-use xml_rs::reader::events::XmlEvent;
+use xml_rs::reader::{EventReader, ParserConfig, XmlEvent};
 
 use super::super::{ParserError, ParserResult, PlistEvent};
 
@@ -25,7 +24,7 @@ impl<R: Read> StreamingParser<R> {
 		};
 
 		StreamingParser {
-			xml_reader: EventReader::with_config(reader, config),
+			xml_reader: EventReader::new_with_config(reader, config),
 			queued_event: None,
 			element_stack: Vec::new(),
 			finished: false
@@ -34,8 +33,8 @@ impl<R: Read> StreamingParser<R> {
 
 	fn read_content<F>(&mut self, f: F) -> ParserResult<PlistEvent> where F:FnOnce(String) -> ParserResult<PlistEvent> {
 		match self.xml_reader.next() {
-			XmlEvent::Characters(s) => f(s),
-			event @ XmlEvent::EndElement{..} => {
+			Ok(XmlEvent::Characters(s)) => f(s),
+			Ok(event @ XmlEvent::EndElement{..}) => {
 				self.queued_event = Some(event);
 				f("".to_owned())
 			},
@@ -43,18 +42,18 @@ impl<R: Read> StreamingParser<R> {
 		}
 	}
 
-	fn next_event(&mut self) -> XmlEvent {
+	fn next_event(&mut self) -> Result<XmlEvent, ()> {
 		if let Some(event) = self.queued_event.take() {
-			event
+			Ok(event)
 		} else {
-			self.xml_reader.next()
+			self.xml_reader.next().map_err(|_| ())
 		}
 	}
 
 	fn read_next(&mut self) -> Option<ParserResult<PlistEvent>> {
 		loop {
 			match self.next_event() {
-				XmlEvent::StartElement { name, .. } => {
+				Ok(XmlEvent::StartElement { name, .. }) => {
 					// Add the current element to the element stack
 					self.element_stack.push(name.local_name.clone());
 					
@@ -92,7 +91,7 @@ impl<R: Read> StreamingParser<R> {
 						_ => return Some(Err(ParserError::InvalidData))
 					}
 				},
-				XmlEvent::EndElement { name, .. } => {
+				Ok(XmlEvent::EndElement { name, .. }) => {
 					// Check the corrent element is being closed
 					match self.element_stack.pop() {
 						Some(ref open_name) if &name.local_name == open_name => (),
@@ -107,13 +106,13 @@ impl<R: Read> StreamingParser<R> {
 						_ => ()
 					}
 				},
-				XmlEvent::EndDocument => {
+				Ok(XmlEvent::EndDocument) => {
 					match self.element_stack.is_empty() {
 						true => return None,
 						false => return Some(Err(ParserError::UnexpectedEof))
 					}
 				},
-				XmlEvent::Error(_) => return Some(Err(ParserError::InvalidData)),
+				Err(_) => return Some(Err(ParserError::InvalidData)),
 				_ => ()
 			}
 		}
@@ -188,8 +187,6 @@ mod tests {
 
 	#[test]
 	fn bad_data() {
-		use PlistEvent::*;
-
 		let reader = File::open(&Path::new("./tests/data/xml_error.plist")).unwrap();
 		let streaming_parser = StreamingParser::new(reader);
 		let events: Vec<_> = streaming_parser.collect();

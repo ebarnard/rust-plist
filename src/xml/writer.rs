@@ -1,4 +1,5 @@
 use rustc_serialize::base64::{MIME, ToBase64};
+use std::borrow::Cow;
 use std::io::Write;
 use xml_rs::attribute::Attribute;
 use xml_rs::name::Name;
@@ -29,12 +30,15 @@ pub struct Writer<W: Write> {
 impl<W: Write> Writer<W> {
 	pub fn new(writer: W) -> Writer<W> {
 		let config = EmitterConfig {
-			line_separator: "\n".to_owned(),
-			indent_string: "    ".to_owned(),
+			line_separator: "\n".into(),
+			indent_string: "    ".into(),
 			perform_indent: true,
+			perform_escaping: true,
 			write_document_declaration: true,
 			normalize_empty_elements: true,
 			cdata_to_characters: true,
+			keep_element_names_stack: false,
+			autopad_comments: true
 		};
 
 		Writer {
@@ -54,8 +58,8 @@ impl<W: Write> Writer<W> {
 	fn start_element(&mut self, name: &str) -> Result<(), ()> {
 		let result = self.xml_writer.write(WriteXmlEvent::StartElement {
 			name: Name::local(name),
-			attributes: Vec::new(),
-			namespace: &self.empty_namespace
+			attributes: Cow::Borrowed(&[]),
+			namespace: Cow::Borrowed(&self.empty_namespace)
 		});
 
 		match result {
@@ -66,7 +70,7 @@ impl<W: Write> Writer<W> {
 
 	fn end_element(&mut self, name: &str) -> Result<(), ()> {
 		let result = self.xml_writer.write(WriteXmlEvent::EndElement {
-			name: Name::local(name)
+			name: Some(Name::local(name))
 		});
 
 		match result {
@@ -106,8 +110,8 @@ impl<W: Write> Writer<W> {
 
 					let result = self.xml_writer.write(WriteXmlEvent::StartElement {
 						name: Name::local("plist"),
-						attributes: vec!(version_attr),
-						namespace: &self.empty_namespace
+						attributes: Cow::Borrowed(&[version_attr]),
+						namespace: Cow::Borrowed(&self.empty_namespace)
 					});
 
 					match result {
@@ -175,11 +179,8 @@ impl<W: Write> Writer<W> {
 mod tests {
 	use chrono::{TimeZone, UTC};
 	use std::io::Cursor;
-	use std::fs::File;
-	use std::path::Path;
 
 	use super::*;
-	use PlistEvent;
 
 	#[test]
 	fn streaming_parser() {
@@ -218,19 +219,25 @@ mod tests {
 		}
 
 		let comparison = "<?xml version=\"1.0\" encoding=\"utf-8\"?>
-<plist version=\"1.0\"><dict><key>Author</key>
-<string>William Shakespeare</string>
-<key>Lines</key>
-<array><string>It is a tale told by an idiot,</string>
-<string>Full of sound and fury, signifying nothing.</string></array>
-<key>Death</key>
-<integer>1564</integer>
-<key>Height</key>
-<real>1.6</real>
-<key>Data</key>
-<data>AAAAvgAAAAMAAAAeAAAA</data>
-<key>Birthdate</key>
-<date>1981-05-16T11:32:06+00:00</date></dict></plist>";
+<plist version=\"1.0\">
+    <dict>
+        <key>Author</key>
+        <string>William Shakespeare</string>
+        <key>Lines</key>
+        <array>
+            <string>It is a tale told by an idiot,</string>
+            <string>Full of sound and fury, signifying nothing.</string>
+        </array>
+        <key>Death</key>
+        <integer>1564</integer>
+        <key>Height</key>
+        <real>1.6</real>
+        <key>Data</key>
+        <data>AAAAvgAAAAMAAAAeAAAA</data>
+        <key>Birthdate</key>
+        <date>1981-05-16T11:32:06+00:00</date>
+    </dict>
+</plist>";
 
 
 		let s = String::from_utf8(cursor.into_inner()).unwrap();
