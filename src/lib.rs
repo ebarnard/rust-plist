@@ -31,6 +31,38 @@ use rustc_serialize::base64::{STANDARD, ToBase64};
 use rustc_serialize::json::Json as RustcJson;
 
 impl Plist {
+	pub fn into_events(self) -> Vec<PlistEvent> {
+		let mut events = Vec::new();
+		self.into_events_inner(&mut events);
+		events
+	}
+
+	fn into_events_inner(self, events: &mut Vec<PlistEvent>) {
+		match self {
+			Plist::Array(array) => {
+				events.push(PlistEvent::StartArray(Some(array.len() as u64)));
+				for value in array.into_iter() {
+					value.into_events_inner(events);
+				}
+				events.push(PlistEvent::EndArray);
+			},
+			Plist::Dictionary(dict) => {
+				events.push(PlistEvent::StartDictionary(Some(dict.len() as u64)));
+				for (key, value) in dict.into_iter() {
+					events.push(PlistEvent::StringValue(key));
+					value.into_events_inner(events);
+				}
+				events.push(PlistEvent::EndDictionary);
+			},
+			Plist::Boolean(value) => events.push(PlistEvent::BooleanValue(value)),
+			Plist::Data(value) => events.push(PlistEvent::DataValue(value)),
+			Plist::Date(value) => events.push(PlistEvent::DateValue(value)),
+			Plist::Real(value) => events.push(PlistEvent::RealValue(value)),
+			Plist::Integer(value) => events.push(PlistEvent::IntegerValue(value)),
+			Plist::String(value) => events.push(PlistEvent::StringValue(value)),
+		}
+	}
+
 	pub fn into_rustc_serialize_json(self) -> RustcJson {
 		match self {
 			Plist::Array(value) => RustcJson::Array(value.into_iter().map(|p| p.into_rustc_serialize_json()).collect()),
