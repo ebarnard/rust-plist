@@ -8,8 +8,20 @@ use xml_rs::writer::events::XmlEvent as WriteXmlEvent;
 
 use {PlistEvent};
 
+enum Element {
+	Dictionary(DictionaryState),
+	Array,
+	Root
+}
+
+enum DictionaryState {
+	ExpectKey,
+	ExpectValue
+}
+
 pub struct Writer<W: Write> {
 	xml_writer: EventWriter<W>,
+	stack: Vec<Element>,
 	// Not very nice
 	empty_namespace: Namespace
 }
@@ -27,6 +39,7 @@ impl<W: Write> Writer<W> {
 
 		Writer {
 			xml_writer: EventWriter::new_with_config(writer, config),
+			stack: Vec::new(),
 			empty_namespace: Namespace::empty()
 		}
 	}
@@ -72,29 +85,68 @@ impl<W: Write> Writer<W> {
 	}
 
 	pub fn write(&mut self, event: &PlistEvent) -> Result<(), ()> {
+		match self.stack.pop() {
+			Some(Element::Dictionary(DictionaryState::ExpectKey)) => {
+				match *event {
+					PlistEvent::StringValue(ref value) => {
+						try!(self.write_element_and_value("key", &*value));
+						self.stack.push(Element::Dictionary(DictionaryState::ExpectValue));
+					}
+					PlistEvent::EndDictionary => try!(self.end_element("dict")),
+					_ => return Err(()) // Invalid event
+				};
+				return Ok(())
+			},
+			Some(Element::Dictionary(DictionaryState::ExpectValue)) => self.stack.push(Element::Dictionary(DictionaryState::ExpectKey)),
+			Some(other) => self.stack.push(other),
+			None => match *event {
+				PlistEvent::StartPlist => {
+					let version_name = Name::local("version");
+					let version_attr = Attribute::new(version_name, "1.0");
+
+					let result = self.xml_writer.write(WriteXmlEvent::StartElement {
+						name: Name::local("plist"),
+						attributes: vec!(version_attr),
+						namespace: &self.empty_namespace
+					});
+
+					match result {
+						Ok(()) => (),
+						Err(_) => return Err(())
+					}
+
+					self.stack.push(Element::Root);
+					return Ok(())
+				},
+				_ => return Err(()) // Invalid event
+			}
+		}
+
 		Ok(match *event {
-			PlistEvent::StartPlist => {
-				let version_name = Name::local("version");
-				let version_attr = Attribute::new(version_name, "1.0");
-
-				let result = self.xml_writer.write(WriteXmlEvent::StartElement {
-					name: Name::local("plist"),
-					attributes: vec!(version_attr),
-					namespace: &self.empty_namespace
-				});
-
-				match result {
-					Ok(()) => (),
-					Err(_) => return Err(())
+			PlistEvent::StartPlist => return Err(()), // Invalid event
+			PlistEvent::EndPlist => {
+				try!(self.end_element("plist"));
+				if let Some(Element::Root) = self.stack.pop() {} else {
+					return Err(()); // Invalid event
 				}
 			},
-			PlistEvent::EndPlist => try!(self.end_element("plist")),
 
-			PlistEvent::StartArray(_) => try!(self.start_element("array")),
-			PlistEvent::EndArray => try!(self.end_element("array")),
+			PlistEvent::StartArray(_) => {
+				try!(self.start_element("array"));
+				self.stack.push(Element::Array);
+			}
+			PlistEvent::EndArray => {
+				try!(self.end_element("array"));
+				if let Some(Element::Array) = self.stack.pop() {} else {
+					return Err(()); // Invalid event
+				}
+			}
 
-			PlistEvent::StartDictionary(_) => try!(self.start_element("dict")),
-			PlistEvent::EndDictionary => try!(self.end_element("dict")),
+			PlistEvent::StartDictionary(_) => {
+				try!(self.start_element("dict"));
+				self.stack.push(Element::Dictionary(DictionaryState::ExpectKey));
+			}
+			PlistEvent::EndDictionary => return Err(()), // Invalid event
 
 			PlistEvent::BooleanValue(true) => {
 				try!(self.start_element("true"));
@@ -166,18 +218,18 @@ mod tests {
 		}
 
 		let comparison = "<?xml version=\"1.0\" encoding=\"utf-8\"?>
-<plist version=\"1.0\"><dict><string>Author</string>
+<plist version=\"1.0\"><dict><key>Author</key>
 <string>William Shakespeare</string>
-<string>Lines</string>
+<key>Lines</key>
 <array><string>It is a tale told by an idiot,</string>
 <string>Full of sound and fury, signifying nothing.</string></array>
-<string>Death</string>
+<key>Death</key>
 <integer>1564</integer>
-<string>Height</string>
+<key>Height</key>
 <real>1.6</real>
-<string>Data</string>
+<key>Data</key>
 <data>AAAAvgAAAAMAAAAeAAAA</data>
-<string>Birthdate</string>
+<key>Birthdate</key>
 <date>1981-05-16T11:32:06+00:00</date></dict></plist>";
 
 
