@@ -24,7 +24,8 @@ pub enum Plist {
 	Date(DateTime<UTC>),
 	Real(f64),
 	Integer(i64),
-	String(String)
+	String(String),
+	Key(String)
 }
 		
 use rustc_serialize::base64::{STANDARD, ToBase64};
@@ -49,7 +50,7 @@ impl Plist {
 			Plist::Dictionary(dict) => {
 				events.push(PlistEvent::StartDictionary(Some(dict.len() as u64)));
 				for (key, value) in dict.into_iter() {
-					events.push(PlistEvent::StringValue(key));
+					events.push(PlistEvent::Key(key));
 					value.into_events_inner(events);
 				}
 				events.push(PlistEvent::EndDictionary);
@@ -60,6 +61,7 @@ impl Plist {
 			Plist::Real(value) => events.push(PlistEvent::RealValue(value)),
 			Plist::Integer(value) => events.push(PlistEvent::IntegerValue(value)),
 			Plist::String(value) => events.push(PlistEvent::StringValue(value)),
+			Plist::Key(value) => events.push(PlistEvent::Key(value)),
 		}
 	}
 
@@ -73,6 +75,7 @@ impl Plist {
 			Plist::Real(value) => RustcJson::F64(value),
 			Plist::Integer(value) => RustcJson::I64(value),
 			Plist::String(value) => RustcJson::String(value),
+			Plist::Key(value) => RustcJson::String(value),
 		}
 	}
 }
@@ -81,6 +84,8 @@ impl Plist {
 pub enum PlistEvent {
 	StartPlist,
 	EndPlist,
+
+	Key(String),
 
 	StartArray(Option<u64>),
 	EndArray,
@@ -103,6 +108,7 @@ pub enum ParserError {
 	InvalidData,
 	UnexpectedEof,
 	UnsupportedType,
+	KeyExpected,
 	Io(IoError)
 }
 
