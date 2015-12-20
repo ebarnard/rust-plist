@@ -71,6 +71,8 @@ impl<T:Iterator<Item=ParserResult<PlistEvent>>> Builder<T> {
 			Some(PlistEvent::StartArray(len)) => Ok(Plist::Array(try!(self.build_array(len)))),
 			Some(PlistEvent::StartDictionary(len)) => Ok(Plist::Dictionary(try!(self.build_dict(len)))),
 
+			Some(PlistEvent::Key(s)) => Ok(Plist::Key(s)),
+
 			Some(PlistEvent::BooleanValue(b)) => Ok(Plist::Boolean(b)),
 			Some(PlistEvent::DataValue(d)) => Ok(Plist::Data(d)),
 			Some(PlistEvent::DateValue(d)) => Ok(Plist::Date(d)),

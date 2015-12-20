@@ -32,6 +32,11 @@ enum StackType {
 	Root
 }
 
+enum ParserState {
+    ExpectValue,
+    ExpectKey
+}
+
 /// https://opensource.apple.com/source/CF/CF-550/CFBinaryPList.c
 /// https://hg.python.org/cpython/file/3.4/Lib/plistlib.py
 pub struct StreamingParser<R> {
@@ -39,7 +44,8 @@ pub struct StreamingParser<R> {
 	object_offsets: Vec<u64>,
 	reader: R,
 	ref_size: u8,
-	finished: bool
+	finished: bool,
+	state: ParserState
 }
 
 impl<R: Read+Seek> StreamingParser<R> {
@@ -49,7 +55,8 @@ impl<R: Read+Seek> StreamingParser<R> {
 			object_offsets: Vec::new(),
 			reader: reader,
 			ref_size: 0,
-			finished: false
+			finished: false,
+			state: ParserState::ExpectValue
 		}
 	}
 
@@ -137,10 +144,30 @@ impl<R: Read+Seek> StreamingParser<R> {
 		Ok(pos)
 	}
 
+        fn read_ascii_string(&mut self, n: u8) -> ParserResult<String> {
+		let len = try!(self.read_object_len(n));
+		let raw = try!(self.read_data(len));
+		Ok(String::from_utf8(raw).unwrap())
+        }
+
+        fn read_unicode_string(&mut self, n: u8) -> ParserResult<String> {
+		let len = try!(self.read_object_len(n));
+		let raw = try!(self.read_data(len));
+		let mut cursor = Cursor::new(raw);
+
+		let mut raw_utf16 = Vec::with_capacity(len as usize / 2);
+		while cursor.position() < len {
+			raw_utf16.push(try!(cursor.read_u16::<BigEndian>()))
+		}
+
+		Ok(try!(String::from_utf16(&raw_utf16)))
+        }
+
 	fn read_next(&mut self) -> ParserResult<Option<PlistEvent>> {
 		if self.ref_size == 0 {
 			// Initialise here rather than in new
 			try!(self.read_trailer());
+			self.state = ParserState::ExpectValue;
 			return Ok(Some(PlistEvent::StartPlist))
 		}
 
@@ -157,6 +184,7 @@ impl<R: Read+Seek> StreamingParser<R> {
 			None => {
 				// We're at the end of an array or dict. Pop the top stack item and return
 				let item = self.stack.pop().unwrap();
+				self.state = ParserState::ExpectKey;
 				match item.ty {
 					StackType::Array => return Ok(Some(PlistEvent::EndArray)),
 					StackType::Dict => return Ok(Some(PlistEvent::EndDictionary)),
@@ -169,91 +197,101 @@ impl<R: Read+Seek> StreamingParser<R> {
 		let ty = (token & 0xf0) >> 4;
 		let size = token & 0x0f;
 
-		let result = match (ty, size) {
-			(0x0, 0x00) => return Err(ParserError::UnsupportedType), // null
-			(0x0, 0x08) => Some(PlistEvent::BooleanValue(false)),
-			(0x0, 0x09) => Some(PlistEvent::BooleanValue(true)),
-			(0x0, 0x0f) => return Err(ParserError::UnsupportedType), // fill
-			(0x1, 0) => Some(PlistEvent::IntegerValue(try!(self.reader.read_u8()) as i64)),
-			(0x1, 1) => Some(PlistEvent::IntegerValue(try!(self.reader.read_u16::<BigEndian>()) as i64)),
-			(0x1, 2) => Some(PlistEvent::IntegerValue(try!(self.reader.read_u32::<BigEndian>()) as i64)),
-			(0x1, 3) => Some(PlistEvent::IntegerValue(try!(self.reader.read_i64::<BigEndian>()))),
-			(0x1, 4) => return Err(ParserError::UnsupportedType), // 128 bit int
-			(0x1, _) => return Err(ParserError::UnsupportedType), // variable length int
-			(0x2, 2) => Some(PlistEvent::RealValue(try!(self.reader.read_f32::<BigEndian>()) as f64)),
-			(0x2, 3) => Some(PlistEvent::RealValue(try!(self.reader.read_f64::<BigEndian>()))),
-			(0x2, _) => return Err(ParserError::UnsupportedType), // odd length float
-			(0x3, 3) => { // Date
-				// Seconds since 1/1/2001 00:00:00
-				let timestamp = try!(self.reader.read_f64::<BigEndian>());
+		let result = match self.state {
+			ParserState::ExpectKey => match (ty, size) {
+				(0x5, n) => { // ASCII string
+					self.state = ParserState::ExpectValue;
+					Some(PlistEvent::Key(try!(self.read_ascii_string(n))))
+				},
+				(0x6, n) => { // UTF-16 string
+					self.state = ParserState::ExpectValue;
+					Some(PlistEvent::Key(try!(self.read_unicode_string(n))))
+				},
+				_ => return Err(ParserError::KeyExpected),
+			},
+			ParserState::ExpectValue => {
+				let result = match (ty, size) {
+					(0x0, 0x00) => return Err(ParserError::UnsupportedType), // null
+					(0x0, 0x08) => Some(PlistEvent::BooleanValue(false)),
+					(0x0, 0x09) => Some(PlistEvent::BooleanValue(true)),
+					(0x0, 0x0f) => return Err(ParserError::UnsupportedType), // fill
+					(0x1, 0) => Some(PlistEvent::IntegerValue(try!(self.reader.read_u8()) as i64)),
+					(0x1, 1) => Some(PlistEvent::IntegerValue(try!(self.reader.read_u16::<BigEndian>()) as i64)),
+					(0x1, 2) => Some(PlistEvent::IntegerValue(try!(self.reader.read_u32::<BigEndian>()) as i64)),
+					(0x1, 3) => Some(PlistEvent::IntegerValue(try!(self.reader.read_i64::<BigEndian>()))),
+					(0x1, 4) => return Err(ParserError::UnsupportedType), // 128 bit int
+					(0x1, _) => return Err(ParserError::UnsupportedType), // variable length int
+					(0x2, 2) => Some(PlistEvent::RealValue(try!(self.reader.read_f32::<BigEndian>()) as f64)),
+					(0x2, 3) => Some(PlistEvent::RealValue(try!(self.reader.read_f64::<BigEndian>()))),
+					(0x2, _) => return Err(ParserError::UnsupportedType), // odd length float
+					(0x3, 3) => { // Date
+						// Seconds since 1/1/2001 00:00:00
+						let timestamp = try!(self.reader.read_f64::<BigEndian>());
 
-				let secs = timestamp.floor();
-				let subsecs = timestamp - secs;
+						let secs = timestamp.floor();
+						let subsecs = timestamp - secs;
 
-				let int_secs = (secs as i64) + (31 * 365 + 8) * 86400;
-				let int_nanos = (subsecs * 1_000_000_000f64) as u32;
+						let int_secs = (secs as i64) + (31 * 365 + 8) * 86400;
+						let int_nanos = (subsecs * 1_000_000_000f64) as u32;
 
-				Some(PlistEvent::DateValue(UTC.timestamp(int_secs, int_nanos)))
+						Some(PlistEvent::DateValue(UTC.timestamp(int_secs, int_nanos)))
+					}
+					(0x4, n) => { // Data
+						let len = try!(self.read_object_len(n));
+						Some(PlistEvent::DataValue(try!(self.read_data(len))))
+					},
+					(0x5, n) => // ASCII string
+						Some(PlistEvent::StringValue(try!(self.read_ascii_string(n)))),
+					(0x6, n) => // UTF-16 string
+						Some(PlistEvent::StringValue(try!(self.read_unicode_string(n)))),
+					(0xa, n) => { // Array
+						let len = try!(self.read_object_len(n));
+						let mut object_refs = try!(self.read_refs(len));
+						// Reverse so we can pop off the end of the stack in order
+						object_refs.reverse();
+
+						self.stack.push(StackItem {
+							ty: StackType::Array,
+							object_refs: object_refs
+						});
+
+						Some(PlistEvent::StartArray(Some(len)))
+					},
+					(0xd, n) => { // Dict
+						let len = try!(self.read_object_len(n));
+						let key_refs = try!(self.read_refs(len));
+						let value_refs = try!(self.read_refs(len));
+
+						let len = len as usize;
+
+						let mut object_refs = Vec::with_capacity(len * 2);
+
+						for i in 1..len+1 {
+							// Reverse so we can pop off the end of the stack in order
+							object_refs.push(value_refs[len - i]);
+							object_refs.push(key_refs[len - i]);
+						}
+
+						self.stack.push(StackItem {
+							ty: StackType::Dict,
+							object_refs: object_refs
+						});
+
+						Some(PlistEvent::StartDictionary(Some(len as u64)))
+					},
+					(_, _) => return Err(ParserError::InvalidData)
+				};
+				match self.stack.last() {
+					Some(t) => {
+						match t.ty {
+							StackType::Array => (),
+							_ => self.state = ParserState::ExpectKey
+						}
+					},
+					_ => self.state = ParserState::ExpectKey
+				}
+				result
 			}
-			(0x4, n) => { // Data
-				let len = try!(self.read_object_len(n));
-				Some(PlistEvent::DataValue(try!(self.read_data(len))))
-			},
-			(0x5, n) => { // ASCII string
-				let len = try!(self.read_object_len(n));
-				let raw = try!(self.read_data(len));
-				let string = String::from_utf8(raw).unwrap();
-				Some(PlistEvent::StringValue(string))
-			},
-			(0x6, n) => { // UTF-16 string
-				let len = try!(self.read_object_len(n));
-				let raw = try!(self.read_data(len));
-				let mut cursor = Cursor::new(raw);
-
-				let mut raw_utf16 = Vec::with_capacity(len as usize / 2);
-				while cursor.position() < len {
-					raw_utf16.push(try!(cursor.read_u16::<BigEndian>()))
-				}
-
-				let string = try!(String::from_utf16(&raw_utf16));
-				Some(PlistEvent::StringValue(string))
-			},
-			(0xa, n) => { // Array
-				let len = try!(self.read_object_len(n));
-				let mut object_refs = try!(self.read_refs(len));
-				// Reverse so we can pop off the end of the stack in order
-				object_refs.reverse();
-
-				self.stack.push(StackItem {
-					ty: StackType::Array,
-					object_refs: object_refs
-				});
-
-				Some(PlistEvent::StartArray(Some(len)))
-			},
-			(0xd, n) => { // Dict
-				let len = try!(self.read_object_len(n));
-				let key_refs = try!(self.read_refs(len));
-				let value_refs = try!(self.read_refs(len));
-
-				let len = len as usize;
-
-				let mut object_refs = Vec::with_capacity(len * 2);
-
-				for i in 1..len+1 {
-					// Reverse so we can pop off the end of the stack in order
-					object_refs.push(value_refs[len - i]);
-					object_refs.push(key_refs[len - i]);
-				}
-
-				self.stack.push(StackItem {
-					ty: StackType::Dict,
-					object_refs: object_refs
-				});
-
-				Some(PlistEvent::StartDictionary(Some(len as u64)))
-			},
-			(_, _) => return Err(ParserError::InvalidData)
 		};
 
 		Ok(result)
@@ -302,20 +340,20 @@ mod tests {
 		let comparison = &[
 			StartPlist,
 			StartDictionary(Some(6)),
-			StringValue("Lines".to_owned()),
+			Key("Lines".to_owned()),
 			StartArray(Some(2)),
 			StringValue("It is a tale told by an idiot,".to_owned()),
 			StringValue("Full of sound and fury, signifying nothing.".to_owned()),
 			EndArray,
-			StringValue("Death".to_owned()),
+			Key("Death".to_owned()),
 			IntegerValue(1564),
-			StringValue("Height".to_owned()),
+			Key("Height".to_owned()),
 			RealValue(1.60),
-			StringValue("Birthdate".to_owned()),
+			Key("Birthdate".to_owned()),
 			DateValue(UTC.ymd(1981, 05, 16).and_hms(11, 32, 06)),
-			StringValue("Author".to_owned()),
+			Key("Author".to_owned()),
 			StringValue("William Shakespeare".to_owned()),
-			StringValue("Data".to_owned()),
+			Key("Data".to_owned()),
 			DataValue(vec![0, 0, 0, 190, 0, 0, 0, 3, 0, 0, 0, 30, 0, 0, 0]),
 			EndDictionary,
 			EndPlist

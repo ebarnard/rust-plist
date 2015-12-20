@@ -92,7 +92,7 @@ impl<W: Write> Writer<W> {
 		match self.stack.pop() {
 			Some(Element::Dictionary(DictionaryState::ExpectKey)) => {
 				match *event {
-					PlistEvent::StringValue(ref value) => {
+					PlistEvent::Key(ref value) => {
 						try!(self.write_element_and_value("key", &*value));
 						self.stack.push(Element::Dictionary(DictionaryState::ExpectValue));
 					}
@@ -134,6 +134,8 @@ impl<W: Write> Writer<W> {
 					return Err(()); // Invalid event
 				}
 			},
+
+			PlistEvent::Key(_) => return Err(()), // Not expecting a key event.
 
 			PlistEvent::StartArray(_) => {
 				try!(self.start_element("array"));
@@ -189,20 +191,20 @@ mod tests {
 		let plist = &[
 			StartPlist,
 			StartDictionary(None),
-			StringValue("Author".to_owned()),
+			Key("Author".to_owned()),
 			StringValue("William Shakespeare".to_owned()),
-			StringValue("Lines".to_owned()),
+			Key("Lines".to_owned()),
 			StartArray(None),
 			StringValue("It is a tale told by an idiot,".to_owned()),
 			StringValue("Full of sound and fury, signifying nothing.".to_owned()),
 			EndArray,
-			StringValue("Death".to_owned()),
+			Key("Death".to_owned()),
 			IntegerValue(1564),
-			StringValue("Height".to_owned()),
+			Key("Height".to_owned()),
 			RealValue(1.60),
-			StringValue("Data".to_owned()),
+			Key("Data".to_owned()),
 			DataValue(vec![0, 0, 0, 190, 0, 0, 0, 3, 0, 0, 0, 30, 0, 0, 0]),
-			StringValue("Birthdate".to_owned()),
+			Key("Birthdate".to_owned()),
 			DateValue(UTC.ymd(1981, 05, 16).and_hms(11, 32, 06)),
 			EndDictionary,
 			EndPlist
