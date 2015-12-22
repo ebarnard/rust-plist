@@ -129,16 +129,14 @@ impl From<ChronoParseError> for ReadError {
 }
 
 pub enum EventReader<R: Read+Seek> {
+	Uninitialized(Option<R>),
 	Xml(xml::EventReader<R>),
 	Binary(binary::EventReader<R>)
 }
 
 impl<R: Read+Seek> EventReader<R> {
-	pub fn new(mut reader: R) -> EventReader<R> {
-		match EventReader::is_binary(&mut reader) {
-			Ok(true) => EventReader::Binary(binary::EventReader::new(reader)),
-			Ok(false) | Err(_) => EventReader::Xml(xml::EventReader::new(reader))
-		}
+	pub fn new(reader: R) -> EventReader<R> {
+		EventReader::Uninitialized(Some(reader))
 	}
 
 	fn is_binary(reader: &mut R) -> Result<bool, IoError> {
@@ -159,9 +157,23 @@ impl<R: Read+Seek> Iterator for EventReader<R> {
 	type Item = ReadResult<PlistEvent>;
 
 	fn next(&mut self) -> Option<ReadResult<PlistEvent>> {
-		match *self {
-			EventReader::Xml(ref mut parser) => parser.next(),
-			EventReader::Binary(ref mut parser) => parser.next()
-		}
+		let mut reader = match *self {
+			EventReader::Xml(ref mut parser) => return parser.next(),
+			EventReader::Binary(ref mut parser) => return parser.next(),
+			EventReader::Uninitialized(ref mut reader) => reader.take().unwrap()
+		};
+
+		let event_reader = match EventReader::is_binary(&mut reader) {
+			Ok(true) => EventReader::Binary(binary::EventReader::new(reader)),
+			Ok(false) => EventReader::Xml(xml::EventReader::new(reader)),
+			Err(err) => {
+				::std::mem::replace(self, EventReader::Uninitialized(Some(reader)));
+				return Some(Err(ReadError::Io(err)))
+			}
+		};
+
+		::std::mem::replace(self, event_reader);
+
+		self.next()
 	}
 }
