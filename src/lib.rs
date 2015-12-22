@@ -134,7 +134,9 @@ impl From<ChronoParseError> for ReadError {
     }
 }
 
-pub enum EventReader<R: Read + Seek> {
+pub struct EventReader<R: Read + Seek>(EventReaderInner<R>);
+
+enum EventReaderInner<R: Read + Seek> {
     Uninitialized(Option<R>),
     Xml(xml::EventReader<R>),
     Binary(binary::EventReader<R>),
@@ -142,7 +144,7 @@ pub enum EventReader<R: Read + Seek> {
 
 impl<R: Read + Seek> EventReader<R> {
     pub fn new(reader: R) -> EventReader<R> {
-        EventReader::Uninitialized(Some(reader))
+        EventReader(EventReaderInner::Uninitialized(Some(reader)))
     }
 
     fn is_binary(reader: &mut R) -> Result<bool, IoError> {
@@ -163,22 +165,22 @@ impl<R: Read + Seek> Iterator for EventReader<R> {
     type Item = ReadResult<PlistEvent>;
 
     fn next(&mut self) -> Option<ReadResult<PlistEvent>> {
-        let mut reader = match *self {
-            EventReader::Xml(ref mut parser) => return parser.next(),
-            EventReader::Binary(ref mut parser) => return parser.next(),
-            EventReader::Uninitialized(ref mut reader) => reader.take().unwrap(),
+        let mut reader = match self.0 {
+            EventReaderInner::Xml(ref mut parser) => return parser.next(),
+            EventReaderInner::Binary(ref mut parser) => return parser.next(),
+            EventReaderInner::Uninitialized(ref mut reader) => reader.take().unwrap(),
         };
 
         let event_reader = match EventReader::is_binary(&mut reader) {
-            Ok(true) => EventReader::Binary(binary::EventReader::new(reader)),
-            Ok(false) => EventReader::Xml(xml::EventReader::new(reader)),
+            Ok(true) => EventReaderInner::Binary(binary::EventReader::new(reader)),
+            Ok(false) => EventReaderInner::Xml(xml::EventReader::new(reader)),
             Err(err) => {
-                ::std::mem::replace(self, EventReader::Uninitialized(Some(reader)));
+                ::std::mem::replace(&mut self.0, EventReaderInner::Uninitialized(Some(reader)));
                 return Some(Err(ReadError::Io(err)));
             }
         };
 
-        ::std::mem::replace(self, event_reader);
+        ::std::mem::replace(&mut self.0, event_reader);
 
         self.next()
     }
