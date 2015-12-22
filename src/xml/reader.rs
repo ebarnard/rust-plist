@@ -2,19 +2,19 @@ use chrono::{DateTime, UTC};
 use rustc_serialize::base64::FromBase64;
 use std::io::Read;
 use std::str::FromStr;
-use xml_rs::reader::{EventReader, ParserConfig, XmlEvent};
+use xml_rs::reader::{EventReader as XmlEventReader, ParserConfig, XmlEvent};
 
-use super::super::{ParserError, ParserResult, PlistEvent};
+use super::super::{ReadError, ReadResult, PlistEvent};
 
-pub struct StreamingParser<R: Read> {
-	xml_reader: EventReader<R>,
+pub struct EventReader<R: Read> {
+	xml_reader: XmlEventReader<R>,
 	queued_event: Option<XmlEvent>,
 	element_stack: Vec<String>,
 	finished: bool
 }
 
-impl<R: Read> StreamingParser<R> {
-	pub fn new(reader: R) -> StreamingParser<R> {
+impl<R: Read> EventReader<R> {
+	pub fn new(reader: R) -> EventReader<R> {
 		let config = ParserConfig {
 			trim_whitespace: false,
 			whitespace_to_characters: true,
@@ -23,22 +23,22 @@ impl<R: Read> StreamingParser<R> {
 			coalesce_characters: true,
 		};
 
-		StreamingParser {
-			xml_reader: EventReader::new_with_config(reader, config),
+		EventReader {
+			xml_reader: XmlEventReader::new_with_config(reader, config),
 			queued_event: None,
 			element_stack: Vec::new(),
 			finished: false
 		}
 	}
 
-	fn read_content<F>(&mut self, f: F) -> ParserResult<PlistEvent> where F:FnOnce(String) -> ParserResult<PlistEvent> {
+	fn read_content<F>(&mut self, f: F) -> ReadResult<PlistEvent> where F:FnOnce(String) -> ReadResult<PlistEvent> {
 		match self.xml_reader.next() {
 			Ok(XmlEvent::Characters(s)) => f(s),
 			Ok(event @ XmlEvent::EndElement{..}) => {
 				self.queued_event = Some(event);
 				f("".to_owned())
 			},
-			_ => Err(ParserError::InvalidData)
+			_ => Err(ReadError::InvalidData)
 		}
 	}
 
@@ -50,7 +50,7 @@ impl<R: Read> StreamingParser<R> {
 		}
 	}
 
-	fn read_next(&mut self) -> Option<ParserResult<PlistEvent>> {
+	fn read_next(&mut self) -> Option<ReadResult<PlistEvent>> {
 		loop {
 			match self.next_event() {
 				Ok(XmlEvent::StartElement { name, .. }) => {
@@ -68,7 +68,7 @@ impl<R: Read> StreamingParser<R> {
 							let s: String = s.replace(" ", "").replace("\t", "");
 							match FromBase64::from_base64(&s[..]) {
 								Ok(b) => Ok(PlistEvent::DataValue(b)),
-								Err(_) => Err(ParserError::InvalidData)
+								Err(_) => Err(ReadError::InvalidData)
 							}
 						})),
 						"date" => return Some(self.read_content(|s| {
@@ -78,25 +78,25 @@ impl<R: Read> StreamingParser<R> {
 						"integer" => return Some(self.read_content(|s| {
 							match FromStr::from_str(&s)	{
 								Ok(i) => Ok(PlistEvent::IntegerValue(i)),
-								Err(_) => Err(ParserError::InvalidData)
+								Err(_) => Err(ReadError::InvalidData)
 							}
 						})),
 						"real" => return Some(self.read_content(|s| {
 							match FromStr::from_str(&s)	{
 								Ok(f) => Ok(PlistEvent::RealValue(f)),
-								Err(_) => Err(ParserError::InvalidData)
+								Err(_) => Err(ReadError::InvalidData)
 							}
 						})),
 						"string" => return Some(self.read_content(|s| Ok(PlistEvent::StringValue(s)))),
-						_ => return Some(Err(ParserError::InvalidData))
+						_ => return Some(Err(ReadError::InvalidData))
 					}
 				},
 				Ok(XmlEvent::EndElement { name, .. }) => {
 					// Check the corrent element is being closed
 					match self.element_stack.pop() {
 						Some(ref open_name) if &name.local_name == open_name => (),
-						Some(ref _open_name) => return Some(Err(ParserError::InvalidData)),
-						None => return Some(Err(ParserError::InvalidData))
+						Some(ref _open_name) => return Some(Err(ReadError::InvalidData)),
+						None => return Some(Err(ReadError::InvalidData))
 					}
 
 					match &name.local_name[..] {
@@ -109,20 +109,20 @@ impl<R: Read> StreamingParser<R> {
 				Ok(XmlEvent::EndDocument) => {
 					match self.element_stack.is_empty() {
 						true => return None,
-						false => return Some(Err(ParserError::UnexpectedEof))
+						false => return Some(Err(ReadError::UnexpectedEof))
 					}
 				},
-				Err(_) => return Some(Err(ParserError::InvalidData)),
+				Err(_) => return Some(Err(ReadError::InvalidData)),
 				_ => ()
 			}
 		}
 	}
 }
 
-impl<R: Read> Iterator for StreamingParser<R> {
-	type Item = ParserResult<PlistEvent>;
+impl<R: Read> Iterator for EventReader<R> {
+	type Item = ReadResult<PlistEvent>;
 
-	fn next(&mut self) -> Option<ParserResult<PlistEvent>> {
+	fn next(&mut self) -> Option<ReadResult<PlistEvent>> {
 		if self.finished {
 			None
 		} else {
@@ -155,7 +155,7 @@ mod tests {
 		use PlistEvent::*;
 
 		let reader = File::open(&Path::new("./tests/data/xml.plist")).unwrap();
-		let streaming_parser = StreamingParser::new(reader);
+		let streaming_parser = EventReader::new(reader);
 		let events: Vec<PlistEvent> = streaming_parser.map(|e| e.unwrap()).collect();
 
 		let comparison = &[
@@ -188,7 +188,7 @@ mod tests {
 	#[test]
 	fn bad_data() {
 		let reader = File::open(&Path::new("./tests/data/xml_error.plist")).unwrap();
-		let streaming_parser = StreamingParser::new(reader);
+		let streaming_parser = EventReader::new(reader);
 		let events: Vec<_> = streaming_parser.collect();
 
 		assert!(events.last().unwrap().is_err());

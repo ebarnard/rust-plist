@@ -4,20 +4,20 @@ use chrono::{TimeZone, UTC};
 use std::io::{Cursor, Read, Seek, SeekFrom};
 use std::string::FromUtf16Error;
 
-use {ParserError, ParserResult, PlistEvent};
+use {ReadError, ReadResult, PlistEvent};
 
-impl From<ByteorderError> for ParserError {
-	fn from(err: ByteorderError) -> ParserError {
+impl From<ByteorderError> for ReadError {
+	fn from(err: ByteorderError) -> ReadError {
 		match err {
-			ByteorderError::UnexpectedEOF => ParserError::UnexpectedEof,
-			ByteorderError::Io(err) => ParserError::Io(err)
+			ByteorderError::UnexpectedEOF => ReadError::UnexpectedEof,
+			ByteorderError::Io(err) => ReadError::Io(err)
 		}
 	}
 }
 
-impl From<FromUtf16Error> for ParserError {
-	fn from(_: FromUtf16Error) -> ParserError {
-		ParserError::InvalidData
+impl From<FromUtf16Error> for ReadError {
+	fn from(_: FromUtf16Error) -> ReadError {
+		ReadError::InvalidData
 	}
 }
 
@@ -34,7 +34,7 @@ enum StackType {
 
 /// https://opensource.apple.com/source/CF/CF-550/CFBinaryPList.c
 /// https://hg.python.org/cpython/file/3.4/Lib/plistlib.py
-pub struct StreamingParser<R> {
+pub struct EventReader<R> {
 	stack: Vec<StackItem>,
 	object_offsets: Vec<u64>,
 	reader: R,
@@ -42,9 +42,9 @@ pub struct StreamingParser<R> {
 	finished: bool
 }
 
-impl<R: Read+Seek> StreamingParser<R> {
-	pub fn new(reader: R) -> StreamingParser<R> {
-		StreamingParser {
+impl<R: Read+Seek> EventReader<R> {
+	pub fn new(reader: R) -> EventReader<R> {
+		EventReader {
 			stack: Vec::new(),
 			object_offsets: Vec::new(),
 			reader: reader,
@@ -53,7 +53,7 @@ impl<R: Read+Seek> StreamingParser<R> {
 		}
 	}
 
-	fn read_trailer(&mut self) -> ParserResult<()> {
+	fn read_trailer(&mut self) -> ReadResult<()> {
 		try!(self.reader.seek(SeekFrom::Start(0)));
 		let mut magic = [0; 8];
 		try!(self.reader.read(&mut magic));
@@ -81,7 +81,7 @@ impl<R: Read+Seek> StreamingParser<R> {
 		Ok(())
 	}
 
-	fn read_ints(&mut self, len: u64, size: u8) -> ParserResult<Vec<u64>> {
+	fn read_ints(&mut self, len: u64, size: u8) -> ReadResult<Vec<u64>> {
 		let mut ints = Vec::with_capacity(len as usize);
 		// TODO: Is the match hoisted out of the loop?
 		for _ in 0..len {
@@ -90,18 +90,18 @@ impl<R: Read+Seek> StreamingParser<R> {
 				2 => ints.push(try!(self.reader.read_u16::<BigEndian>()) as u64),
 				4 => ints.push(try!(self.reader.read_u32::<BigEndian>()) as u64),
 				8 => ints.push(try!(self.reader.read_u64::<BigEndian>()) as u64),
-				_ => return Err(ParserError::InvalidData)
+				_ => return Err(ReadError::InvalidData)
 			}
 		}
 		Ok(ints)
 	}
 
-	fn read_refs(&mut self, len: u64) -> ParserResult<Vec<u64>> {
+	fn read_refs(&mut self, len: u64) -> ReadResult<Vec<u64>> {
 		let ref_size = self.ref_size;
 		self.read_ints(len, ref_size)
 	}
 
-	fn read_object_len(&mut self, len: u8) -> ParserResult<u64> {
+	fn read_object_len(&mut self, len: u8) -> ReadResult<u64> {
 		if (len & 0xf) == 0xf {
 			let len_power_of_two = try!(self.reader.read_u8()) & 0x3;
 			Ok(match len_power_of_two {
@@ -109,21 +109,21 @@ impl<R: Read+Seek> StreamingParser<R> {
 				1 => try!(self.reader.read_u16::<BigEndian>()) as u64,
 				2 => try!(self.reader.read_u32::<BigEndian>()) as u64,
 				3 => try!(self.reader.read_u64::<BigEndian>()),
-				_ => return Err(ParserError::InvalidData)
+				_ => return Err(ReadError::InvalidData)
 			})
 		} else {
 			Ok(len as u64)
 		}
 	}
 
-	fn read_data(&mut self, len: u64) -> ParserResult<Vec<u8>> {
+	fn read_data(&mut self, len: u64) -> ReadResult<Vec<u8>> {
 		let mut data = vec![0; len as usize];
 		let mut total_read = 0usize;
 
 		while (total_read as u64) < len {
 			let read = try!(self.reader.read(&mut data[total_read..]));
 			if read == 0 {
-				return Err(ParserError::UnexpectedEof);
+				return Err(ReadError::UnexpectedEof);
 			}
 			total_read += read;
 		}
@@ -131,13 +131,13 @@ impl<R: Read+Seek> StreamingParser<R> {
 		Ok(data)
 	}
 
-	fn seek_to_object(&mut self, object_ref: u64) -> ParserResult<u64> {
+	fn seek_to_object(&mut self, object_ref: u64) -> ReadResult<u64> {
 		let offset = *&self.object_offsets[object_ref as usize];
 		let pos = try!(self.reader.seek(SeekFrom::Start(offset)));
 		Ok(pos)
 	}
 
-	fn read_next(&mut self) -> ParserResult<Option<PlistEvent>> {
+	fn read_next(&mut self) -> ReadResult<Option<PlistEvent>> {
 		if self.ref_size == 0 {
 			// Initialise here rather than in new
 			try!(self.read_trailer());
@@ -170,19 +170,19 @@ impl<R: Read+Seek> StreamingParser<R> {
 		let size = token & 0x0f;
 
 		let result = match (ty, size) {
-			(0x0, 0x00) => return Err(ParserError::UnsupportedType), // null
+			(0x0, 0x00) => return Err(ReadError::UnsupportedType), // null
 			(0x0, 0x08) => Some(PlistEvent::BooleanValue(false)),
 			(0x0, 0x09) => Some(PlistEvent::BooleanValue(true)),
-			(0x0, 0x0f) => return Err(ParserError::UnsupportedType), // fill
+			(0x0, 0x0f) => return Err(ReadError::UnsupportedType), // fill
 			(0x1, 0) => Some(PlistEvent::IntegerValue(try!(self.reader.read_u8()) as i64)),
 			(0x1, 1) => Some(PlistEvent::IntegerValue(try!(self.reader.read_u16::<BigEndian>()) as i64)),
 			(0x1, 2) => Some(PlistEvent::IntegerValue(try!(self.reader.read_u32::<BigEndian>()) as i64)),
 			(0x1, 3) => Some(PlistEvent::IntegerValue(try!(self.reader.read_i64::<BigEndian>()))),
-			(0x1, 4) => return Err(ParserError::UnsupportedType), // 128 bit int
-			(0x1, _) => return Err(ParserError::UnsupportedType), // variable length int
+			(0x1, 4) => return Err(ReadError::UnsupportedType), // 128 bit int
+			(0x1, _) => return Err(ReadError::UnsupportedType), // variable length int
 			(0x2, 2) => Some(PlistEvent::RealValue(try!(self.reader.read_f32::<BigEndian>()) as f64)),
 			(0x2, 3) => Some(PlistEvent::RealValue(try!(self.reader.read_f64::<BigEndian>()))),
-			(0x2, _) => return Err(ParserError::UnsupportedType), // odd length float
+			(0x2, _) => return Err(ReadError::UnsupportedType), // odd length float
 			(0x3, 3) => { // Date
 				// Seconds since 1/1/2001 00:00:00
 				let timestamp = try!(self.reader.read_f64::<BigEndian>());
@@ -253,17 +253,17 @@ impl<R: Read+Seek> StreamingParser<R> {
 
 				Some(PlistEvent::StartDictionary(Some(len as u64)))
 			},
-			(_, _) => return Err(ParserError::InvalidData)
+			(_, _) => return Err(ReadError::InvalidData)
 		};
 
 		Ok(result)
 	}
 }
 
-impl<R: Read+Seek> Iterator for StreamingParser<R> {
-	type Item = ParserResult<PlistEvent>;
+impl<R: Read+Seek> Iterator for EventReader<R> {
+	type Item = ReadResult<PlistEvent>;
 
-	fn next(&mut self) -> Option<ParserResult<PlistEvent>> {
+	fn next(&mut self) -> Option<ReadResult<PlistEvent>> {
 		if self.finished {
 			None
 		} else {
@@ -296,7 +296,7 @@ mod tests {
 		use PlistEvent::*;
 
 		let reader = File::open(&Path::new("./tests/data/binary.plist")).unwrap();
-		let streaming_parser = StreamingParser::new(reader);
+		let streaming_parser = EventReader::new(reader);
 		let events: Vec<PlistEvent> = streaming_parser.map(|e| e.unwrap()).collect();
 
 		let comparison = &[

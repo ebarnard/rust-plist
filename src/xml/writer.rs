@@ -4,7 +4,7 @@ use std::io::Write;
 use xml_rs::attribute::Attribute;
 use xml_rs::name::Name;
 use xml_rs::namespace::Namespace;
-use xml_rs::writer::{EventWriter, EmitterConfig};
+use xml_rs::writer::{EventWriter as XmlEventWriter, EmitterConfig};
 use xml_rs::writer::events::XmlEvent as WriteXmlEvent;
 
 use {PlistEvent};
@@ -20,15 +20,15 @@ enum DictionaryState {
 	ExpectValue
 }
 
-pub struct Writer<W: Write> {
-	xml_writer: EventWriter<W>,
+pub struct EventWriter<W: Write> {
+	xml_writer: XmlEventWriter<W>,
 	stack: Vec<Element>,
 	// Not very nice
 	empty_namespace: Namespace
 }
 
-impl<W: Write> Writer<W> {
-	pub fn new(writer: W) -> Writer<W> {
+impl<W: Write> EventWriter<W> {
+	pub fn new(writer: W) -> EventWriter<W> {
 		let config = EmitterConfig {
 			line_separator: "\n".into(),
 			indent_string: "    ".into(),
@@ -41,8 +41,8 @@ impl<W: Write> Writer<W> {
 			autopad_comments: true
 		};
 
-		Writer {
-			xml_writer: EventWriter::new_with_config(writer, config),
+		EventWriter {
+			xml_writer: XmlEventWriter::new_with_config(writer, config),
 			stack: Vec::new(),
 			empty_namespace: Namespace::empty()
 		}
@@ -211,7 +211,7 @@ mod tests {
 		let mut cursor = Cursor::new(Vec::new());
 
 		{
-			let mut plist_w = Writer::new(&mut cursor);
+			let mut plist_w = EventWriter::new(&mut cursor);
 
 			for item in plist {
 				plist_w.write(item).unwrap();

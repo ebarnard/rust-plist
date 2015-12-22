@@ -1,7 +1,7 @@
 use std::collections::BTreeMap;
 use std::io::{Read, Seek};
 
-use {ParserError, ParserResult, Plist, PlistEvent, StreamingParser};
+use {ReadError, ReadResult, Plist, PlistEvent, EventReader};
 
 pub type BuilderResult<T> = Result<T, BuilderError>;
 
@@ -9,12 +9,12 @@ pub type BuilderResult<T> = Result<T, BuilderError>;
 pub enum BuilderError {
 	InvalidEvent,
 	UnsupportedDictionaryKey,
-	ParserError(ParserError)
+	ReadError(ReadError)
 }
 
-impl From<ParserError> for BuilderError {
-	fn from(err: ParserError) -> BuilderError {
-		BuilderError::ParserError(err)
+impl From<ReadError> for BuilderError {
+	fn from(err: ReadError) -> BuilderError {
+		BuilderError::ReadError(err)
 	}
 }
 
@@ -23,13 +23,13 @@ pub struct Builder<T> {
 	token: Option<PlistEvent>,
 }
 
-impl<R: Read+Seek> Builder<StreamingParser<R>> {
-	pub fn new(reader: R) -> Builder<StreamingParser<R>> {
-		Builder::from_event_stream(StreamingParser::new(reader))
+impl<R: Read+Seek> Builder<EventReader<R>> {
+	pub fn new(reader: R) -> Builder<EventReader<R>> {
+		Builder::from_event_stream(EventReader::new(reader))
 	}
 }
 
-impl<T:Iterator<Item=ParserResult<PlistEvent>>> Builder<T> {
+impl<T:Iterator<Item=ReadResult<PlistEvent>>> Builder<T> {
 	pub fn from_event_stream(stream: T) -> Builder<T> {
 		Builder {
 			stream: stream,
@@ -57,7 +57,7 @@ impl<T:Iterator<Item=ParserResult<PlistEvent>>> Builder<T> {
 	fn bump(&mut self) -> BuilderResult<()> {
 		self.token = match self.stream.next() {
 			Some(Ok(token)) => Some(token),
-			Some(Err(err)) => return Err(BuilderError::ParserError(err)),
+			Some(Err(err)) => return Err(BuilderError::ReadError(err)),
 			None => None,
 		};
 		Ok(())

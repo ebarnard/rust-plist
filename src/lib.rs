@@ -96,38 +96,38 @@ pub enum PlistEvent {
 	StringValue(String),
 }
 
-pub type ParserResult<T> = Result<T, ParserError>;
+pub type ReadResult<T> = Result<T, ReadError>;
 
 #[derive(Debug)]
-pub enum ParserError {
+pub enum ReadError {
 	InvalidData,
 	UnexpectedEof,
 	UnsupportedType,
 	Io(IoError)
 }
 
-impl From<IoError> for ParserError {
-	fn from(io_error: IoError) -> ParserError {
-		ParserError::Io(io_error)
+impl From<IoError> for ReadError {
+	fn from(io_error: IoError) -> ReadError {
+		ReadError::Io(io_error)
 	}
 }
 
-impl From<ChronoParseError> for ParserError {
-	fn from(_: ChronoParseError) -> ParserError {
-		ParserError::InvalidData
+impl From<ChronoParseError> for ReadError {
+	fn from(_: ChronoParseError) -> ReadError {
+		ReadError::InvalidData
 	}
 }
 
-pub enum StreamingParser<R: Read+Seek> {
-	Xml(xml::StreamingParser<R>),
-	Binary(binary::StreamingParser<R>)
+pub enum EventReader<R: Read+Seek> {
+	Xml(xml::EventReader<R>),
+	Binary(binary::EventReader<R>)
 }
 
-impl<R: Read+Seek> StreamingParser<R> {
-	pub fn new(mut reader: R) -> StreamingParser<R> {
-		match StreamingParser::is_binary(&mut reader) {
-			Ok(true) => StreamingParser::Binary(binary::StreamingParser::new(reader)),
-			Ok(false) | Err(_) => StreamingParser::Xml(xml::StreamingParser::new(reader))
+impl<R: Read+Seek> EventReader<R> {
+	pub fn new(mut reader: R) -> EventReader<R> {
+		match EventReader::is_binary(&mut reader) {
+			Ok(true) => EventReader::Binary(binary::EventReader::new(reader)),
+			Ok(false) | Err(_) => EventReader::Xml(xml::EventReader::new(reader))
 		}
 	}
 
@@ -145,13 +145,13 @@ impl<R: Read+Seek> StreamingParser<R> {
 	}
 }
 
-impl<R: Read+Seek> Iterator for StreamingParser<R> {
-	type Item = ParserResult<PlistEvent>;
+impl<R: Read+Seek> Iterator for EventReader<R> {
+	type Item = ReadResult<PlistEvent>;
 
-	fn next(&mut self) -> Option<ParserResult<PlistEvent>> {
+	fn next(&mut self) -> Option<ReadResult<PlistEvent>> {
 		match *self {
-			StreamingParser::Xml(ref mut parser) => parser.next(),
-			StreamingParser::Binary(ref mut parser) => parser.next()
+			EventReader::Xml(ref mut parser) => parser.next(),
+			EventReader::Binary(ref mut parser) => parser.next()
 		}
 	}
 }

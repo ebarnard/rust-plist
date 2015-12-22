@@ -1,5 +1,5 @@
 mod reader;
 mod writer;
 
-pub use self::reader::StreamingParser;
-pub use self::writer::Writer;
+pub use self::reader::EventReader;
+pub use self::writer::EventWriter;

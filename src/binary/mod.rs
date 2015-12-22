@@ -1,3 +1,3 @@
 mod reader;
 
-pub use self::reader::StreamingParser;
+pub use self::reader::EventReader;
