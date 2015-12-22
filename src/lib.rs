@@ -7,8 +7,6 @@ pub mod binary;
 pub mod xml;
 mod builder;
 
-pub use builder::{Builder, BuilderError, BuilderResult};
-
 use chrono::{DateTime, UTC};
 use chrono::format::ParseError as ChronoParseError;
 use std::collections::BTreeMap;
@@ -31,6 +29,18 @@ use rustc_serialize::base64::{STANDARD, ToBase64};
 use rustc_serialize::json::Json as RustcJson;
 
 impl Plist {
+	pub fn from_events<T>(events: T) -> Result<Plist, ()>
+		where T: IntoIterator<Item = ReadResult<PlistEvent>>
+	{
+		let iter = events.into_iter();
+		let builder = builder::Builder::new(iter);
+
+		match builder.build() {
+			Ok(plist) => Ok(plist),
+			Err(_) => Err(())
+		}
+	}
+
 	pub fn into_events(self) -> Vec<PlistEvent> {
 		let mut events = Vec::new();
 		self.into_events_inner(&mut events);
