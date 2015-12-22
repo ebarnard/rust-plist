@@ -1,3 +1,40 @@
+//! # Plist
+//!
+//! A rusty plist parser.
+//!
+//! ## Usage
+//!
+//! Put this in your `Cargo.toml`:
+//!
+//! ```toml
+//! [dependencies]
+//! plist = "0.0.11"
+//! ```
+//!
+//! And put this in your crate root:
+//!
+//! ```rust
+//! extern crate plist;
+//! ```
+//!
+//! ## Examples
+//!
+//! ```rust ignore
+//! use plist::Plist;
+//! use std::fs::File;
+//!
+//! let file = File::open("tests/data/xml.plist").unwrap();
+//! let plist = Plist::read(file).unwrap();
+//!
+//! match plist {
+//! Plist::Array(array) => (),
+//! _ => ()
+//! }
+//!
+//! ```
+//!
+//!
+
 extern crate byteorder;
 extern crate chrono;
 extern crate rustc_serialize;
