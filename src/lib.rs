@@ -29,6 +29,11 @@ use rustc_serialize::base64::{STANDARD, ToBase64};
 use rustc_serialize::json::Json as RustcJson;
 
 impl Plist {
+    pub fn read<R: Read + Seek>(reader: R) -> Result<Plist, ()> {
+        let reader = EventReader::new(reader);
+        Plist::from_events(reader)
+    }
+
     pub fn from_events<T>(events: T) -> Result<Plist, ()>
         where T: IntoIterator<Item = ReadResult<PlistEvent>>
     {
