@@ -27,8 +27,8 @@
 //! let plist = Plist::read(file).unwrap();
 //!
 //! match plist {
-//! Plist::Array(array) => (),
-//! _ => ()
+//!     Plist::Array(_array) => (),
+//!     _ => ()
 //! }
 //!
 //! ```
