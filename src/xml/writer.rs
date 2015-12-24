@@ -7,7 +7,7 @@ use xml_rs::namespace::Namespace;
 use xml_rs::writer::{EventWriter as XmlEventWriter, EmitterConfig};
 use xml_rs::writer::events::XmlEvent as WriteXmlEvent;
 
-use PlistEvent;
+use {Error, EventWriter as EventWriterTrait, PlistEvent, Result};
 
 enum Element {
     Dictionary(DictionaryState),
@@ -48,46 +48,39 @@ impl<W: Write> EventWriter<W> {
         }
     }
 
-    fn write_element_and_value(&mut self, name: &str, value: &str) -> Result<(), ()> {
+    fn write_element_and_value(&mut self, name: &str, value: &str) -> Result<()> {
         try!(self.start_element(name));
         try!(self.write_value(value));
         try!(self.end_element(name));
         Ok(())
     }
 
-    fn start_element(&mut self, name: &str) -> Result<(), ()> {
-        let result = self.xml_writer.write(WriteXmlEvent::StartElement {
+    fn start_element(&mut self, name: &str) -> Result<()> {
+        try!(self.xml_writer.write(WriteXmlEvent::StartElement {
             name: Name::local(name),
             attributes: Cow::Borrowed(&[]),
             namespace: Cow::Borrowed(&self.empty_namespace),
-        });
-
-        match result {
-            Ok(()) => Ok(()),
-            Err(_) => Err(()),
-        }
+        }));
+        Ok(())
     }
 
-    fn end_element(&mut self, name: &str) -> Result<(), ()> {
-        let result = self.xml_writer
-                         .write(WriteXmlEvent::EndElement { name: Some(Name::local(name)) });
-
-        match result {
-            Ok(()) => Ok(()),
-            Err(_) => Err(()),
-        }
+    fn end_element(&mut self, name: &str) -> Result<()> {
+        try!(self.xml_writer.write(WriteXmlEvent::EndElement { name: Some(Name::local(name)) }));
+        Ok(())
     }
 
-    fn write_value(&mut self, value: &str) -> Result<(), ()> {
-        let result = self.xml_writer.write(WriteXmlEvent::Characters(value));
-
-        match result {
-            Ok(()) => Ok(()),
-            Err(_) => Err(()),
-        }
+    fn write_value(&mut self, value: &str) -> Result<()> {
+        try!(self.xml_writer.write(WriteXmlEvent::Characters(value)));
+        Ok(())
     }
 
-    pub fn write(&mut self, event: &PlistEvent) -> Result<(), ()> {
+    pub fn write(&mut self, event: &PlistEvent) -> Result<()> {
+        <Self as EventWriterTrait>::write(self, event)
+    }
+}
+
+impl<W: Write> EventWriterTrait for EventWriter<W> {
+    fn write(&mut self, event: &PlistEvent) -> Result<()> {
         match self.stack.pop() {
             Some(Element::Dictionary(DictionaryState::ExpectKey)) => {
                 match *event {
@@ -96,7 +89,7 @@ impl<W: Write> EventWriter<W> {
                         self.stack.push(Element::Dictionary(DictionaryState::ExpectValue));
                     }
                     PlistEvent::EndDictionary => try!(self.end_element("dict")),
-                    _ => return Err(()), // Invalid event
+                    _ => return Err(Error::InvalidData),
                 };
                 return Ok(());
             }
@@ -118,23 +111,23 @@ impl<W: Write> EventWriter<W> {
 
                         match result {
                             Ok(()) => (),
-                            Err(_) => return Err(()),
+                            Err(_) => return Err(Error::InvalidData),
                         }
 
                         self.stack.push(Element::Root);
                         return Ok(());
                     }
-                    _ => return Err(()), // Invalid event
+                    _ => return Err(Error::InvalidData),
                 }
             }
         }
 
         Ok(match *event {
-            PlistEvent::StartPlist => return Err(()), // Invalid event
+            PlistEvent::StartPlist => return Err(Error::InvalidData),
             PlistEvent::EndPlist => {
                 try!(self.end_element("plist"));
                 if let Some(Element::Root) = self.stack.pop() {} else {
-                    return Err(()); // Invalid event
+                    return Err(Error::InvalidData);
                 }
             }
 
@@ -145,7 +138,7 @@ impl<W: Write> EventWriter<W> {
             PlistEvent::EndArray => {
                 try!(self.end_element("array"));
                 if let Some(Element::Array) = self.stack.pop() {} else {
-                    return Err(()); // Invalid event
+                    return Err(Error::InvalidData);
                 }
             }
 
@@ -153,7 +146,7 @@ impl<W: Write> EventWriter<W> {
                 try!(self.start_element("dict"));
                 self.stack.push(Element::Dictionary(DictionaryState::ExpectKey));
             }
-            PlistEvent::EndDictionary => return Err(()), // Invalid event
+            PlistEvent::EndDictionary => return Err(Error::InvalidData),
 
             PlistEvent::BooleanValue(true) => {
                 try!(self.start_element("true"));

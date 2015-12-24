@@ -4,7 +4,7 @@ use std::io::Read;
 use std::str::FromStr;
 use xml_rs::reader::{EventReader as XmlEventReader, ParserConfig, XmlEvent};
 
-use super::super::{ReadError, ReadResult, PlistEvent};
+use {Error, Result, PlistEvent};
 
 pub struct EventReader<R: Read> {
     xml_reader: XmlEventReader<R>,
@@ -31,8 +31,8 @@ impl<R: Read> EventReader<R> {
         }
     }
 
-    fn read_content<F>(&mut self, f: F) -> ReadResult<PlistEvent>
-        where F: FnOnce(String) -> ReadResult<PlistEvent>
+    fn read_content<F>(&mut self, f: F) -> Result<PlistEvent>
+        where F: FnOnce(String) -> Result<PlistEvent>
     {
         match self.xml_reader.next() {
             Ok(XmlEvent::Characters(s)) => f(s),
@@ -40,11 +40,11 @@ impl<R: Read> EventReader<R> {
                 self.queued_event = Some(event);
                 f("".to_owned())
             }
-            _ => Err(ReadError::InvalidData),
+            _ => Err(Error::InvalidData),
         }
     }
 
-    fn next_event(&mut self) -> Result<XmlEvent, ()> {
+    fn next_event(&mut self) -> ::std::result::Result<XmlEvent, ()> {
         if let Some(event) = self.queued_event.take() {
             Ok(event)
         } else {
@@ -52,7 +52,7 @@ impl<R: Read> EventReader<R> {
         }
     }
 
-    fn read_next(&mut self) -> Option<ReadResult<PlistEvent>> {
+    fn read_next(&mut self) -> Option<Result<PlistEvent>> {
         loop {
             match self.next_event() {
                 Ok(XmlEvent::StartElement { name, .. }) => {
@@ -71,7 +71,7 @@ impl<R: Read> EventReader<R> {
                                 let s: String = s.replace(" ", "").replace("\t", "");
                                 match FromBase64::from_base64(&s[..]) {
                                     Ok(b) => Ok(PlistEvent::DataValue(b)),
-                                    Err(_) => Err(ReadError::InvalidData),
+                                    Err(_) => Err(Error::InvalidData),
                                 }
                             }))
                         }
@@ -85,7 +85,7 @@ impl<R: Read> EventReader<R> {
                             return Some(self.read_content(|s| {
                                 match FromStr::from_str(&s) {
                                     Ok(i) => Ok(PlistEvent::IntegerValue(i)),
-                                    Err(_) => Err(ReadError::InvalidData),
+                                    Err(_) => Err(Error::InvalidData),
                                 }
                             }))
                         }
@@ -93,22 +93,22 @@ impl<R: Read> EventReader<R> {
                             return Some(self.read_content(|s| {
                                 match FromStr::from_str(&s) {
                                     Ok(f) => Ok(PlistEvent::RealValue(f)),
-                                    Err(_) => Err(ReadError::InvalidData),
+                                    Err(_) => Err(Error::InvalidData),
                                 }
                             }))
                         }
                         "string" => {
                             return Some(self.read_content(|s| Ok(PlistEvent::StringValue(s))))
                         }
-                        _ => return Some(Err(ReadError::InvalidData)),
+                        _ => return Some(Err(Error::InvalidData)),
                     }
                 }
                 Ok(XmlEvent::EndElement { name, .. }) => {
                     // Check the corrent element is being closed
                     match self.element_stack.pop() {
                         Some(ref open_name) if &name.local_name == open_name => (),
-                        Some(ref _open_name) => return Some(Err(ReadError::InvalidData)),
-                        None => return Some(Err(ReadError::InvalidData)),
+                        Some(ref _open_name) => return Some(Err(Error::InvalidData)),
+                        None => return Some(Err(Error::InvalidData)),
                     }
 
                     match &name.local_name[..] {
@@ -121,10 +121,10 @@ impl<R: Read> EventReader<R> {
                 Ok(XmlEvent::EndDocument) => {
                     match self.element_stack.is_empty() {
                         true => return None,
-                        false => return Some(Err(ReadError::UnexpectedEof)),
+                        false => return Some(Err(Error::UnexpectedEof)),
                     }
                 }
-                Err(_) => return Some(Err(ReadError::InvalidData)),
+                Err(_) => return Some(Err(Error::InvalidData)),
                 _ => (),
             }
         }
@@ -132,9 +132,9 @@ impl<R: Read> EventReader<R> {
 }
 
 impl<R: Read> Iterator for EventReader<R> {
-    type Item = ReadResult<PlistEvent>;
+    type Item = Result<PlistEvent>;
 
-    fn next(&mut self) -> Option<ReadResult<PlistEvent>> {
+    fn next(&mut self) -> Option<Result<PlistEvent>> {
         if self.finished {
             None
         } else {

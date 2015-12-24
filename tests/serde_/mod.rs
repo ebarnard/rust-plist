@@ -1,4 +1,4 @@
-use plist::{Deserializer, EventWriter, PlistEvent, Serializer};
+use plist::{Deserializer, EventWriter, PlistEvent, Result as PlistResult, Serializer};
 use plist::PlistEvent::*;
 use serde::{Deserialize, Serialize};
 use std::fmt::Debug;
@@ -18,7 +18,7 @@ impl VecWriter {
 }
 
 impl EventWriter for VecWriter {
-    fn write(&mut self, event: &PlistEvent) -> Result<(), ()> {
+    fn write(&mut self, event: &PlistEvent) -> PlistResult<()> {
         self.events.push(event.clone());
         Ok(())
     }

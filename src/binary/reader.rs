@@ -4,20 +4,20 @@ use chrono::{TimeZone, UTC};
 use std::io::{Cursor, Read, Seek, SeekFrom};
 use std::string::FromUtf16Error;
 
-use {ReadError, ReadResult, PlistEvent};
+use {Error, Result, PlistEvent};
 
-impl From<ByteorderError> for ReadError {
-    fn from(err: ByteorderError) -> ReadError {
+impl From<ByteorderError> for Error {
+    fn from(err: ByteorderError) -> Error {
         match err {
-            ByteorderError::UnexpectedEOF => ReadError::UnexpectedEof,
-            ByteorderError::Io(err) => ReadError::Io(err),
+            ByteorderError::UnexpectedEOF => Error::UnexpectedEof,
+            ByteorderError::Io(err) => Error::Io(err),
         }
     }
 }
 
-impl From<FromUtf16Error> for ReadError {
-    fn from(_: FromUtf16Error) -> ReadError {
-        ReadError::InvalidData
+impl From<FromUtf16Error> for Error {
+    fn from(_: FromUtf16Error) -> Error {
+        Error::InvalidData
     }
 }
 
@@ -53,7 +53,7 @@ impl<R: Read + Seek> EventReader<R> {
         }
     }
 
-    fn read_trailer(&mut self) -> ReadResult<()> {
+    fn read_trailer(&mut self) -> Result<()> {
         try!(self.reader.seek(SeekFrom::Start(0)));
         let mut magic = [0; 8];
         try!(self.reader.read(&mut magic));
@@ -81,7 +81,7 @@ impl<R: Read + Seek> EventReader<R> {
         Ok(())
     }
 
-    fn read_ints(&mut self, len: u64, size: u8) -> ReadResult<Vec<u64>> {
+    fn read_ints(&mut self, len: u64, size: u8) -> Result<Vec<u64>> {
         let mut ints = Vec::with_capacity(len as usize);
         // TODO: Is the match hoisted out of the loop?
         for _ in 0..len {
@@ -90,18 +90,18 @@ impl<R: Read + Seek> EventReader<R> {
                 2 => ints.push(try!(self.reader.read_u16::<BigEndian>()) as u64),
                 4 => ints.push(try!(self.reader.read_u32::<BigEndian>()) as u64),
                 8 => ints.push(try!(self.reader.read_u64::<BigEndian>()) as u64),
-                _ => return Err(ReadError::InvalidData),
+                _ => return Err(Error::InvalidData),
             }
         }
         Ok(ints)
     }
 
-    fn read_refs(&mut self, len: u64) -> ReadResult<Vec<u64>> {
+    fn read_refs(&mut self, len: u64) -> Result<Vec<u64>> {
         let ref_size = self.ref_size;
         self.read_ints(len, ref_size)
     }
 
-    fn read_object_len(&mut self, len: u8) -> ReadResult<u64> {
+    fn read_object_len(&mut self, len: u8) -> Result<u64> {
         if (len & 0xf) == 0xf {
             let len_power_of_two = try!(self.reader.read_u8()) & 0x3;
             Ok(match len_power_of_two {
@@ -109,21 +109,21 @@ impl<R: Read + Seek> EventReader<R> {
                 1 => try!(self.reader.read_u16::<BigEndian>()) as u64,
                 2 => try!(self.reader.read_u32::<BigEndian>()) as u64,
                 3 => try!(self.reader.read_u64::<BigEndian>()),
-                _ => return Err(ReadError::InvalidData),
+                _ => return Err(Error::InvalidData),
             })
         } else {
             Ok(len as u64)
         }
     }
 
-    fn read_data(&mut self, len: u64) -> ReadResult<Vec<u8>> {
+    fn read_data(&mut self, len: u64) -> Result<Vec<u8>> {
         let mut data = vec![0; len as usize];
         let mut total_read = 0usize;
 
         while (total_read as u64) < len {
             let read = try!(self.reader.read(&mut data[total_read..]));
             if read == 0 {
-                return Err(ReadError::UnexpectedEof);
+                return Err(Error::UnexpectedEof);
             }
             total_read += read;
         }
@@ -131,13 +131,13 @@ impl<R: Read + Seek> EventReader<R> {
         Ok(data)
     }
 
-    fn seek_to_object(&mut self, object_ref: u64) -> ReadResult<u64> {
+    fn seek_to_object(&mut self, object_ref: u64) -> Result<u64> {
         let offset = *&self.object_offsets[object_ref as usize];
         let pos = try!(self.reader.seek(SeekFrom::Start(offset)));
         Ok(pos)
     }
 
-    fn read_next(&mut self) -> ReadResult<Option<PlistEvent>> {
+    fn read_next(&mut self) -> Result<Option<PlistEvent>> {
         if self.ref_size == 0 {
             // Initialise here rather than in new
             try!(self.read_trailer());
@@ -170,10 +170,10 @@ impl<R: Read + Seek> EventReader<R> {
         let size = token & 0x0f;
 
         let result = match (ty, size) {
-            (0x0, 0x00) => return Err(ReadError::UnsupportedType), // null
+            (0x0, 0x00) => return Err(Error::InvalidData), // null
             (0x0, 0x08) => Some(PlistEvent::BooleanValue(false)),
             (0x0, 0x09) => Some(PlistEvent::BooleanValue(true)),
-            (0x0, 0x0f) => return Err(ReadError::UnsupportedType), // fill
+            (0x0, 0x0f) => return Err(Error::InvalidData), // fill
             (0x1, 0) => Some(PlistEvent::IntegerValue(try!(self.reader.read_u8()) as i64)),
             (0x1, 1) => {
                 Some(PlistEvent::IntegerValue(try!(self.reader.read_u16::<BigEndian>()) as i64))
@@ -182,13 +182,13 @@ impl<R: Read + Seek> EventReader<R> {
                 Some(PlistEvent::IntegerValue(try!(self.reader.read_u32::<BigEndian>()) as i64))
             }
             (0x1, 3) => Some(PlistEvent::IntegerValue(try!(self.reader.read_i64::<BigEndian>()))),
-            (0x1, 4) => return Err(ReadError::UnsupportedType), // 128 bit int
-            (0x1, _) => return Err(ReadError::UnsupportedType), // variable length int
+            (0x1, 4) => return Err(Error::InvalidData), // 128 bit int
+            (0x1, _) => return Err(Error::InvalidData), // variable length int
             (0x2, 2) => {
                 Some(PlistEvent::RealValue(try!(self.reader.read_f32::<BigEndian>()) as f64))
             }
             (0x2, 3) => Some(PlistEvent::RealValue(try!(self.reader.read_f64::<BigEndian>()))),
-            (0x2, _) => return Err(ReadError::UnsupportedType), // odd length float
+            (0x2, _) => return Err(Error::InvalidData), // odd length float
             (0x3, 3) => {
                 // Date
                 // Seconds since 1/1/2001 00:00:00
@@ -265,7 +265,7 @@ impl<R: Read + Seek> EventReader<R> {
 
                 Some(PlistEvent::StartDictionary(Some(len as u64)))
             }
-            (_, _) => return Err(ReadError::InvalidData),
+            (_, _) => return Err(Error::InvalidData),
         };
 
         Ok(result)
@@ -273,9 +273,9 @@ impl<R: Read + Seek> EventReader<R> {
 }
 
 impl<R: Read + Seek> Iterator for EventReader<R> {
-    type Item = ReadResult<PlistEvent>;
+    type Item = Result<PlistEvent>;
 
-    fn next(&mut self) -> Option<ReadResult<PlistEvent>> {
+    fn next(&mut self) -> Option<Result<PlistEvent>> {
         if self.finished {
             None
         } else {

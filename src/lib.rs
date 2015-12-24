@@ -73,21 +73,17 @@ use rustc_serialize::base64::{STANDARD, ToBase64};
 use rustc_serialize::json::Json as RustcJson;
 
 impl Plist {
-    pub fn read<R: Read + Seek>(reader: R) -> Result<Plist, ()> {
+    pub fn read<R: Read + Seek>(reader: R) -> Result<Plist> {
         let reader = EventReader::new(reader);
         Plist::from_events(reader)
     }
 
-    pub fn from_events<T>(events: T) -> Result<Plist, ()>
-        where T: IntoIterator<Item = ReadResult<PlistEvent>>
+    pub fn from_events<T>(events: T) -> Result<Plist>
+        where T: IntoIterator<Item = Result<PlistEvent>>
     {
         let iter = events.into_iter();
         let builder = builder::Builder::new(iter);
-
-        match builder.build() {
-            Ok(plist) => Ok(plist),
-            Err(_) => Err(()),
-        }
+        builder.build()
     }
 
     pub fn into_events(self) -> Vec<PlistEvent> {
@@ -175,25 +171,63 @@ pub enum PlistEvent {
     StringValue(String),
 }
 
-pub type ReadResult<T> = Result<T, ReadError>;
+pub type Result<T> = ::std::result::Result<T, Error>;
 
 #[derive(Debug)]
-pub enum ReadError {
+pub enum Error {
     InvalidData,
     UnexpectedEof,
-    UnsupportedType,
     Io(IoError),
 }
 
-impl From<IoError> for ReadError {
-    fn from(io_error: IoError) -> ReadError {
-        ReadError::Io(io_error)
+impl ::std::error::Error for Error {
+    fn description(&self) -> &str {
+        match *self {
+            Error::InvalidData => "invalid data",
+            Error::UnexpectedEof => "unexpected eof",
+            Error::Io(ref err) => err.description(),
+        }
+    }
+
+    fn cause(&self) -> Option<&::std::error::Error> {
+        match *self {
+            Error::Io(ref err) => Some(err),
+            _ => None,
+        }
     }
 }
 
-impl From<ChronoParseError> for ReadError {
-    fn from(_: ChronoParseError) -> ReadError {
-        ReadError::InvalidData
+use std::fmt;
+
+impl fmt::Display for Error {
+    fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
+        match *self {
+            Error::Io(ref err) => err.fmt(fmt),
+            _ => <Self as ::std::error::Error>::description(self).fmt(fmt),
+        }
+    }
+}
+
+impl From<IoError> for Error {
+    fn from(err: IoError) -> Error {
+        Error::Io(err)
+    }
+}
+
+impl From<ChronoParseError> for Error {
+    fn from(_: ChronoParseError) -> Error {
+        Error::InvalidData
+    }
+}
+
+use xml_rs::writer::Error as XmlWriterError;
+
+impl From<XmlWriterError> for Error {
+    fn from(err: XmlWriterError) -> Error {
+        match err {
+            XmlWriterError::Io(err) => Error::Io(err),
+            _ => Error::InvalidData,
+        }
     }
 }
 
@@ -210,7 +244,7 @@ impl<R: Read + Seek> EventReader<R> {
         EventReader(EventReaderInner::Uninitialized(Some(reader)))
     }
 
-    fn is_binary(reader: &mut R) -> Result<bool, IoError> {
+    fn is_binary(reader: &mut R) -> Result<bool> {
         try!(reader.seek(SeekFrom::Start(0)));
         let mut magic = [0; 8];
         try!(reader.read(&mut magic));
@@ -225,9 +259,9 @@ impl<R: Read + Seek> EventReader<R> {
 }
 
 impl<R: Read + Seek> Iterator for EventReader<R> {
-    type Item = ReadResult<PlistEvent>;
+    type Item = Result<PlistEvent>;
 
-    fn next(&mut self) -> Option<ReadResult<PlistEvent>> {
+    fn next(&mut self) -> Option<Result<PlistEvent>> {
         let mut reader = match self.0 {
             EventReaderInner::Xml(ref mut parser) => return parser.next(),
             EventReaderInner::Binary(ref mut parser) => return parser.next(),
@@ -239,7 +273,7 @@ impl<R: Read + Seek> Iterator for EventReader<R> {
             Ok(false) => EventReaderInner::Xml(xml::EventReader::new(reader)),
             Err(err) => {
                 ::std::mem::replace(&mut self.0, EventReaderInner::Uninitialized(Some(reader)));
-                return Some(Err(ReadError::Io(err)));
+                return Some(Err(err));
             }
         };
 
@@ -250,5 +284,5 @@ impl<R: Read + Seek> Iterator for EventReader<R> {
 }
 
 pub trait EventWriter {
-    fn write(&mut self, event: &PlistEvent) -> Result<(), ()>;
+    fn write(&mut self, event: &PlistEvent) -> Result<()>;
 }

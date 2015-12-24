@@ -1,28 +1,13 @@
 use std::collections::BTreeMap;
 
-use {ReadError, ReadResult, Plist, PlistEvent};
-
-pub type BuildResult<T> = Result<T, BuildError>;
-
-#[derive(Debug)]
-pub enum BuildError {
-    InvalidEvent,
-    UnsupportedDictionaryKey,
-    ReadError(ReadError),
-}
-
-impl From<ReadError> for BuildError {
-    fn from(err: ReadError) -> BuildError {
-        BuildError::ReadError(err)
-    }
-}
+use {Error, Result, Plist, PlistEvent};
 
 pub struct Builder<T> {
     stream: T,
     token: Option<PlistEvent>,
 }
 
-impl<T: Iterator<Item = ReadResult<PlistEvent>>> Builder<T> {
+impl<T: Iterator<Item = Result<PlistEvent>>> Builder<T> {
     pub fn new(stream: T) -> Builder<T> {
         Builder {
             stream: stream,
@@ -30,7 +15,7 @@ impl<T: Iterator<Item = ReadResult<PlistEvent>>> Builder<T> {
         }
     }
 
-    pub fn build(mut self) -> BuildResult<Plist> {
+    pub fn build(mut self) -> Result<Plist> {
         try!(self.bump());
         if let Some(PlistEvent::StartPlist) = self.token {
             try!(self.bump());
@@ -42,24 +27,24 @@ impl<T: Iterator<Item = ReadResult<PlistEvent>>> Builder<T> {
             None => (),
             Some(PlistEvent::EndPlist) => try!(self.bump()),
             // The stream should have finished
-            _ => return Err(BuildError::InvalidEvent),
+            _ => return Err(Error::InvalidData),
         };
         Ok(plist)
     }
 
-    fn bump(&mut self) -> BuildResult<()> {
+    fn bump(&mut self) -> Result<()> {
         self.token = match self.stream.next() {
             Some(Ok(token)) => Some(token),
-            Some(Err(err)) => return Err(BuildError::ReadError(err)),
+            Some(Err(err)) => return Err(err),
             None => None,
         };
         Ok(())
     }
 
-    fn build_value(&mut self) -> BuildResult<Plist> {
+    fn build_value(&mut self) -> Result<Plist> {
         match self.token.take() {
-            Some(PlistEvent::StartPlist) => Err(BuildError::InvalidEvent),
-            Some(PlistEvent::EndPlist) => Err(BuildError::InvalidEvent),
+            Some(PlistEvent::StartPlist) => Err(Error::InvalidData),
+            Some(PlistEvent::EndPlist) => Err(Error::InvalidData),
 
             Some(PlistEvent::StartArray(len)) => Ok(Plist::Array(try!(self.build_array(len)))),
             Some(PlistEvent::StartDictionary(len)) => {
@@ -73,15 +58,15 @@ impl<T: Iterator<Item = ReadResult<PlistEvent>>> Builder<T> {
             Some(PlistEvent::RealValue(f)) => Ok(Plist::Real(f)),
             Some(PlistEvent::StringValue(s)) => Ok(Plist::String(s)),
 
-            Some(PlistEvent::EndArray) => Err(BuildError::InvalidEvent),
-            Some(PlistEvent::EndDictionary) => Err(BuildError::InvalidEvent),
+            Some(PlistEvent::EndArray) => Err(Error::InvalidData),
+            Some(PlistEvent::EndDictionary) => Err(Error::InvalidData),
 
             // The stream should not have ended here
-            None => Err(BuildError::InvalidEvent),
+            None => Err(Error::InvalidData),
         }
     }
 
-    fn build_array(&mut self, len: Option<u64>) -> Result<Vec<Plist>, BuildError> {
+    fn build_array(&mut self, len: Option<u64>) -> Result<Vec<Plist>> {
         let mut values = match len {
             Some(len) => Vec::with_capacity(len as usize),
             None => Vec::new(),
@@ -97,7 +82,7 @@ impl<T: Iterator<Item = ReadResult<PlistEvent>>> Builder<T> {
         }
     }
 
-    fn build_dict(&mut self, _len: Option<u64>) -> Result<BTreeMap<String, Plist>, BuildError> {
+    fn build_dict(&mut self, _len: Option<u64>) -> Result<BTreeMap<String, Plist>> {
         let mut values = BTreeMap::new();
 
         loop {
@@ -110,7 +95,7 @@ impl<T: Iterator<Item = ReadResult<PlistEvent>>> Builder<T> {
                 }
                 _ => {
                     // Only string keys are supported in plists
-                    return Err(BuildError::UnsupportedDictionaryKey);
+                    return Err(Error::InvalidData);
                 }
             }
         }

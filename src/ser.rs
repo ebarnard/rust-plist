@@ -3,7 +3,7 @@
 
 use serde::ser::{MapVisitor, Serialize, Serializer as SerdeSerializer, SeqVisitor};
 
-use {EventWriter, PlistEvent};
+use {Error, EventWriter, PlistEvent};
 
 pub struct Serializer<W: EventWriter> {
     writer: W,
@@ -15,7 +15,7 @@ impl<W: EventWriter> Serializer<W> {
     }
 
     #[inline]
-    fn emit(&mut self, event: PlistEvent) -> Result<(), ()> {
+    fn emit(&mut self, event: PlistEvent) -> Result<(), Error> {
         self.writer.write(&event)
     }
 
@@ -39,7 +39,7 @@ impl<W: EventWriter> Serializer<W> {
 }
 
 impl<W: EventWriter> SerdeSerializer for Serializer<W> {
-    type Error = ();
+    type Error = Error;
 
     fn visit_bool(&mut self, v: bool) -> Result<(), Self::Error> {
         self.emit(PlistEvent::BooleanValue(v))
