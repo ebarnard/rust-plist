@@ -38,11 +38,18 @@
 extern crate byteorder;
 extern crate chrono;
 extern crate rustc_serialize;
+extern crate serde;
 extern crate xml as xml_rs;
 
 pub mod binary;
 pub mod xml;
+
 mod builder;
+mod de;
+mod ser;
+
+pub use de::Deserializer;
+pub use ser::Serializer;
 
 use chrono::{DateTime, UTC};
 use chrono::format::ParseError as ChronoParseError;
@@ -240,4 +247,8 @@ impl<R: Read + Seek> Iterator for EventReader<R> {
 
         self.next()
     }
+}
+
+pub trait EventWriter {
+    fn write(&mut self, event: &PlistEvent) -> Result<(), ()>;
 }
