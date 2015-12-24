@@ -135,6 +135,20 @@ impl Plist {
     }
 }
 
+/// An encoding of a plist as a flat structure.
+///
+/// Output by the event readers.
+///
+/// Dictionary keys and values are represented as pairs of values e.g.:
+///
+/// ```ignore rust
+/// StartDictionary
+/// StringValue("Height") // Key
+/// RealValue(181.2)      // Value
+/// StringValue("Age")    // Key
+/// IntegerValue(28)      // Value
+/// EndDictionary
+/// ```
 #[derive(Clone, Debug, PartialEq)]
 pub enum PlistEvent {
     StartPlist,
