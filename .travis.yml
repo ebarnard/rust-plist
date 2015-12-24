@@ -12,7 +12,7 @@ script:
 - |
   travis-cargo build &&
   travis-cargo test -- --features serde_tests &&
-  travis-cargo --only stable doc
+  travis-cargo --only stable doc -- --no-deps
 after_success:
 - travis-cargo --only stable doc-upload
 env:
