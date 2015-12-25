@@ -216,7 +216,8 @@ impl<R: Read + Seek> EventReader<R> {
             }
             (0x6, n) => {
                 // UTF-16 string
-                let len = try!(self.read_object_len(n));
+                // n is the length of code units (16 bits), not bytes.
+                let len = try!(self.read_object_len(n * 2));
                 let raw = try!(self.read_data(len));
                 let mut cursor = Cursor::new(raw);
 
@@ -332,5 +333,15 @@ mod tests {
                            EndPlist];
 
         assert_eq!(events, comparison);
+    }
+
+    #[test]
+    fn utf16_plist() {
+        use PlistEvent::*;
+
+        let reader = File::open(&Path::new("./tests/data/utf16_bplist.plist")).unwrap();
+        let streaming_parser = EventReader::new(reader);
+        let events: Vec<PlistEvent> = streaming_parser.map(|e| e.unwrap()).collect();
+        assert_eq!(events[39], StringValue("\u{2605} or better".to_owned()));
     }
 }
