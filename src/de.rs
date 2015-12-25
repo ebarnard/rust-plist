@@ -5,21 +5,21 @@ use serde::de::{Deserializer as SerdeDeserializer, Error as SerdeError, Visitor,
                 MapVisitor, VariantVisitor, Deserialize, EnumVisitor};
 use std::iter::Peekable;
 
-use {PlistEvent, u64_option_to_usize};
+use {Error, PlistEvent, u64_option_to_usize};
 
 macro_rules! expect {
     ($next:expr, $pat:pat) => {
         match $next {
             Some(Ok(v@$pat)) => v,
-            None => return Err(Error::end_of_stream()),
-            _ => return Err(Error::syntax(""))
+            None => return Err(DeserializeError::end_of_stream()),
+            _ => return Err(DeserializeError::syntax(""))
         }
     };
     ($next:expr, $pat:pat => $save:expr) => {
         match $next {
             Some(Ok($pat)) => $save,
-            None => return Err(Error::end_of_stream()),
-            _ => return Err(Error::syntax(""))
+            None => return Err(DeserializeError::end_of_stream()),
+            _ => return Err(DeserializeError::syntax(""))
         }
     };
 }
@@ -28,42 +28,42 @@ macro_rules! try_next {
     ($next:expr) => {
         match $next {
             Some(Ok(v)) => v,
-            Some(Err(_)) => return Err(Error::syntax("")),
-            None => return Err(Error::end_of_stream())
+            Some(Err(_)) => return Err(DeserializeError::syntax("")),
+            None => return Err(DeserializeError::end_of_stream())
         }
     }
 }
 
 #[derive(Debug)]
-pub enum Error {
+pub enum DeserializeError {
     None,
 }
 
-impl From<::Error> for Error {
-    fn from(_: ::Error) -> Error {
-        Error::None
+impl From<Error> for DeserializeError {
+    fn from(_: Error) -> DeserializeError {
+        DeserializeError::None
     }
 }
 
-impl SerdeError for Error {
+impl SerdeError for DeserializeError {
     fn syntax(_msg: &str) -> Self {
         panic!("stx");
-        Error::None
+        DeserializeError::None
     }
 
     fn end_of_stream() -> Self {
         panic!("eos");
-        Error::None
+        DeserializeError::None
     }
 
     fn unknown_field(_field: &str) -> Self {
         panic!("uf");
-        Error::None
+        DeserializeError::None
     }
 
     fn missing_field(_field: &'static str) -> Self {
         panic!("mf");
-        Error::None
+        DeserializeError::None
     }
 }
 
@@ -83,7 +83,7 @@ impl<I, E> Deserializer<I, E> where I: IntoIterator<Item = Result<PlistEvent, E>
 impl<I, E> SerdeDeserializer for Deserializer<I, E>
     where I: IntoIterator<Item = Result<PlistEvent, E>>
 {
-    type Error = Error;
+    type Error = DeserializeError;
 
     fn visit<V>(&mut self, mut visitor: V) -> Result<V::Value, Self::Error>
         where V: Visitor
@@ -96,13 +96,13 @@ impl<I, E> SerdeDeserializer for Deserializer<I, E>
                 let len = try!(u64_option_to_usize(len));
                 visitor.visit_seq(MapSeq::new(self, len))
             }
-            PlistEvent::EndArray => return Err(Error::syntax("")),
+            PlistEvent::EndArray => return Err(DeserializeError::syntax("")),
 
             PlistEvent::StartDictionary(len) => {
                 let len = try!(u64_option_to_usize(len));
                 visitor.visit_map(MapSeq::new(self, len))
             }
-            PlistEvent::EndDictionary => return Err(Error::syntax("")),
+            PlistEvent::EndDictionary => return Err(DeserializeError::syntax("")),
 
             PlistEvent::BooleanValue(v) => visitor.visit_bool(v),
             PlistEvent::DataValue(v) => visitor.visit_byte_buf(v),
@@ -139,7 +139,7 @@ impl<I, E> SerdeDeserializer for Deserializer<I, E>
                 ret
             }
             PlistEvent::StringValue(ref s) if &s[..] == "Some" => try!(visitor.visit_some(self)),
-            _ => return Err(Error::syntax("")),
+            _ => return Err(DeserializeError::syntax("")),
         };
 
         expect!(self.events.next(), PlistEvent::EndDictionary);
@@ -172,7 +172,7 @@ impl<I, E> SerdeDeserializer for Deserializer<I, E>
 
 impl<I, E> VariantVisitor for Deserializer<I, E> where I: IntoIterator<Item = Result<PlistEvent, E>>
 {
-    type Error = Error;
+    type Error = DeserializeError;
 
     fn visit_variant<V>(&mut self) -> Result<V, Self::Error>
         where V: Deserialize
@@ -233,7 +233,7 @@ impl<'a, I, E> SeqVisitor for MapSeq<'a, I, E>
     where E: 'a,
           I: 'a + IntoIterator<Item = Result<PlistEvent, E>>
 {
-    type Error = Error;
+    type Error = DeserializeError;
 
     fn visit<T>(&mut self) -> Result<Option<T>, Self::Error>
         where T: Deserialize
@@ -265,7 +265,7 @@ impl<'a, I, E> MapVisitor for MapSeq<'a, I, E>
     where E: 'a,
           I: 'a + IntoIterator<Item = Result<PlistEvent, E>>
 {
-    type Error = Error;
+    type Error = DeserializeError;
 
     fn visit_key<K>(&mut self) -> Result<Option<K>, Self::Error>
         where K: Deserialize

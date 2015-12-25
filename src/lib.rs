@@ -48,14 +48,27 @@ mod builder;
 mod de;
 mod ser;
 
-pub use de::Deserializer;
+pub use de::{Deserializer, DeserializeError};
 pub use ser::Serializer;
 
 use chrono::{DateTime, UTC};
 use chrono::format::ParseError as ChronoParseError;
+use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
-use std::io::{Read, Seek, SeekFrom};
+use std::io::{Read, Seek, SeekFrom, Write};
 use std::io::Error as IoError;
+
+pub fn deserialize<R: Read + Seek, T: Deserialize>(reader: R) -> ::std::result::Result<T, DeserializeError> {
+    let reader = EventReader::new(reader);
+    let mut de = Deserializer::new(reader);
+    Deserialize::deserialize(&mut de)
+}
+
+pub fn serialize_to_xml<W: Write, T: Serialize>(writer: W, value: &T) -> Result<()> {
+    let writer = xml::EventWriter::new(writer);
+    let mut ser = Serializer::new(writer);
+    value.serialize(&mut ser)
+}
 
 #[derive(Clone, Debug, PartialEq)]
 pub enum Plist {
@@ -154,6 +167,7 @@ impl Plist {
 /// ```
 #[derive(Clone, Debug, PartialEq)]
 pub enum PlistEvent {
+    // TODO: Kill these. They're unnecessary.
     StartPlist,
     EndPlist,
 
