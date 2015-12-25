@@ -17,15 +17,11 @@ impl<T: Iterator<Item = Result<PlistEvent>>> Builder<T> {
 
     pub fn build(mut self) -> Result<Plist> {
         try!(self.bump());
-        if let Some(PlistEvent::StartPlist) = self.token {
-            try!(self.bump());
-        }
 
         let plist = try!(self.build_value());
         try!(self.bump());
         match self.token {
             None => (),
-            Some(PlistEvent::EndPlist) => try!(self.bump()),
             // The stream should have finished
             _ => return Err(Error::InvalidData),
         };
@@ -43,9 +39,6 @@ impl<T: Iterator<Item = Result<PlistEvent>>> Builder<T> {
 
     fn build_value(&mut self) -> Result<Plist> {
         match self.token.take() {
-            Some(PlistEvent::StartPlist) => Err(Error::InvalidData),
-            Some(PlistEvent::EndPlist) => Err(Error::InvalidData),
-
             Some(PlistEvent::StartArray(len)) => Ok(Plist::Array(try!(self.build_array(len)))),
             Some(PlistEvent::StartDictionary(len)) => {
                 Ok(Plist::Dictionary(try!(self.build_dict(len))))
@@ -116,23 +109,19 @@ mod tests {
 
         // Input
 
-        let events = vec![
-			StartPlist,
-			StartDictionary(None),
-			StringValue("Author".to_owned()),
-			StringValue("William Shakespeare".to_owned()),
-			StringValue("Lines".to_owned()),
-			StartArray(None),
-			StringValue("It is a tale told by an idiot,".to_owned()),
-			StringValue("Full of sound and fury, signifying nothing.".to_owned()),
-			EndArray,
-			StringValue("Birthdate".to_owned()),
-			IntegerValue(1564),
-			StringValue("Height".to_owned()),
-			RealValue(1.60),
-			EndDictionary,
-			EndPlist,
-		];
+        let events = vec![StartDictionary(None),
+                          StringValue("Author".to_owned()),
+                          StringValue("William Shakespeare".to_owned()),
+                          StringValue("Lines".to_owned()),
+                          StartArray(None),
+                          StringValue("It is a tale told by an idiot,".to_owned()),
+                          StringValue("Full of sound and fury, signifying nothing.".to_owned()),
+                          EndArray,
+                          StringValue("Birthdate".to_owned()),
+                          IntegerValue(1564),
+                          StringValue("Height".to_owned()),
+                          RealValue(1.60),
+                          EndDictionary];
 
         let builder = Builder::new(events.into_iter().map(|e| Ok(e)));
         let plist = builder.build();

@@ -167,10 +167,6 @@ impl Plist {
 /// ```
 #[derive(Clone, Debug, PartialEq)]
 pub enum PlistEvent {
-    // TODO: Kill these. They're unnecessary.
-    StartPlist,
-    EndPlist,
-
     // While the length of an array or dict cannot be feasably greater than max(usize) this better
     // conveys the concept of an effectively unbounded event stream.
     StartArray(Option<u64>),

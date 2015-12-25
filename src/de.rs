@@ -89,9 +89,6 @@ impl<I, E> SerdeDeserializer for Deserializer<I, E>
         where V: Visitor
     {
         match try_next!(self.events.next()) {
-            PlistEvent::StartPlist => panic!(),
-            PlistEvent::EndPlist => panic!(),
-
             PlistEvent::StartArray(len) => {
                 let len = try!(u64_option_to_usize(len));
                 visitor.visit_seq(MapSeq::new(self, len))

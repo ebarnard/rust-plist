@@ -144,7 +144,6 @@ impl<R: Read + Seek> EventReader<R> {
         if self.ref_size == 0 {
             // Initialise here rather than in new
             try!(self.read_trailer());
-            return Ok(Some(PlistEvent::StartPlist));
         }
 
         let object_ref = match self.stack.last_mut() {
@@ -163,7 +162,8 @@ impl<R: Read + Seek> EventReader<R> {
                 match item.ty {
                     StackType::Array => return Ok(Some(PlistEvent::EndArray)),
                     StackType::Dict => return Ok(Some(PlistEvent::EndDictionary)),
-                    StackType::Root => return Ok(Some(PlistEvent::EndPlist)),
+                    // We're at the end of the plist
+                    StackType::Root => return Ok(None),
                 }
             }
         }
@@ -317,8 +317,7 @@ mod tests {
         let streaming_parser = EventReader::new(reader);
         let events: Vec<PlistEvent> = streaming_parser.map(|e| e.unwrap()).collect();
 
-        let comparison = &[StartPlist,
-                           StartDictionary(Some(6)),
+        let comparison = &[StartDictionary(Some(6)),
                            StringValue("Lines".to_owned()),
                            StartArray(Some(2)),
                            StringValue("It is a tale told by an idiot,".to_owned()),
@@ -334,8 +333,7 @@ mod tests {
                            StringValue("William Shakespeare".to_owned()),
                            StringValue("Data".to_owned()),
                            DataValue(vec![0, 0, 0, 190, 0, 0, 0, 3, 0, 0, 0, 30, 0, 0, 0]),
-                           EndDictionary,
-                           EndPlist];
+                           EndDictionary];
 
         assert_eq!(events, comparison);
     }
@@ -347,6 +345,6 @@ mod tests {
         let reader = File::open(&Path::new("./tests/data/utf16_bplist.plist")).unwrap();
         let streaming_parser = EventReader::new(reader);
         let events: Vec<PlistEvent> = streaming_parser.map(|e| e.unwrap()).collect();
-        assert_eq!(events[39], StringValue("\u{2605} or better".to_owned()));
+        assert_eq!(events[38], StringValue("\u{2605} or better".to_owned()));
     }
 }

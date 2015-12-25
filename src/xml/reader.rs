@@ -60,7 +60,7 @@ impl<R: Read> EventReader<R> {
                     self.element_stack.push(name.local_name.clone());
 
                     match &name.local_name[..] {
-                        "plist" => return Some(Ok(PlistEvent::StartPlist)),
+                        "plist" => (),
                         "array" => return Some(Ok(PlistEvent::StartArray(None))),
                         "dict" => return Some(Ok(PlistEvent::StartDictionary(None))),
                         "key" => return Some(self.read_content(|s| Ok(PlistEvent::StringValue(s)))),
@@ -114,7 +114,7 @@ impl<R: Read> EventReader<R> {
                     match &name.local_name[..] {
                         "array" => return Some(Ok(PlistEvent::EndArray)),
                         "dict" => return Some(Ok(PlistEvent::EndDictionary)),
-                        "plist" => return Some(Ok(PlistEvent::EndPlist)),
+                        "plist" => (),
                         _ => (),
                     }
                 }
@@ -170,8 +170,7 @@ mod tests {
         let streaming_parser = EventReader::new(reader);
         let events: Vec<PlistEvent> = streaming_parser.map(|e| e.unwrap()).collect();
 
-        let comparison = &[StartPlist,
-                           StartDictionary(None),
+        let comparison = &[StartDictionary(None),
                            StringValue("Author".to_owned()),
                            StringValue("William Shakespeare".to_owned()),
                            StringValue("Lines".to_owned()),
@@ -189,8 +188,7 @@ mod tests {
                            DateValue(UTC.ymd(1981, 05, 16).and_hms(11, 32, 06)),
                            StringValue("Blank".to_owned()),
                            StringValue("".to_owned()),
-                           EndDictionary,
-                           EndPlist];
+                           EndDictionary];
 
         assert_eq!(events, comparison);
     }

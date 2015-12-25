@@ -74,6 +74,17 @@ impl<W: Write> EventWriter<W> {
         Ok(())
     }
 
+    fn maybe_end_plist(&mut self) -> Result<()> {
+        // If there are no more open tags then write the </plist> element
+        if self.stack.len() == 1 {
+            try!(self.end_element("plist"));
+            if let Some(Element::Root) = self.stack.pop() {} else {
+                return Err(Error::InvalidData);
+            }
+        }
+        Ok(())
+    }
+
     pub fn write(&mut self, event: &PlistEvent) -> Result<()> {
         <Self as EventWriterTrait>::write(self, event)
     }
@@ -88,7 +99,11 @@ impl<W: Write> EventWriterTrait for EventWriter<W> {
                         try!(self.write_element_and_value("key", &*value));
                         self.stack.push(Element::Dictionary(DictionaryState::ExpectValue));
                     }
-                    PlistEvent::EndDictionary => try!(self.end_element("dict")),
+                    PlistEvent::EndDictionary => {
+                        try!(self.end_element("dict"));
+                        // We might be closing the last tag here as well
+                        try!(self.maybe_end_plist());
+                    }
                     _ => return Err(Error::InvalidData),
                 };
                 return Ok(());
@@ -98,39 +113,20 @@ impl<W: Write> EventWriterTrait for EventWriter<W> {
             }
             Some(other) => self.stack.push(other),
             None => {
-                match *event {
-                    PlistEvent::StartPlist => {
-                        let version_name = Name::local("version");
-                        let version_attr = Attribute::new(version_name, "1.0");
+                let version_name = Name::local("version");
+                let version_attr = Attribute::new(version_name, "1.0");
 
-                        let result = self.xml_writer.write(WriteXmlEvent::StartElement {
-                            name: Name::local("plist"),
-                            attributes: Cow::Borrowed(&[version_attr]),
-                            namespace: Cow::Borrowed(&self.empty_namespace),
-                        });
+                try!(self.xml_writer.write(WriteXmlEvent::StartElement {
+                    name: Name::local("plist"),
+                    attributes: Cow::Borrowed(&[version_attr]),
+                    namespace: Cow::Borrowed(&self.empty_namespace),
+                }));
 
-                        match result {
-                            Ok(()) => (),
-                            Err(_) => return Err(Error::InvalidData),
-                        }
-
-                        self.stack.push(Element::Root);
-                        return Ok(());
-                    }
-                    _ => return Err(Error::InvalidData),
-                }
+                self.stack.push(Element::Root);
             }
         }
 
-        Ok(match *event {
-            PlistEvent::StartPlist => return Err(Error::InvalidData),
-            PlistEvent::EndPlist => {
-                try!(self.end_element("plist"));
-                if let Some(Element::Root) = self.stack.pop() {} else {
-                    return Err(Error::InvalidData);
-                }
-            }
-
+        match *event {
             PlistEvent::StartArray(_) => {
                 try!(self.start_element("array"));
                 self.stack.push(Element::Array);
@@ -173,7 +169,11 @@ impl<W: Write> EventWriterTrait for EventWriter<W> {
             PlistEvent::StringValue(ref value) => {
                 try!(self.write_element_and_value("string", &*value))
             }
-        })
+        };
+
+        try!(self.maybe_end_plist());
+
+        Ok(())
     }
 }
 
@@ -188,8 +188,7 @@ mod tests {
     fn streaming_parser() {
         use PlistEvent::*;
 
-        let plist = &[StartPlist,
-                      StartDictionary(None),
+        let plist = &[StartDictionary(None),
                       StringValue("Author".to_owned()),
                       StringValue("William Shakespeare".to_owned()),
                       StringValue("Lines".to_owned()),
@@ -205,8 +204,7 @@ mod tests {
                       DataValue(vec![0, 0, 0, 190, 0, 0, 0, 3, 0, 0, 0, 30, 0, 0, 0]),
                       StringValue("Birthdate".to_owned()),
                       DateValue(UTC.ymd(1981, 05, 16).and_hms(11, 32, 06)),
-                      EndDictionary,
-                      EndPlist];
+                      EndDictionary];
 
         let mut cursor = Cursor::new(Vec::new());
 
@@ -220,36 +218,27 @@ mod tests {
 
         let comparison = "<?xml version=\"1.0\" encoding=\"utf-8\"?>
 <plist version=\"1.0\">
-    \
-                          <dict>
+    <dict>
         <key>Author</key>
-        <string>William \
-                          Shakespeare</string>
+        <string>William Shakespeare</string>
         <key>Lines</key>
         <array>
-            \
-                          <string>It is a tale told by an idiot,</string>
-            \
-                          <string>Full of sound and fury, signifying nothing.</string>
-        \
-                          </array>
+            <string>It is a tale told by an idiot,</string>
+            <string>Full of sound and fury, signifying nothing.</string>
+        </array>
         <key>Death</key>
         <integer>1564</integer>
-        \
-                          <key>Height</key>
+        <key>Height</key>
         <real>1.6</real>
         <key>Data</key>
-        \
-                          <data>AAAAvgAAAAMAAAAeAAAA</data>
+        <data>AAAAvgAAAAMAAAAeAAAA</data>
         <key>Birthdate</key>
-        \
-                          <date>1981-05-16T11:32:06+00:00</date>
+        <date>1981-05-16T11:32:06+00:00</date>
     </dict>
 </plist>";
 
-
         let s = String::from_utf8(cursor.into_inner()).unwrap();
 
-        assert_eq!(&s, comparison);
+        assert_eq!(s, comparison);
     }
 }
