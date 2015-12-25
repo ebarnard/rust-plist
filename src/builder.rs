@@ -1,6 +1,6 @@
 use std::collections::BTreeMap;
 
-use {Error, Result, Plist, PlistEvent};
+use {Error, Result, Plist, PlistEvent, u64_option_to_usize};
 
 pub struct Builder<T> {
     stream: T,
@@ -67,8 +67,9 @@ impl<T: Iterator<Item = Result<PlistEvent>>> Builder<T> {
     }
 
     fn build_array(&mut self, len: Option<u64>) -> Result<Vec<Plist>> {
+        let len = try!(u64_option_to_usize(len));
         let mut values = match len {
-            Some(len) => Vec::with_capacity(len as usize),
+            Some(len) => Vec::with_capacity(len),
             None => Vec::new(),
         };
 

@@ -5,7 +5,7 @@ use serde::de::{Deserializer as SerdeDeserializer, Error as SerdeError, Visitor,
                 MapVisitor, VariantVisitor, Deserialize, EnumVisitor};
 use std::iter::Peekable;
 
-use PlistEvent;
+use {PlistEvent, u64_option_to_usize};
 
 macro_rules! expect {
     ($next:expr, $pat:pat) => {
@@ -37,6 +37,12 @@ macro_rules! try_next {
 #[derive(Debug)]
 pub enum Error {
     None,
+}
+
+impl From<::Error> for Error {
+    fn from(_: ::Error) -> Error {
+        Error::None
+    }
 }
 
 impl SerdeError for Error {
@@ -87,12 +93,14 @@ impl<I, E> SerdeDeserializer for Deserializer<I, E>
             PlistEvent::EndPlist => panic!(),
 
             PlistEvent::StartArray(len) => {
-                visitor.visit_seq(MapSeq::new(self, len.map(|l| l as usize)))
+                let len = try!(u64_option_to_usize(len));
+                visitor.visit_seq(MapSeq::new(self, len))
             }
             PlistEvent::EndArray => return Err(Error::syntax("")),
 
             PlistEvent::StartDictionary(len) => {
-                visitor.visit_map(MapSeq::new(self, len.map(|l| l as usize)))
+                let len = try!(u64_option_to_usize(len));
+                visitor.visit_map(MapSeq::new(self, len))
             }
             PlistEvent::EndDictionary => return Err(Error::syntax("")),
 
@@ -120,7 +128,13 @@ impl<I, E> SerdeDeserializer for Deserializer<I, E>
 
         let ret = match try_next!(self.events.next()) {
             PlistEvent::StringValue(ref s) if &s[..] == "None" => {
-                let ret = try!(visitor.visit_none());
+                let ret = match visitor.visit_none() {
+                    Ok(ret) => ret,
+                    Err(e) => return Err(e)
+                };
+                // For some reason the try! below doesn't work - probably a macro hygene issue
+                // with Error and ::Error
+                //let ret = try!(visitor.visit_none());
                 expect!(self.events.next(), PlistEvent::StringValue(_));
                 ret
             }

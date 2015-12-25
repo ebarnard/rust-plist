@@ -4,7 +4,7 @@ use chrono::{TimeZone, UTC};
 use std::io::{Cursor, Read, Seek, SeekFrom};
 use std::string::FromUtf16Error;
 
-use {Error, Result, PlistEvent};
+use {Error, Result, PlistEvent, u64_to_usize};
 
 impl From<ByteorderError> for Error {
     fn from(err: ByteorderError) -> Error {
@@ -82,7 +82,8 @@ impl<R: Read + Seek> EventReader<R> {
     }
 
     fn read_ints(&mut self, len: u64, size: u8) -> Result<Vec<u64>> {
-        let mut ints = Vec::with_capacity(len as usize);
+        let len = try!(u64_to_usize(len));
+        let mut ints = Vec::with_capacity(len);
         // TODO: Is the match hoisted out of the loop?
         for _ in 0..len {
             match size {
@@ -117,10 +118,11 @@ impl<R: Read + Seek> EventReader<R> {
     }
 
     fn read_data(&mut self, len: u64) -> Result<Vec<u8>> {
-        let mut data = vec![0; len as usize];
-        let mut total_read = 0usize;
+        let len = try!(u64_to_usize(len));
+        let mut data = vec![0; len];
+        let mut total_read = 0;
 
-        while (total_read as u64) < len {
+        while total_read < len {
             let read = try!(self.reader.read(&mut data[total_read..]));
             if read == 0 {
                 return Err(Error::UnexpectedEof);
@@ -132,7 +134,8 @@ impl<R: Read + Seek> EventReader<R> {
     }
 
     fn seek_to_object(&mut self, object_ref: u64) -> Result<u64> {
-        let offset = *&self.object_offsets[object_ref as usize];
+        let object_ref = try!(u64_to_usize(object_ref));
+        let offset = *&self.object_offsets[object_ref];
         let pos = try!(self.reader.seek(SeekFrom::Start(offset)));
         Ok(pos)
     }
@@ -221,7 +224,8 @@ impl<R: Read + Seek> EventReader<R> {
                 let raw = try!(self.read_data(len));
                 let mut cursor = Cursor::new(raw);
 
-                let mut raw_utf16 = Vec::with_capacity(len as usize / 2);
+                let len_div_2 = try!(u64_to_usize(len / 2));
+                let mut raw_utf16 = Vec::with_capacity(len_div_2);
                 while cursor.position() < len {
                     raw_utf16.push(try!(cursor.read_u16::<BigEndian>()))
                 }
@@ -249,9 +253,10 @@ impl<R: Read + Seek> EventReader<R> {
                 let key_refs = try!(self.read_refs(len));
                 let value_refs = try!(self.read_refs(len));
 
-                let len = len as usize;
+                let len_mul_2 = try!(u64_to_usize(len * 2));
+                let len = try!(u64_to_usize(len));
 
-                let mut object_refs = Vec::with_capacity(len * 2);
+                let mut object_refs = Vec::with_capacity(len_mul_2);
 
                 for i in 1..len + 1 {
                     // Reverse so we can pop off the end of the stack in order

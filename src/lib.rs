@@ -157,6 +157,8 @@ pub enum PlistEvent {
     StartPlist,
     EndPlist,
 
+    // While the length of an array or dict cannot be feasably greater than max(usize) this better
+    // conveys the concept of an effectively unbounded event stream.
     StartArray(Option<u64>),
     EndArray,
 
@@ -285,4 +287,19 @@ impl<R: Read + Seek> Iterator for EventReader<R> {
 
 pub trait EventWriter {
     fn write(&mut self, event: &PlistEvent) -> Result<()>;
+}
+
+fn u64_to_usize(len_u64: u64) -> Result<usize> {
+    let len = len_u64 as usize;
+    if len as u64 != len_u64 {
+        return Err(Error::InvalidData); // Too long
+    }
+    Ok(len)
+}
+
+fn u64_option_to_usize(len: Option<u64>) -> Result<Option<usize>> {
+    match len {
+        Some(len) => Ok(Some(try!(u64_to_usize(len)))),
+        None => Ok(None),
+    }
 }
