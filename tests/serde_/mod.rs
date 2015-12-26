@@ -28,7 +28,7 @@ fn new_serializer() -> Serializer<VecWriter> {
     Serializer::new(VecWriter::new())
 }
 
-fn new_deserializer(events: Vec<PlistEvent>) -> Deserializer<Vec<Result<PlistEvent, ()>>, ()> {
+fn new_deserializer(events: Vec<PlistEvent>) -> Deserializer<Vec<PlistResult<PlistEvent>>> {
     let result_events = events.into_iter().map(|e| Ok(e)).collect();
     Deserializer::new(result_events)
 }

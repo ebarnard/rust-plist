@@ -36,52 +36,52 @@ macro_rules! try_next {
 
 #[derive(Debug)]
 pub enum DeserializeError {
-    None,
+    Syntax,
+    EndOfStream,
+    UnknownField,
+    MissingField,
+    Reader(Error),
 }
 
 impl From<Error> for DeserializeError {
-    fn from(_: Error) -> DeserializeError {
-        DeserializeError::None
+    fn from(err: Error) -> DeserializeError {
+        DeserializeError::Reader(err)
     }
 }
 
 impl SerdeError for DeserializeError {
     fn syntax(_msg: &str) -> Self {
-        panic!("stx");
-        DeserializeError::None
+        DeserializeError::Syntax
     }
 
     fn end_of_stream() -> Self {
-        panic!("eos");
-        DeserializeError::None
+        DeserializeError::EndOfStream
     }
 
     fn unknown_field(_field: &str) -> Self {
-        panic!("uf");
-        DeserializeError::None
+        DeserializeError::UnknownField
     }
 
     fn missing_field(_field: &'static str) -> Self {
-        panic!("mf");
-        DeserializeError::None
+        DeserializeError::MissingField
     }
 }
 
-pub struct Deserializer<I, E>
-    where I: IntoIterator<Item = Result<PlistEvent, E>>
+pub struct Deserializer<I>
+    where I: IntoIterator<Item = Result<PlistEvent, Error>>
 {
     events: Peekable<<I as IntoIterator>::IntoIter>,
 }
 
-impl<I, E> Deserializer<I, E> where I: IntoIterator<Item = Result<PlistEvent, E>>
+impl<I> Deserializer<I> where I: IntoIterator<Item = Result<PlistEvent, Error>>
 {
-    pub fn new(iter: I) -> Deserializer<I, E> {
+    pub fn new(iter: I) -> Deserializer<I> {
         Deserializer { events: iter.into_iter().peekable() }
     }
 }
 
-impl<I, E> SerdeDeserializer for Deserializer<I, E>
-    where I: IntoIterator<Item = Result<PlistEvent, E>>
+impl<I> SerdeDeserializer for Deserializer<I>
+    where I: IntoIterator<Item = Result<PlistEvent, Error>>
 {
     type Error = DeserializeError;
 
@@ -167,7 +167,7 @@ impl<I, E> SerdeDeserializer for Deserializer<I, E>
     }
 }
 
-impl<I, E> VariantVisitor for Deserializer<I, E> where I: IntoIterator<Item = Result<PlistEvent, E>>
+impl<I> VariantVisitor for Deserializer<I> where I: IntoIterator<Item = Result<PlistEvent, Error>>
 {
     type Error = DeserializeError;
 
@@ -204,20 +204,17 @@ impl<I, E> VariantVisitor for Deserializer<I, E> where I: IntoIterator<Item = Re
     }
 }
 
-struct MapSeq<'a, I, E>
-    where E: 'a,
-          I: 'a + IntoIterator<Item = Result<PlistEvent, E>>
+struct MapSeq<'a, I>
+    where I: 'a + IntoIterator<Item = Result<PlistEvent, Error>>
 {
-    de: &'a mut Deserializer<I, E>,
+    de: &'a mut Deserializer<I>,
     remaining: Option<usize>,
     finished: bool,
 }
 
-impl<'a, I, E> MapSeq<'a, I, E>
-    where E: 'a,
-          I: 'a + IntoIterator<Item = Result<PlistEvent, E>>
+impl<'a, I> MapSeq<'a, I> where I: 'a + IntoIterator<Item = Result<PlistEvent, Error>>
 {
-    fn new(de: &'a mut Deserializer<I, E>, len: Option<usize>) -> MapSeq<'a, I, E> {
+    fn new(de: &'a mut Deserializer<I>, len: Option<usize>) -> MapSeq<'a, I> {
         MapSeq {
             de: de,
             remaining: len,
@@ -226,9 +223,8 @@ impl<'a, I, E> MapSeq<'a, I, E>
     }
 }
 
-impl<'a, I, E> SeqVisitor for MapSeq<'a, I, E>
-    where E: 'a,
-          I: 'a + IntoIterator<Item = Result<PlistEvent, E>>
+impl<'a, I> SeqVisitor for MapSeq<'a, I>
+    where I: 'a + IntoIterator<Item = Result<PlistEvent, Error>>
 {
     type Error = DeserializeError;
 
@@ -258,9 +254,8 @@ impl<'a, I, E> SeqVisitor for MapSeq<'a, I, E>
     }
 }
 
-impl<'a, I, E> MapVisitor for MapSeq<'a, I, E>
-    where E: 'a,
-          I: 'a + IntoIterator<Item = Result<PlistEvent, E>>
+impl<'a, I> MapVisitor for MapSeq<'a, I>
+    where I: 'a + IntoIterator<Item = Result<PlistEvent, Error>>
 {
     type Error = DeserializeError;
 
