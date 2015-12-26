@@ -58,7 +58,9 @@ use std::collections::BTreeMap;
 use std::io::{Read, Seek, SeekFrom, Write};
 use std::io::Error as IoError;
 
-pub fn deserialize<R: Read + Seek, T: Deserialize>(reader: R) -> ::std::result::Result<T, DeserializeError> {
+pub fn deserialize<R: Read + Seek, T: Deserialize>
+    (reader: R)
+     -> ::std::result::Result<T, DeserializeError> {
     let reader = EventReader::new(reader);
     let mut de = Deserializer::new(reader);
     Deserialize::deserialize(&mut de)

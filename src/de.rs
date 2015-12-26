@@ -127,11 +127,11 @@ impl<I> SerdeDeserializer for Deserializer<I>
             PlistEvent::StringValue(ref s) if &s[..] == "None" => {
                 let ret = match visitor.visit_none() {
                     Ok(ret) => ret,
-                    Err(e) => return Err(e)
+                    Err(e) => return Err(e),
                 };
                 // For some reason the try! below doesn't work - probably a macro hygene issue
                 // with Error and ::Error
-                //let ret = try!(visitor.visit_none());
+                // let ret = try!(visitor.visit_none());
                 expect!(self.events.next(), PlistEvent::StringValue(_));
                 ret
             }
