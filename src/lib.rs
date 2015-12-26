@@ -8,7 +8,7 @@
 //!
 //! ```toml
 //! [dependencies]
-//! plist = "0.0.11"
+//! plist = "0.0.12"
 //! ```
 //!
 //! And put this in your crate root:
