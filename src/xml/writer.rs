@@ -4,10 +4,19 @@ use std::io::Write;
 use xml_rs::attribute::Attribute;
 use xml_rs::name::Name;
 use xml_rs::namespace::Namespace;
-use xml_rs::writer::{EventWriter as XmlEventWriter, EmitterConfig};
+use xml_rs::writer::{Error as XmlWriterError, EventWriter as XmlEventWriter, EmitterConfig};
 use xml_rs::writer::events::XmlEvent as WriteXmlEvent;
 
 use {Error, EventWriter as PlistEventWriter, PlistEvent, Result};
+
+impl From<XmlWriterError> for Error {
+    fn from(err: XmlWriterError) -> Error {
+        match err {
+            XmlWriterError::Io(err) => Error::Io(err),
+            _ => Error::InvalidData,
+        }
+    }
+}
 
 enum Element {
     Dictionary(DictionaryState),

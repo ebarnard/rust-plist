@@ -1,10 +1,17 @@
 use chrono::{DateTime, UTC};
+use chrono::format::ParseError as ChronoParseError;
 use rustc_serialize::base64::FromBase64;
 use std::io::Read;
 use std::str::FromStr;
 use xml_rs::reader::{EventReader as XmlEventReader, ParserConfig, XmlEvent};
 
 use {Error, Result, PlistEvent};
+
+impl From<ChronoParseError> for Error {
+    fn from(_: ChronoParseError) -> Error {
+        Error::InvalidData
+    }
+}
 
 pub struct EventReader<R: Read> {
     xml_reader: XmlEventReader<R>,

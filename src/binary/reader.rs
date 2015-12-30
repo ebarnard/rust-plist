@@ -1,8 +1,7 @@
-use byteorder::{BigEndian, ReadBytesExt};
-use byteorder::Error as ByteorderError;
+use byteorder::{BigEndian, Error as ByteorderError, ReadBytesExt};
 use chrono::{TimeZone, UTC};
 use std::io::{Cursor, Read, Seek, SeekFrom};
-use std::string::FromUtf16Error;
+use std::string::{FromUtf8Error, FromUtf16Error};
 
 use {Error, Result, PlistEvent, u64_to_usize};
 
@@ -12,6 +11,12 @@ impl From<ByteorderError> for Error {
             ByteorderError::UnexpectedEOF => Error::UnexpectedEof,
             ByteorderError::Io(err) => Error::Io(err),
         }
+    }
+}
+
+impl From<FromUtf8Error> for Error {
+    fn from(_: FromUtf8Error) -> Error {
+        Error::InvalidData
     }
 }
 
@@ -57,8 +62,9 @@ impl<R: Read + Seek> EventReader<R> {
         try!(self.reader.seek(SeekFrom::Start(0)));
         let mut magic = [0; 8];
         try!(self.reader.read(&mut magic));
-        assert_eq!(&magic, b"bplist00");
-
+        if &magic != b"bplist00" {
+            return Err(Error::InvalidData);
+        }
 
         // Trailer starts with 6 bytes of padding
         try!(self.reader.seek(SeekFrom::End(-32 + 6)));
@@ -103,8 +109,8 @@ impl<R: Read + Seek> EventReader<R> {
     }
 
     fn read_object_len(&mut self, len: u8) -> Result<u64> {
-        if (len & 0xf) == 0xf {
-            let len_power_of_two = try!(self.reader.read_u8()) & 0x3;
+        if (len & 0x0f) == 0x0f {
+            let len_power_of_two = try!(self.reader.read_u8()) & 0x03;
             Ok(match len_power_of_two {
                 0 => try!(self.reader.read_u8()) as u64,
                 1 => try!(self.reader.read_u16::<BigEndian>()) as u64,
@@ -214,7 +220,7 @@ impl<R: Read + Seek> EventReader<R> {
                 // ASCII string
                 let len = try!(self.read_object_len(n));
                 let raw = try!(self.read_data(len));
-                let string = String::from_utf8(raw).unwrap();
+                let string = try!(String::from_utf8(raw));
                 Some(PlistEvent::StringValue(string))
             }
             (0x6, n) => {

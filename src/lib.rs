@@ -52,9 +52,9 @@ pub use de::{Deserializer, DeserializeError};
 pub use ser::Serializer;
 
 use chrono::{DateTime, UTC};
-use chrono::format::ParseError as ChronoParseError;
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
+use std::fmt;
 use std::io::{Read, Seek, SeekFrom, Write};
 use std::io::Error as IoError;
 
@@ -211,8 +211,6 @@ impl ::std::error::Error for Error {
     }
 }
 
-use std::fmt;
-
 impl fmt::Display for Error {
     fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
         match *self {
@@ -225,23 +223,6 @@ impl fmt::Display for Error {
 impl From<IoError> for Error {
     fn from(err: IoError) -> Error {
         Error::Io(err)
-    }
-}
-
-impl From<ChronoParseError> for Error {
-    fn from(_: ChronoParseError) -> Error {
-        Error::InvalidData
-    }
-}
-
-use xml_rs::writer::Error as XmlWriterError;
-
-impl From<XmlWriterError> for Error {
-    fn from(err: XmlWriterError) -> Error {
-        match err {
-            XmlWriterError::Io(err) => Error::Io(err),
-            _ => Error::InvalidData,
-        }
     }
 }
 
