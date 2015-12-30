@@ -7,7 +7,7 @@ use xml_rs::namespace::Namespace;
 use xml_rs::writer::{EventWriter as XmlEventWriter, EmitterConfig};
 use xml_rs::writer::events::XmlEvent as WriteXmlEvent;
 
-use {Error, EventWriter as EventWriterTrait, PlistEvent, Result};
+use {Error, EventWriter as PlistEventWriter, PlistEvent, Result};
 
 enum Element {
     Dictionary(DictionaryState),
@@ -86,11 +86,11 @@ impl<W: Write> EventWriter<W> {
     }
 
     pub fn write(&mut self, event: &PlistEvent) -> Result<()> {
-        <Self as EventWriterTrait>::write(self, event)
+        <Self as PlistEventWriter>::write(self, event)
     }
 }
 
-impl<W: Write> EventWriterTrait for EventWriter<W> {
+impl<W: Write> PlistEventWriter for EventWriter<W> {
     fn write(&mut self, event: &PlistEvent) -> Result<()> {
         match self.stack.pop() {
             Some(Element::Dictionary(DictionaryState::ExpectKey)) => {
