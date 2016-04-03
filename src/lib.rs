@@ -199,6 +199,18 @@ impl Plist {
         }
     }
 
+    /// If the `Plist` is a Data, returns the underlying Vec.
+    /// Returns None otherwise.
+    ///
+    /// This method consumes the `Plist`. If this is not desired, please use
+    /// `as_data` method.
+    pub fn into_data(self) -> Option<Vec<u8>> {
+        match self {
+            Plist::Data(data) => Some(data),
+            _ => None,
+        }
+    }
+
     /// If the `Plist` is a Data, returns the associated Vec.
     /// Returns None otherwise.
     pub fn as_data(&self) -> Option<&[u8]> {
@@ -231,6 +243,18 @@ impl Plist {
     pub fn as_integer(&self) -> Option<i64> {
         match self {
             &Plist::Integer(v) => Some(v),
+            _ => None,
+        }
+    }
+
+    /// If the `Plist` is a String, returns the underlying String.
+    /// Returns None otherwise.
+    ///
+    /// This method consumes the `Plist`. If this is not desired, please use
+    /// `as_string` method.
+    pub fn into_string(self) -> Option<String> {
+        match self {
+            Plist::String(v) => Some(v),
             _ => None,
         }
     }
@@ -413,6 +437,7 @@ mod tests {
 
         let slice: &[u8] = &[1, 2, 3];
         assert_eq!(Plist::Data(slice.to_vec()).as_data(), Some(slice));
+        assert_eq!(Plist::Data(slice.to_vec()).into_data(), Some(slice.to_vec()));
 
         let date: DateTime<UTC> = UTC::now();
         assert_eq!(Plist::Date(date).as_date(), Some(date));
@@ -420,5 +445,6 @@ mod tests {
         assert_eq!(Plist::Real(0.0).as_real(), Some(0.0));
         assert_eq!(Plist::Integer(1).as_integer(), Some(1));
         assert_eq!(Plist::String("2".to_owned()).as_string(), Some("2"));
+        assert_eq!(Plist::String("t".to_owned()).into_string(), Some("t".to_owned()));
     }
 }
