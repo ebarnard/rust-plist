@@ -48,7 +48,7 @@ mod builder;
 mod de;
 mod ser;
 
-pub use de::{Deserializer, DeserializeError};
+pub use de::Deserializer;
 pub use ser::Serializer;
 
 use chrono::{DateTime, UTC};
@@ -58,9 +58,7 @@ use std::fmt;
 use std::io::{Read, Seek, SeekFrom, Write};
 use std::io::Error as IoError;
 
-pub fn deserialize<R: Read + Seek, T: Deserialize>
-    (reader: R)
-     -> ::std::result::Result<T, DeserializeError> {
+pub fn deserialize<R: Read + Seek, T: Deserialize>(reader: R) -> Result<T> {
     let reader = EventReader::new(reader);
     let mut de = Deserializer::new(reader);
     Deserialize::deserialize(&mut de)
@@ -308,6 +306,7 @@ pub enum Error {
     InvalidData,
     UnexpectedEof,
     Io(IoError),
+    Serde(String)
 }
 
 impl ::std::error::Error for Error {
@@ -316,6 +315,7 @@ impl ::std::error::Error for Error {
             Error::InvalidData => "invalid data",
             Error::UnexpectedEof => "unexpected eof",
             Error::Io(ref err) => err.description(),
+            Error::Serde(ref err) => &err
         }
     }
 

@@ -11,15 +11,15 @@ macro_rules! expect {
     ($next:expr, $pat:pat) => {
         match $next {
             Some(Ok(v@$pat)) => v,
-            None => return Err(DeserializeError::end_of_stream()),
-            _ => return Err(DeserializeError::syntax(""))
+            None => return Err(Error::UnexpectedEof),
+            _ => return return Err(event_mismatch_error())
         }
     };
     ($next:expr, $pat:pat => $save:expr) => {
         match $next {
             Some(Ok($pat)) => $save,
-            None => return Err(DeserializeError::end_of_stream()),
-            _ => return Err(DeserializeError::syntax(""))
+            None => return Err(Error::UnexpectedEof),
+            _ => return Err(event_mismatch_error())
         }
     };
 }
@@ -28,42 +28,23 @@ macro_rules! try_next {
     ($next:expr) => {
         match $next {
             Some(Ok(v)) => v,
-            Some(Err(_)) => return Err(DeserializeError::syntax("")),
-            None => return Err(DeserializeError::end_of_stream())
+            Some(Err(_)) => return Err(event_mismatch_error()),
+            None => return Err(Error::UnexpectedEof)
         }
     }
 }
 
-#[derive(Debug)]
-pub enum DeserializeError {
-    Syntax,
-    EndOfStream,
-    UnknownField,
-    MissingField,
-    Reader(Error),
+fn event_mismatch_error() -> Error {
+    Error::InvalidData
 }
 
-impl From<Error> for DeserializeError {
-    fn from(err: Error) -> DeserializeError {
-        DeserializeError::Reader(err)
-    }
-}
-
-impl SerdeError for DeserializeError {
-    fn syntax(_msg: &str) -> Self {
-        DeserializeError::Syntax
+impl SerdeError for Error {
+    fn custom<T: Into<String>>(msg: T) -> Self {
+        Error::Serde(msg.into())
     }
 
     fn end_of_stream() -> Self {
-        DeserializeError::EndOfStream
-    }
-
-    fn unknown_field(_field: &str) -> Self {
-        DeserializeError::UnknownField
-    }
-
-    fn missing_field(_field: &'static str) -> Self {
-        DeserializeError::MissingField
+        Error::UnexpectedEof
     }
 }
 
@@ -83,9 +64,9 @@ impl<I> Deserializer<I> where I: IntoIterator<Item = Result<PlistEvent, Error>>
 impl<I> SerdeDeserializer for Deserializer<I>
     where I: IntoIterator<Item = Result<PlistEvent, Error>>
 {
-    type Error = DeserializeError;
+    type Error = Error;
 
-    fn visit<V>(&mut self, mut visitor: V) -> Result<V::Value, Self::Error>
+    fn deserialize<V>(&mut self, mut visitor: V) -> Result<V::Value, Self::Error>
         where V: Visitor
     {
         match try_next!(self.events.next()) {
@@ -93,13 +74,13 @@ impl<I> SerdeDeserializer for Deserializer<I>
                 let len = try!(u64_option_to_usize(len));
                 visitor.visit_seq(MapSeq::new(self, len))
             }
-            PlistEvent::EndArray => return Err(DeserializeError::syntax("")),
+            PlistEvent::EndArray => return Err(event_mismatch_error()),
 
             PlistEvent::StartDictionary(len) => {
                 let len = try!(u64_option_to_usize(len));
                 visitor.visit_map(MapSeq::new(self, len))
             }
-            PlistEvent::EndDictionary => return Err(DeserializeError::syntax("")),
+            PlistEvent::EndDictionary => return Err(event_mismatch_error()),
 
             PlistEvent::BooleanValue(v) => visitor.visit_bool(v),
             PlistEvent::DataValue(v) => visitor.visit_byte_buf(v),
@@ -111,14 +92,14 @@ impl<I> SerdeDeserializer for Deserializer<I>
         }
     }
 
-    fn visit_unit<V>(&mut self, mut visitor: V) -> Result<V::Value, Self::Error>
+    fn deserialize_unit<V>(&mut self, mut visitor: V) -> Result<V::Value, Self::Error>
         where V: Visitor
     {
         expect!(self.events.next(), PlistEvent::StringValue(_));
         visitor.visit_unit()
     }
 
-    fn visit_option<V>(&mut self, mut visitor: V) -> Result<V::Value, Self::Error>
+    fn deserialize_option<V>(&mut self, mut visitor: V) -> Result<V::Value, Self::Error>
         where V: Visitor
     {
         expect!(self.events.next(), PlistEvent::StartDictionary(_));
@@ -136,7 +117,7 @@ impl<I> SerdeDeserializer for Deserializer<I>
                 ret
             }
             PlistEvent::StringValue(ref s) if &s[..] == "Some" => try!(visitor.visit_some(self)),
-            _ => return Err(DeserializeError::syntax("")),
+            _ => return Err(event_mismatch_error()),
         };
 
         expect!(self.events.next(), PlistEvent::EndDictionary);
@@ -144,7 +125,7 @@ impl<I> SerdeDeserializer for Deserializer<I>
         Ok(ret)
     }
 
-    fn visit_newtype_struct<V>(&mut self,
+    fn deserialize_newtype_struct<V>(&mut self,
                                _name: &'static str,
                                mut visitor: V)
                                -> Result<V::Value, Self::Error>
@@ -153,7 +134,7 @@ impl<I> SerdeDeserializer for Deserializer<I>
         visitor.visit_newtype_struct(self)
     }
 
-    fn visit_enum<V>(&mut self,
+    fn deserialize_enum<V>(&mut self,
                      _enum: &'static str,
                      _variants: &'static [&'static str],
                      mut visitor: V)
@@ -169,7 +150,7 @@ impl<I> SerdeDeserializer for Deserializer<I>
 
 impl<I> VariantVisitor for Deserializer<I> where I: IntoIterator<Item = Result<PlistEvent, Error>>
 {
-    type Error = DeserializeError;
+    type Error = Error;
 
     fn visit_variant<V>(&mut self) -> Result<V, Self::Error>
         where V: Deserialize
@@ -190,7 +171,7 @@ impl<I> VariantVisitor for Deserializer<I> where I: IntoIterator<Item = Result<P
     fn visit_tuple<V>(&mut self, len: usize, visitor: V) -> Result<V::Value, Self::Error>
         where V: Visitor
     {
-        <Self as SerdeDeserializer>::visit_tuple(self, len, visitor)
+        <Self as SerdeDeserializer>::deserialize_tuple(self, len, visitor)
     }
 
     fn visit_struct<V>(&mut self,
@@ -200,7 +181,7 @@ impl<I> VariantVisitor for Deserializer<I> where I: IntoIterator<Item = Result<P
         where V: Visitor
     {
         let name = "";
-        <Self as SerdeDeserializer>::visit_struct(self, name, fields, visitor)
+        <Self as SerdeDeserializer>::deserialize_struct(self, name, fields, visitor)
     }
 }
 
@@ -226,7 +207,7 @@ impl<'a, I> MapSeq<'a, I> where I: 'a + IntoIterator<Item = Result<PlistEvent, E
 impl<'a, I> SeqVisitor for MapSeq<'a, I>
     where I: 'a + IntoIterator<Item = Result<PlistEvent, Error>>
 {
-    type Error = DeserializeError;
+    type Error = Error;
 
     fn visit<T>(&mut self) -> Result<Option<T>, Self::Error>
         where T: Deserialize
@@ -257,7 +238,7 @@ impl<'a, I> SeqVisitor for MapSeq<'a, I>
 impl<'a, I> MapVisitor for MapSeq<'a, I>
     where I: 'a + IntoIterator<Item = Result<PlistEvent, Error>>
 {
-    type Error = DeserializeError;
+    type Error = Error;
 
     fn visit_key<K>(&mut self) -> Result<Option<K>, Self::Error>
         where K: Deserialize

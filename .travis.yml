@@ -1,9 +1,10 @@
+sudo: false
 language: rust
 rust:
 - nightly
 - beta
 - stable
-- 1.4.0
+- 1.6.0
 before_script:
 - |
   pip install 'travis-cargo<0.2' --user &&

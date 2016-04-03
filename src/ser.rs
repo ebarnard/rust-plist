@@ -1,9 +1,19 @@
 // Tests for the serializer and deserializer are located in tests/serde_/mod.rs.
 // They can be run with `cargo test --features serde_tests`.
 
-use serde::ser::{MapVisitor, Serialize, Serializer as SerdeSerializer, SeqVisitor};
+use serde::ser::{Error as SerdeError, MapVisitor, Serialize, Serializer as SerdeSerializer, SeqVisitor};
 
 use {Error, EventWriter, PlistEvent};
+
+impl SerdeError for Error {
+    fn custom<T: Into<String>>(msg: T) -> Self {
+        Error::Serde(msg.into())
+    }
+
+    fn invalid_value(_: &str) -> Self {
+        Error::InvalidData
+    }
+}
 
 pub struct Serializer<W: EventWriter> {
     writer: W,
@@ -41,46 +51,46 @@ impl<W: EventWriter> Serializer<W> {
 impl<W: EventWriter> SerdeSerializer for Serializer<W> {
     type Error = Error;
 
-    fn visit_bool(&mut self, v: bool) -> Result<(), Self::Error> {
+    fn serialize_bool(&mut self, v: bool) -> Result<(), Self::Error> {
         self.emit(PlistEvent::BooleanValue(v))
     }
 
-    fn visit_i64(&mut self, v: i64) -> Result<(), Self::Error> {
+    fn serialize_i64(&mut self, v: i64) -> Result<(), Self::Error> {
         self.emit(PlistEvent::IntegerValue(v))
     }
 
-    fn visit_u64(&mut self, v: u64) -> Result<(), Self::Error> {
+    fn serialize_u64(&mut self, v: u64) -> Result<(), Self::Error> {
         self.emit(PlistEvent::IntegerValue(v as i64))
     }
 
-    fn visit_f64(&mut self, v: f64) -> Result<(), Self::Error> {
+    fn serialize_f64(&mut self, v: f64) -> Result<(), Self::Error> {
         self.emit(PlistEvent::RealValue(v))
     }
 
-    fn visit_str(&mut self, value: &str) -> Result<(), Self::Error> {
+    fn serialize_str(&mut self, value: &str) -> Result<(), Self::Error> {
         self.emit(PlistEvent::StringValue(value.to_owned()))
     }
 
-    fn visit_bytes(&mut self, value: &[u8]) -> Result<(), Self::Error> {
+    fn serialize_bytes(&mut self, value: &[u8]) -> Result<(), Self::Error> {
         self.emit(PlistEvent::DataValue(value.to_owned()))
     }
 
-    fn visit_unit(&mut self) -> Result<(), Self::Error> {
+    fn serialize_unit(&mut self) -> Result<(), Self::Error> {
         // Emit empty string
         self.emit(PlistEvent::StringValue(String::new()))
     }
 
-    fn visit_none(&mut self) -> Result<(), Self::Error> {
-        self.single_key_dict("None".to_owned(), |this| this.visit_unit())
+    fn serialize_none(&mut self) -> Result<(), Self::Error> {
+        self.single_key_dict("None".to_owned(), |this| this.serialize_unit())
     }
 
-    fn visit_some<V>(&mut self, value: V) -> Result<(), Self::Error>
+    fn serialize_some<V>(&mut self, value: V) -> Result<(), Self::Error>
         where V: Serialize
     {
         self.single_key_dict("Some".to_owned(), |this| value.serialize(this))
     }
 
-    fn visit_seq<V>(&mut self, mut visitor: V) -> Result<(), Self::Error>
+    fn serialize_seq<V>(&mut self, mut visitor: V) -> Result<(), Self::Error>
         where V: SeqVisitor
     {
         let len = visitor.len().map(|len| len as u64);
@@ -95,13 +105,13 @@ impl<W: EventWriter> SerdeSerializer for Serializer<W> {
         Ok(())
     }
 
-    fn visit_seq_elt<T>(&mut self, value: T) -> Result<(), Self::Error>
+    fn serialize_seq_elt<T>(&mut self, value: T) -> Result<(), Self::Error>
         where T: Serialize
     {
         value.serialize(self)
     }
 
-    fn visit_map<V>(&mut self, mut visitor: V) -> Result<(), Self::Error>
+    fn serialize_map<V>(&mut self, mut visitor: V) -> Result<(), Self::Error>
         where V: MapVisitor
     {
         let len = visitor.len().map(|len| len as u64);
@@ -116,7 +126,7 @@ impl<W: EventWriter> SerdeSerializer for Serializer<W> {
         Ok(())
     }
 
-    fn visit_map_elt<K, V>(&mut self, key: K, value: V) -> Result<(), Self::Error>
+    fn serialize_map_elt<K, V>(&mut self, key: K, value: V) -> Result<(), Self::Error>
         where K: Serialize,
               V: Serialize
     {
@@ -125,21 +135,21 @@ impl<W: EventWriter> SerdeSerializer for Serializer<W> {
         Ok(())
     }
 
-    fn visit_unit_variant(&mut self,
+    fn serialize_unit_variant(&mut self,
                           _name: &'static str,
                           _variant_index: usize,
                           variant: &'static str)
                           -> Result<(), Self::Error> {
-        self.single_key_dict(variant.to_owned(), |this| this.visit_unit())
+        self.single_key_dict(variant.to_owned(), |this| this.serialize_unit())
     }
 
-    fn visit_newtype_struct<T>(&mut self, _name: &'static str, value: T) -> Result<(), Self::Error>
+    fn serialize_newtype_struct<T>(&mut self, _name: &'static str, value: T) -> Result<(), Self::Error>
         where T: Serialize
     {
         value.serialize(self)
     }
 
-    fn visit_newtype_variant<T>(&mut self,
+    fn serialize_newtype_variant<T>(&mut self,
                                 _name: &'static str,
                                 _variant_index: usize,
                                 variant: &'static str,
@@ -150,7 +160,7 @@ impl<W: EventWriter> SerdeSerializer for Serializer<W> {
         self.single_key_dict(variant.to_owned(), |this| value.serialize(this))
     }
 
-    fn visit_tuple_variant<V>(&mut self,
+    fn serialize_tuple_variant<V>(&mut self,
                               _name: &'static str,
                               _variant_index: usize,
                               variant: &'static str,
@@ -159,10 +169,10 @@ impl<W: EventWriter> SerdeSerializer for Serializer<W> {
         where V: SeqVisitor
     {
         self.single_key_dict(variant.to_owned(),
-                             |this| this.visit_tuple_struct(variant, visitor))
+                             |this| this.serialize_tuple_struct(variant, visitor))
     }
 
-    fn visit_struct_variant<V>(&mut self,
+    fn serialize_struct_variant<V>(&mut self,
                                _name: &'static str,
                                _variant_index: usize,
                                variant: &'static str,
@@ -171,6 +181,6 @@ impl<W: EventWriter> SerdeSerializer for Serializer<W> {
         where V: MapVisitor
     {
         self.single_key_dict(variant.to_owned(),
-                             |this| this.visit_struct(variant, visitor))
+                             |this| this.serialize_struct(variant, visitor))
     }
 }

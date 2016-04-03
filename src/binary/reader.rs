@@ -1,18 +1,9 @@
-use byteorder::{BigEndian, Error as ByteorderError, ReadBytesExt};
+use byteorder::{BigEndian, ReadBytesExt};
 use chrono::{TimeZone, UTC};
 use std::io::{Cursor, Read, Seek, SeekFrom};
 use std::string::{FromUtf8Error, FromUtf16Error};
 
 use {Error, Result, PlistEvent, u64_to_usize};
-
-impl From<ByteorderError> for Error {
-    fn from(err: ByteorderError) -> Error {
-        match err {
-            ByteorderError::UnexpectedEOF => Error::UnexpectedEof,
-            ByteorderError::Io(err) => Error::Io(err),
-        }
-    }
-}
 
 impl From<FromUtf8Error> for Error {
     fn from(_: FromUtf8Error) -> Error {
