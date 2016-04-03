@@ -153,6 +153,98 @@ impl Plist {
     }
 }
 
+impl Plist {
+    /// If the `Plist` is an Array, returns the associated Vec.
+    /// Returns None otherwise.
+    pub fn as_array(&self) -> Option<&Vec<Plist>> {
+        match self {
+            &Plist::Array(ref array) => Some(array),
+            _ => None,
+        }
+    }
+
+    /// If the `Plist` is an Array, returns the associated mutable Vec.
+    /// Returns None otherwise.
+    pub fn as_array_mut(&mut self) -> Option<&mut Vec<Plist>> {
+        match self {
+            &mut Plist::Array(ref mut array) => Some(array),
+            _ => None,
+        }
+    }
+
+    /// If the `Plist` is a Dictionary, returns the associated BTreeMap.
+    /// Returns None otherwise.
+    pub fn as_dictionary(&self) -> Option<&BTreeMap<String, Plist>> {
+        match self {
+            &Plist::Dictionary(ref map) => Some(map),
+            _ => None,
+        }
+    }
+
+    /// If the `Plist` is a Dictionary, returns the associated mutable BTreeMap.
+    /// Returns None otherwise.
+    pub fn as_dictionary_mut(&mut self) -> Option<&mut BTreeMap<String, Plist>> {
+        match self {
+            &mut Plist::Dictionary(ref mut map) => Some(map),
+            _ => None,
+        }
+    }
+
+    /// If the `Plist` is a Boolean, returns the associated bool.
+    /// Returns None otherwise.
+    pub fn as_boolean(&self) -> Option<bool> {
+        match self {
+            &Plist::Boolean(v) => Some(v),
+            _ => None,
+        }
+    }
+
+    /// If the `Plist` is a Data, returns the associated Vec.
+    /// Returns None otherwise.
+    pub fn as_data(&self) -> Option<&[u8]> {
+        match self {
+            &Plist::Data(ref data) => Some(data),
+            _ => None,
+        }
+    }
+
+    /// If the `Plist` is a Date, returns the associated DateTime.
+    /// Returns None otherwise.
+    pub fn as_date(&self) -> Option<DateTime<UTC>> {
+        match self {
+            &Plist::Date(date) => Some(date),
+            _ => None,
+        }
+    }
+
+    /// If the `Plist` is a Real, returns the associated f64.
+    /// Returns None otherwise.
+    pub fn as_real(&self) -> Option<f64> {
+        match self {
+            &Plist::Real(v) => Some(v),
+            _ => None,
+        }
+    }
+
+    /// If the `Plist` is an Integer, returns the associated i64.
+    /// Returns None otherwise.
+    pub fn as_integer(&self) -> Option<i64> {
+        match self {
+            &Plist::Integer(v) => Some(v),
+            _ => None,
+        }
+    }
+
+    /// If the `Plist` is a String, returns the associated str.
+    /// Returns None otherwise.
+    pub fn as_string(&self) -> Option<&str> {
+        match self {
+            &Plist::String(ref v) => Some(v),
+            _ => None,
+        }
+    }
+}
+
 /// An encoding of a plist as a flat structure.
 ///
 /// Output by the event readers.
@@ -294,5 +386,39 @@ fn u64_option_to_usize(len: Option<u64>) -> Result<Option<usize>> {
     match len {
         Some(len) => Ok(Some(try!(u64_to_usize(len)))),
         None => Ok(None),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::Plist;
+
+    #[test]
+    fn test_plist_access() {
+        use std::collections::BTreeMap;
+        use chrono::*;
+
+        let vec = vec![Plist::Real(0.0)];
+        let mut array = Plist::Array(vec.clone());
+        assert_eq!(array.as_array(), Some(&vec.clone()));
+        assert_eq!(array.as_array_mut(), Some(&mut vec.clone()));
+
+        let mut map = BTreeMap::new();
+        map.insert("key1".to_owned(), Plist::String("value1".to_owned()));
+        let mut dict = Plist::Dictionary(map.clone());
+        assert_eq!(dict.as_dictionary(), Some(&map.clone()));
+        assert_eq!(dict.as_dictionary_mut(), Some(&mut map.clone()));
+
+        assert_eq!(Plist::Boolean(true).as_boolean(), Some(true));
+
+        let slice: &[u8] = &[1, 2, 3];
+        assert_eq!(Plist::Data(slice.to_vec()).as_data(), Some(slice));
+
+        let date: DateTime<UTC> = UTC::now();
+        assert_eq!(Plist::Date(date).as_date(), Some(date));
+
+        assert_eq!(Plist::Real(0.0).as_real(), Some(0.0));
+        assert_eq!(Plist::Integer(1).as_integer(), Some(1));
+        assert_eq!(Plist::String("2".to_owned()).as_string(), Some("2"));
     }
 }
