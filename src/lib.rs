@@ -201,18 +201,9 @@ impl Plist {
 
     /// If the `Plist` is a Data, returns the associated Vec.
     /// Returns None otherwise.
-    pub fn as_data(&self) -> Option<&Vec<u8>> {
+    pub fn as_data(&self) -> Option<&[u8]> {
         match self {
             &Plist::Data(ref data) => Some(data),
-            _ => None,
-        }
-    }
-
-    /// If the `Plist` is a Data, returns the associated mutable Vec.
-    /// Returns None otherwise.
-    pub fn as_data_mut(&mut self) -> Option<&mut Vec<u8>> {
-        match self {
-            &mut Plist::Data(ref mut data) => Some(data),
             _ => None,
         }
     }
@@ -420,10 +411,8 @@ mod tests {
 
         assert_eq!(Plist::Boolean(true).as_boolean(), Some(true));
 
-        let vec = vec![1, 2, 3];
-        let mut data = Plist::Data(vec.clone());
-        assert_eq!(data.as_data(), Some(&vec.clone()));
-        assert_eq!(data.as_data_mut(), Some(&mut vec.clone()));
+        let slice: &[u8] = &[1, 2, 3];
+        assert_eq!(Plist::Data(slice.to_vec()).as_data(), Some(slice));
 
         let date: DateTime<UTC> = UTC::now();
         assert_eq!(Plist::Date(date).as_date(), Some(date));
