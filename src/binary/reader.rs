@@ -216,8 +216,9 @@ impl<R: Read + Seek> EventReader<R> {
             }
             (0x6, n) => {
                 // UTF-16 string
-                // n is the length of code units (16 bits), not bytes.
-                let len = try!(self.read_object_len(n * 2));
+                // n is the length of 16 bit code units
+                // len is the number of bytes
+                let len = try!(self.read_object_len(n)) * 2;
                 let raw = try!(self.read_data(len));
                 let mut cursor = Cursor::new(raw);
 
@@ -341,7 +342,12 @@ mod tests {
 
         let reader = File::open(&Path::new("./tests/data/utf16_bplist.plist")).unwrap();
         let streaming_parser = EventReader::new(reader);
-        let events: Vec<PlistEvent> = streaming_parser.map(|e| e.unwrap()).collect();
-        assert_eq!(events[38], StringValue("\u{2605} or better".to_owned()));
+        let mut events: Vec<PlistEvent> = streaming_parser.map(|e| e.unwrap()).collect();
+
+        assert_eq!(events[2], StringValue("\u{2605} or better".to_owned()));
+
+        let poem = if let StringValue(ref mut poem) = events[4] { poem } else { panic!("not a string") };
+        assert_eq!(poem.len(), 643);
+        assert_eq!(poem.pop().unwrap(), '\u{2605}');
     }
 }
