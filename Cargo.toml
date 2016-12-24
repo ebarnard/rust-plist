@@ -5,7 +5,7 @@ authors = ["Ed Barnard <eabarnard@gmail.com>"]
 description = "A rusty plist parser. Very much a work in progress."
 license = "MIT"
 repository = "https://github.com/ebarnard/rust-plist/"
-documentation = "https://ebarnard.github.io/rust-plist/"
+documentation = "https://docs.rs/plist/0.0.15/plist/"
 keywords = ["plist", "parser"]
 build = "build.rs"
 
