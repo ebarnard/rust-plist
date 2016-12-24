@@ -166,7 +166,7 @@ impl<W: Write> PlistEventWriter for EventWriter<W> {
                 try!(self.write_element_and_value("data", &base64_data));
             }
             PlistEvent::DateValue(ref value) => {
-                let date = value.to_rfc3339();
+                let date = format!("{:?}", value);
                 try!(self.write_element_and_value("date", &date));
             }
             PlistEvent::IntegerValue(ref value) => {
@@ -242,7 +242,7 @@ mod tests {
         <key>Data</key>
         <data>AAAAvgAAAAMAAAAeAAAA</data>
         <key>Birthdate</key>
-        <date>1981-05-16T11:32:06+00:00</date>
+        <date>1981-05-16T11:32:06Z</date>
     </dict>
 </plist>";
 
