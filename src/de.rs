@@ -12,7 +12,7 @@ macro_rules! expect {
         match $next {
             Some(Ok(v@$pat)) => v,
             None => return Err(Error::UnexpectedEof),
-            _ => return return Err(event_mismatch_error())
+            _ => return Err(event_mismatch_error())
         }
     };
     ($next:expr, $pat:pat => $save:expr) => {
