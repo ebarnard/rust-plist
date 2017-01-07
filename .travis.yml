@@ -5,18 +5,7 @@ rust:
 - beta
 - stable
 - 1.15.0
-before_script:
-- |
-  pip install 'travis-cargo<0.2' --user &&
-  export PATH=$HOME/.local/bin:$PATH
 script:
 - |
-  travis-cargo build &&
-  travis-cargo test -- --features serde_tests &&
-  travis-cargo --only stable doc -- --no-deps
-after_success:
-- travis-cargo --only stable doc-upload
-env:
-  global:
-  - TRAVIS_CARGO_NIGHTLY_FEATURE=""
-  - secure: lefRmUba6BflwfWllEWIsG9PLqCDrjC96aEzspelLn267R8tiISkHqDXLQZA7IINo+gSzTZBv4sY5R9MeKKwowywWSZQxf8Wm2gItm2/dEXGGzUUqTZn6+q+pSRtreAorJ2Wl9US6I/j8srN0kw+7iJVCzRQq8rsi8cJZ1SmopgtPlN9BH3OTZFIrXsR/a+WvoCFsIphhQ2p2w6QOsMPHw/dHEgqWSnuVELJbu6XsVHjAlbFDzECwRngCkRIGhBzm6VxtvoXxbEQthjBoUjPgIiHqaE00qLDrCqWb/CR1Z1+X8KstM5JM2mVcVJM0DC2W+ugKp7SS4qQDmKB1qcH6Kre3MdM2/Lo0j3ZtePCFkrAjU15rwZCL9cM9rAnM9OGkPta8hTkFK6qAV/phtnBTJhNhcJfAjZFvosim/01GFa6TrK5aw9GZonNAJ1kayfKMLfKcZROWi3ZFQvSSfceGSPiOWGUAsPhaFHVBHYA4asEYIBidNgvFnCozkwIVuMKa0msZPaum3uwZM1a82ScnH71EHKhdATXa2GMeO7U0aZ1mfojIW5u2yt3ALTbVItuCewYqMDnSH2eGx4AIxhvLYiyP5dgaLSmRsin5Y+/e8tNJwCY/OONUliH7MNpdwILRCIQL5SEgsxQssrORx5ar7MSWl5irlabBubUUDHyF4o=
+  cargo test
+  cargo test --no-default-features
