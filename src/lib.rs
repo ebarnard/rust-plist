@@ -19,7 +19,7 @@
 //!
 //! ## Examples
 //!
-//! ```rust ignore
+//! ```rust
 //! use plist::Plist;
 //! use std::fs::File;
 //!
