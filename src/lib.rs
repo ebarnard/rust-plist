@@ -32,7 +32,22 @@
 //! }
 //! ```
 //!
+//! ```rust,ignore
+//! #[macro_use]
+//! extern crate serde_derive;
 //!
+//! use plist::serde::deserialize;
+//! use std::fs::File;
+//!
+//! #[derive(Deserialize)]
+//! struct Info {
+//!     name: String,
+//!     x: i32
+//! }
+//!
+//! let file = File::open("tests/data/xml.plist").unwrap();
+//! let info: Info = deserialize(file).unwrap();
+//! ```
 
 extern crate byteorder;
 extern crate chrono;
