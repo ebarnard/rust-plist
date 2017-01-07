@@ -43,7 +43,7 @@ impl<R: Read> EventReader<R> {
     {
         match self.xml_reader.next() {
             Ok(XmlEvent::Characters(s)) => f(s),
-            Ok(event @ XmlEvent::EndElement{..}) => {
+            Ok(event @ XmlEvent::EndElement { .. }) => {
                 self.queued_event = Some(event);
                 f("".to_owned())
             }

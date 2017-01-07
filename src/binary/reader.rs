@@ -346,7 +346,11 @@ mod tests {
 
         assert_eq!(events[2], StringValue("\u{2605} or better".to_owned()));
 
-        let poem = if let StringValue(ref mut poem) = events[4] { poem } else { panic!("not a string") };
+        let poem = if let StringValue(ref mut poem) = events[4] {
+            poem
+        } else {
+            panic!("not a string")
+        };
         assert_eq!(poem.len(), 643);
         assert_eq!(poem.pop().unwrap(), '\u{2605}');
     }

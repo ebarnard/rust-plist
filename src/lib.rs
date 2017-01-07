@@ -30,7 +30,6 @@
 //!     Plist::Array(_array) => (),
 //!     _ => ()
 //! }
-//!
 //! ```
 //!
 //!
@@ -99,7 +98,7 @@ pub enum Error {
     InvalidData,
     UnexpectedEof,
     Io(IoError),
-    Serde(String)
+    Serde(String),
 }
 
 impl ::std::error::Error for Error {
@@ -108,7 +107,7 @@ impl ::std::error::Error for Error {
             Error::InvalidData => "invalid data",
             Error::UnexpectedEof => "unexpected eof",
             Error::Io(ref err) => err.description(),
-            Error::Serde(ref err) => &err
+            Error::Serde(ref err) => &err,
         }
     }
 
@@ -154,11 +153,7 @@ impl<R: Read + Seek> EventReader<R> {
         try!(reader.read(&mut magic));
         try!(reader.seek(SeekFrom::Start(0)));
 
-        Ok(if &magic == b"bplist00" {
-            true
-        } else {
-            false
-        })
+        Ok(if &magic == b"bplist00" { true } else { false })
     }
 }
 
