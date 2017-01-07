@@ -1,5 +1,5 @@
 use byteorder::{BigEndian, ReadBytesExt};
-use chrono::{TimeZone, UTC};
+use chrono::{Duration, TimeZone, UTC};
 use std::io::{Cursor, Read, Seek, SeekFrom};
 use std::string::{FromUtf8Error, FromUtf16Error};
 
@@ -189,18 +189,28 @@ impl<R: Read + Seek> EventReader<R> {
             }
             (0x2, 3) => Some(PlistEvent::RealValue(try!(self.reader.read_f64::<BigEndian>()))),
             (0x2, _) => return Err(Error::InvalidData), // odd length float
-            (0x3, 3) => {
+            (0x3, 3) => {;
                 // Date
-                // Seconds since 1/1/2001 00:00:00
+                // Seconds since 1/1/2001 00:00:00.
                 let timestamp = try!(self.reader.read_f64::<BigEndian>());
 
-                let secs = timestamp.floor();
-                let subsecs = timestamp - secs;
+                let millis = timestamp * 1_000.0;
+                // Chrono's Duration can only millisecond values between ::std::i64::MIN and
+                // ::std::i64::MAX.
+                if millis > ::std::i64::MAX as f64 || millis < ::std::i64::MIN as f64 {
+                    return Err(Error::InvalidData);
+                }
 
-                let int_secs = (secs as i64) + (31 * 365 + 8) * 86400;
-                let int_nanos = (subsecs * 1_000_000_000f64) as u32;
+                let whole_millis = millis.floor();
+                let submilli_nanos = ((millis - whole_millis) * 1_000_000.0).floor();
 
-                Some(PlistEvent::DateValue(UTC.timestamp(int_secs, int_nanos)))
+                let dur = Duration::milliseconds(whole_millis as i64);
+                let dur = dur + Duration::nanoseconds(submilli_nanos as i64);
+
+                let plist_epoch = UTC.ymd(2001, 1, 1).and_hms(0, 0, 0);
+                let date = try!(plist_epoch.checked_add(dur).ok_or(Error::InvalidData));
+
+                Some(PlistEvent::DateValue(date))
             }
             (0x4, n) => {
                 // Data
