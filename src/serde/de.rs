@@ -1,8 +1,8 @@
 // Tests for the serializer and deserializer are located in tests/serde_/mod.rs.
 // They can be run with `cargo test --features serde_tests`.
 
-use serde::de::{Deserializer as SerdeDeserializer, Error as SerdeError, Visitor, SeqVisitor,
-                MapVisitor, VariantVisitor, Deserialize, EnumVisitor};
+use serde_base::de::{Deserializer as SerdeDeserializer, Error as SerdeError, Visitor, SeqVisitor,
+                     MapVisitor, VariantVisitor, Deserialize, EnumVisitor};
 use std::iter::Peekable;
 
 use {Error, PlistEvent, u64_option_to_usize};
@@ -54,7 +54,8 @@ pub struct Deserializer<I>
     events: Peekable<<I as IntoIterator>::IntoIter>,
 }
 
-impl<I> Deserializer<I> where I: IntoIterator<Item = Result<PlistEvent, Error>>
+impl<I> Deserializer<I>
+    where I: IntoIterator<Item = Result<PlistEvent, Error>>
 {
     pub fn new(iter: I) -> Deserializer<I> {
         Deserializer { events: iter.into_iter().peekable() }
@@ -72,13 +73,13 @@ impl<I> SerdeDeserializer for Deserializer<I>
         match try_next!(self.events.next()) {
             PlistEvent::StartArray(len) => {
                 let len = try!(u64_option_to_usize(len));
-                visitor.visit_seq(MapSeq::new(self, len))
+                visitor.visit_seq(MapAndSeqVisitor::new(self, len))
             }
             PlistEvent::EndArray => return Err(event_mismatch_error()),
 
             PlistEvent::StartDictionary(len) => {
                 let len = try!(u64_option_to_usize(len));
-                visitor.visit_map(MapSeq::new(self, len))
+                visitor.visit_map(MapAndSeqVisitor::new(self, len))
             }
             PlistEvent::EndDictionary => return Err(event_mismatch_error()),
 
@@ -90,6 +91,12 @@ impl<I> SerdeDeserializer for Deserializer<I>
             PlistEvent::RealValue(v) => visitor.visit_f64(v),
             PlistEvent::StringValue(v) => visitor.visit_string(v),
         }
+    }
+
+    forward_to_deserialize! {
+        bool usize u8 u16 u32 u64 isize i8 i16 i32 i64 f32 f64 char str string
+        seq seq_fixed_size bytes map unit_struct
+        tuple_struct struct struct_field tuple ignored_any
     }
 
     fn deserialize_unit<V>(&mut self, mut visitor: V) -> Result<V::Value, Self::Error>
@@ -126,19 +133,19 @@ impl<I> SerdeDeserializer for Deserializer<I>
     }
 
     fn deserialize_newtype_struct<V>(&mut self,
-                               _name: &'static str,
-                               mut visitor: V)
-                               -> Result<V::Value, Self::Error>
+                                     _name: &'static str,
+                                     mut visitor: V)
+                                     -> Result<V::Value, Self::Error>
         where V: Visitor
     {
         visitor.visit_newtype_struct(self)
     }
 
     fn deserialize_enum<V>(&mut self,
-                     _enum: &'static str,
-                     _variants: &'static [&'static str],
-                     mut visitor: V)
-                     -> Result<V::Value, Self::Error>
+                           _enum: &'static str,
+                           _variants: &'static [&'static str],
+                           mut visitor: V)
+                           -> Result<V::Value, Self::Error>
         where V: EnumVisitor
     {
         expect!(self.events.next(), PlistEvent::StartDictionary(_));
@@ -148,7 +155,8 @@ impl<I> SerdeDeserializer for Deserializer<I>
     }
 }
 
-impl<I> VariantVisitor for Deserializer<I> where I: IntoIterator<Item = Result<PlistEvent, Error>>
+impl<I> VariantVisitor for Deserializer<I>
+    where I: IntoIterator<Item = Result<PlistEvent, Error>>
 {
     type Error = Error;
 
@@ -185,7 +193,7 @@ impl<I> VariantVisitor for Deserializer<I> where I: IntoIterator<Item = Result<P
     }
 }
 
-struct MapSeq<'a, I>
+struct MapAndSeqVisitor<'a, I>
     where I: 'a + IntoIterator<Item = Result<PlistEvent, Error>>
 {
     de: &'a mut Deserializer<I>,
@@ -193,10 +201,11 @@ struct MapSeq<'a, I>
     finished: bool,
 }
 
-impl<'a, I> MapSeq<'a, I> where I: 'a + IntoIterator<Item = Result<PlistEvent, Error>>
+impl<'a, I> MapAndSeqVisitor<'a, I>
+    where I: 'a + IntoIterator<Item = Result<PlistEvent, Error>>
 {
-    fn new(de: &'a mut Deserializer<I>, len: Option<usize>) -> MapSeq<'a, I> {
-        MapSeq {
+    fn new(de: &'a mut Deserializer<I>, len: Option<usize>) -> MapAndSeqVisitor<'a, I> {
+        MapAndSeqVisitor {
             de: de,
             remaining: len,
             finished: false,
@@ -204,7 +213,7 @@ impl<'a, I> MapSeq<'a, I> where I: 'a + IntoIterator<Item = Result<PlistEvent, E
     }
 }
 
-impl<'a, I> SeqVisitor for MapSeq<'a, I>
+impl<'a, I> SeqVisitor for MapAndSeqVisitor<'a, I>
     where I: 'a + IntoIterator<Item = Result<PlistEvent, Error>>
 {
     type Error = Error;
@@ -235,7 +244,7 @@ impl<'a, I> SeqVisitor for MapSeq<'a, I>
     }
 }
 
-impl<'a, I> MapVisitor for MapSeq<'a, I>
+impl<'a, I> MapVisitor for MapAndSeqVisitor<'a, I>
     where I: 'a + IntoIterator<Item = Result<PlistEvent, Error>>
 {
     type Error = Error;

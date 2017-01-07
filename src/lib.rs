@@ -38,37 +38,25 @@
 extern crate byteorder;
 extern crate chrono;
 extern crate rustc_serialize;
-extern crate serde;
 extern crate xml as xml_rs;
 
 pub mod binary;
 pub mod xml;
 
 mod builder;
-mod de;
-mod ser;
 
-pub use de::Deserializer;
-pub use ser::Serializer;
+// Optional serde module
+#[cfg(feature = "serde")]
+#[macro_use]
+extern crate serde as serde_base;
+#[cfg(feature = "serde")]
+pub mod serde;
 
 use chrono::{DateTime, UTC};
-use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 use std::fmt;
-use std::io::{Read, Seek, SeekFrom, Write};
+use std::io::{Read, Seek, SeekFrom};
 use std::io::Error as IoError;
-
-pub fn deserialize<R: Read + Seek, T: Deserialize>(reader: R) -> Result<T> {
-    let reader = EventReader::new(reader);
-    let mut de = Deserializer::new(reader);
-    Deserialize::deserialize(&mut de)
-}
-
-pub fn serialize_to_xml<W: Write, T: Serialize>(writer: W, value: &T) -> Result<()> {
-    let writer = xml::EventWriter::new(writer);
-    let mut ser = Serializer::new(writer);
-    value.serialize(&mut ser)
-}
 
 #[derive(Clone, Debug, PartialEq)]
 pub enum Plist {

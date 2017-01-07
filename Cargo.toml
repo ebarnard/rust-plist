@@ -10,14 +10,16 @@ keywords = ["plist", "parser"]
 build = "build.rs"
 
 [features]
-serde_tests = ["serde_codegen"]
+default = ["serde_serialization"]
+serde_serialization = ["serde"]
 
 [dependencies]
 rustc-serialize = "0.3.19"
 xml-rs = "0.3.4"
 byteorder = "0.5.3"
 chrono = "0.2.22"
-serde = "0.7.10"
+serde = { version = "0.8.21", optional = true }
 
-[build-dependencies]
-serde_codegen = { version = "0.7.10", optional = true }
+[dev-dependencies]
+# Should be an optional dependency on serde_serialization
+serde_derive = { version = "0.8.21" }

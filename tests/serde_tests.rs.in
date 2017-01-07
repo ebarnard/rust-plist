@@ -1,4 +1,0 @@
-extern crate serde;
-extern crate plist;
-
-mod serde_;

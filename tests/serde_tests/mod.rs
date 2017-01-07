@@ -1,4 +1,5 @@
-use plist::{Deserializer, EventWriter, PlistEvent, Result as PlistResult, Serializer};
+use plist::{EventWriter, PlistEvent, Result as PlistResult};
+use plist::serde::{Serializer, Deserializer};
 use plist::PlistEvent::*;
 use serde::{Deserialize, Serialize};
 use std::fmt::Debug;
@@ -199,11 +200,8 @@ struct NewtypeInner(u8, u8, u8);
 fn newtype_struct() {
     let newtype = NewtypeStruct(NewtypeInner(34, 32, 13));
 
-    let comparison = &[StartArray(Some(3)),
-                       IntegerValue(34),
-                       IntegerValue(32),
-                       IntegerValue(13),
-                       EndArray];
+    let comparison =
+        &[StartArray(Some(3)), IntegerValue(34), IntegerValue(32), IntegerValue(13), EndArray];
 
     assert_roundtrip(newtype, Some(comparison));
 }
