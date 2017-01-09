@@ -267,6 +267,132 @@ impl Plist {
     }
 }
 
+impl From<Vec<Plist>> for Plist {
+    fn from(from: Vec<Plist>) -> Plist { Plist::Array(from) }
+}
+
+impl<'a> From<&'a Vec<Plist>> for Plist {
+    fn from(from: &'a Vec<Plist>) -> Plist { Plist::Array(from.clone()) }
+}
+
+impl<'a, T> From<&'a [T]> for Plist where &'a T: Into<Plist> {
+    fn from(from: &'a [T]) -> Plist {
+        Plist::Array(from.iter().map(Into::into).collect())
+    }
+}
+
+impl From<BTreeMap<String, Plist>> for Plist {
+    fn from(from: BTreeMap<String, Plist>) -> Plist { Plist::Dictionary(from) }
+}
+
+impl<'a> From<&'a BTreeMap<String, Plist>> for Plist {
+    fn from(from: &'a BTreeMap<String, Plist>) -> Plist { Plist::Dictionary(from.clone()) }
+}
+
+impl From<bool> for Plist {
+    fn from(from: bool) -> Plist { Plist::Boolean(from) }
+}
+
+impl<'a> From<&'a bool> for Plist {
+    fn from(from: &'a bool) -> Plist { Plist::Boolean(*from) }
+}
+
+impl From<Vec<u8>> for Plist {
+    fn from(from: Vec<u8>) -> Plist { Plist::Data(from) }
+}
+
+impl<'a> From<&'a Vec<u8>> for Plist {
+    fn from(from: &'a Vec<u8>) -> Plist { Plist::Data(from.clone()) }
+}
+
+impl From<DateTime<UTC>> for Plist {
+    fn from(from: DateTime<UTC>) -> Plist { Plist::Date(from) }
+}
+
+impl<'a> From<&'a DateTime<UTC>> for Plist {
+    fn from(from: &'a DateTime<UTC>) -> Plist { Plist::Date(from.clone()) }
+}
+
+impl From<f64> for Plist {
+    fn from(from: f64) -> Plist { Plist::Real(from) }
+}
+
+impl From<f32> for Plist {
+    fn from(from: f32) -> Plist { Plist::Real(from as f64) }
+}
+
+impl From<i64> for Plist {
+    fn from(from: i64) -> Plist { Plist::Integer(from) }
+}
+
+impl From<i32> for Plist {
+    fn from(from: i32) -> Plist { Plist::Integer(from as i64) }
+}
+
+impl From<i16> for Plist {
+    fn from(from: i16) -> Plist { Plist::Integer(from as i64) }
+}
+
+impl From<i8> for Plist {
+    fn from(from: i8) -> Plist { Plist::Integer(from as i64) }
+}
+
+impl From<u32> for Plist {
+    fn from(from: u32) -> Plist { Plist::Integer(from as i64) }
+}
+
+impl From<u16> for Plist {
+    fn from(from: u16) -> Plist { Plist::Integer(from as i64) }
+}
+
+impl From<u8> for Plist {
+    fn from(from: u8) -> Plist { Plist::Integer(from as i64) }
+}
+
+impl<'a> From<&'a f64> for Plist {
+    fn from(from: &'a f64) -> Plist { Plist::Real(*from) }
+}
+
+impl<'a> From<&'a f32> for Plist {
+    fn from(from: &'a f32) -> Plist { Plist::Real(*from as f64) }
+}
+
+impl<'a> From<&'a i64> for Plist {
+    fn from(from: &'a i64) -> Plist { Plist::Integer(*from) }
+}
+
+impl<'a> From<&'a i32> for Plist {
+    fn from(from: &'a i32) -> Plist { Plist::Integer(*from as i64) }
+}
+
+impl<'a> From<&'a i16> for Plist {
+    fn from(from: &'a i16) -> Plist { Plist::Integer(*from as i64) }
+}
+
+impl<'a> From<&'a i8> for Plist {
+    fn from(from: &'a i8) -> Plist { Plist::Integer(*from as i64) }
+}
+
+impl<'a> From<&'a u32> for Plist {
+    fn from(from: &'a u32) -> Plist { Plist::Integer(*from as i64) }
+}
+
+impl<'a> From<&'a u16> for Plist {
+    fn from(from: &'a u16) -> Plist { Plist::Integer(*from as i64) }
+}
+
+impl<'a> From<&'a u8> for Plist {
+    fn from(from: &'a u8) -> Plist { Plist::Integer(*from as i64) }
+}
+
+impl From<String> for Plist {
+    fn from(from: String) -> Plist { Plist::String(from) }
+}
+
+impl<'a> From<&'a str> for Plist {
+    fn from(from: &'a str) -> Plist { Plist::String(from.into()) }
+}
+
 /// An encoding of a plist as a flat structure.
 ///
 /// Output by the event readers.
