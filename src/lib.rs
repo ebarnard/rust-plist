@@ -271,22 +271,8 @@ impl From<Vec<Plist>> for Plist {
     fn from(from: Vec<Plist>) -> Plist { Plist::Array(from) }
 }
 
-impl<'a> From<&'a Vec<Plist>> for Plist {
-    fn from(from: &'a Vec<Plist>) -> Plist { Plist::Array(from.clone()) }
-}
-
-impl<'a, T> From<&'a [T]> for Plist where &'a T: Into<Plist> {
-    fn from(from: &'a [T]) -> Plist {
-        Plist::Array(from.iter().map(Into::into).collect())
-    }
-}
-
 impl From<BTreeMap<String, Plist>> for Plist {
     fn from(from: BTreeMap<String, Plist>) -> Plist { Plist::Dictionary(from) }
-}
-
-impl<'a> From<&'a BTreeMap<String, Plist>> for Plist {
-    fn from(from: &'a BTreeMap<String, Plist>) -> Plist { Plist::Dictionary(from.clone()) }
 }
 
 impl From<bool> for Plist {
@@ -295,14 +281,6 @@ impl From<bool> for Plist {
 
 impl<'a> From<&'a bool> for Plist {
     fn from(from: &'a bool) -> Plist { Plist::Boolean(*from) }
-}
-
-impl From<Vec<u8>> for Plist {
-    fn from(from: Vec<u8>) -> Plist { Plist::Data(from) }
-}
-
-impl<'a> From<&'a Vec<u8>> for Plist {
-    fn from(from: &'a Vec<u8>) -> Plist { Plist::Data(from.clone()) }
 }
 
 impl From<DateTime<UTC>> for Plist {
