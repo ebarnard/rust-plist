@@ -1,9 +1,9 @@
 // Tests for the serializer and deserializer are located in tests/serde_/mod.rs.
 // They can be run with `cargo test --features serde_tests`.
 
-use serde_base::de::{Deserializer as SerdeDeserializer, Error as SerdeError, Visitor, SeqVisitor,
-                     MapVisitor, VariantVisitor, Deserialize, EnumVisitor};
+use serde_base::de;
 use std::iter::Peekable;
+use std::fmt::Display;
 
 use {Error, PlistEvent, u64_option_to_usize};
 
@@ -38,13 +38,9 @@ fn event_mismatch_error() -> Error {
     Error::InvalidData
 }
 
-impl SerdeError for Error {
-    fn custom<T: Into<String>>(msg: T) -> Self {
-        Error::Serde(msg.into())
-    }
-
-    fn end_of_stream() -> Self {
-        Error::UnexpectedEof
+impl de::Error for Error {
+    fn custom<T: Display>(msg: T) -> Self {
+        Error::Serde(msg.to_string())
     }
 }
 
@@ -62,24 +58,28 @@ impl<I> Deserializer<I>
     }
 }
 
-impl<I> SerdeDeserializer for Deserializer<I>
+impl<'a, I> de::Deserializer for &'a mut Deserializer<I>
     where I: IntoIterator<Item = Result<PlistEvent, Error>>
 {
     type Error = Error;
 
-    fn deserialize<V>(&mut self, mut visitor: V) -> Result<V::Value, Self::Error>
-        where V: Visitor
+    fn deserialize<V>(self, visitor: V) -> Result<V::Value, Self::Error>
+        where V: de::Visitor
     {
         match try_next!(self.events.next()) {
             PlistEvent::StartArray(len) => {
                 let len = try!(u64_option_to_usize(len));
-                visitor.visit_seq(MapAndSeqVisitor::new(self, len))
+                let ret = visitor.visit_seq(MapAndSeqVisitor::new(self, len))?;
+                expect!(self.events.next(), PlistEvent::EndArray);
+                Ok(ret)
             }
             PlistEvent::EndArray => return Err(event_mismatch_error()),
 
             PlistEvent::StartDictionary(len) => {
                 let len = try!(u64_option_to_usize(len));
-                visitor.visit_map(MapAndSeqVisitor::new(self, len))
+                let ret = visitor.visit_map(MapAndSeqVisitor::new(self, len))?;
+                expect!(self.events.next(), PlistEvent::EndDictionary);
+                Ok(ret)
             }
             PlistEvent::EndDictionary => return Err(event_mismatch_error()),
 
@@ -94,20 +94,20 @@ impl<I> SerdeDeserializer for Deserializer<I>
     }
 
     forward_to_deserialize! {
-        bool usize u8 u16 u32 u64 isize i8 i16 i32 i64 f32 f64 char str string
-        seq seq_fixed_size bytes map unit_struct
+        bool u8 u16 u32 u64 i8 i16 i32 i64 f32 f64 char str string
+        seq seq_fixed_size bytes byte_buf map unit_struct
         tuple_struct struct struct_field tuple ignored_any
     }
 
-    fn deserialize_unit<V>(&mut self, mut visitor: V) -> Result<V::Value, Self::Error>
-        where V: Visitor
+    fn deserialize_unit<V>(self, visitor: V) -> Result<V::Value, Self::Error>
+        where V: de::Visitor
     {
         expect!(self.events.next(), PlistEvent::StringValue(_));
         visitor.visit_unit()
     }
 
-    fn deserialize_option<V>(&mut self, mut visitor: V) -> Result<V::Value, Self::Error>
-        where V: Visitor
+    fn deserialize_option<V>(self, visitor: V) -> Result<V::Value, Self::Error>
+        where V: de::Visitor
     {
         expect!(self.events.next(), PlistEvent::StartDictionary(_));
 
@@ -123,7 +123,9 @@ impl<I> SerdeDeserializer for Deserializer<I>
                 expect!(self.events.next(), PlistEvent::StringValue(_));
                 ret
             }
-            PlistEvent::StringValue(ref s) if &s[..] == "Some" => try!(visitor.visit_some(self)),
+            PlistEvent::StringValue(ref s) if &s[..] == "Some" => {
+                try!(visitor.visit_some(&mut *self))
+            }
             _ => return Err(event_mismatch_error()),
         };
 
@@ -132,64 +134,71 @@ impl<I> SerdeDeserializer for Deserializer<I>
         Ok(ret)
     }
 
-    fn deserialize_newtype_struct<V>(&mut self,
+    fn deserialize_newtype_struct<V>(self,
                                      _name: &'static str,
-                                     mut visitor: V)
+                                     visitor: V)
                                      -> Result<V::Value, Self::Error>
-        where V: Visitor
+        where V: de::Visitor
     {
         visitor.visit_newtype_struct(self)
     }
 
-    fn deserialize_enum<V>(&mut self,
+    fn deserialize_enum<V>(self,
                            _enum: &'static str,
                            _variants: &'static [&'static str],
-                           mut visitor: V)
+                           visitor: V)
                            -> Result<V::Value, Self::Error>
-        where V: EnumVisitor
+        where V: de::Visitor
     {
         expect!(self.events.next(), PlistEvent::StartDictionary(_));
-        let ret = try!(visitor.visit(&mut *self));
+        let ret = try!(visitor.visit_enum(&mut *self));
         expect!(self.events.next(), PlistEvent::EndDictionary);
         Ok(ret)
     }
 }
 
-impl<I> VariantVisitor for Deserializer<I>
+impl<'a, I> de::EnumVisitor for &'a mut Deserializer<I>
+    where I: IntoIterator<Item = Result<PlistEvent, Error>>
+{
+    type Error = Error;
+    type Variant = Self;
+
+    fn visit_variant_seed<V>(self, seed: V) -> Result<(V::Value, Self), Self::Error>
+        where V: de::DeserializeSeed
+    {
+        Ok((seed.deserialize(&mut *self)?, self))
+    }
+}
+
+impl<'a, I> de::VariantVisitor for &'a mut Deserializer<I>
     where I: IntoIterator<Item = Result<PlistEvent, Error>>
 {
     type Error = Error;
 
-    fn visit_variant<V>(&mut self) -> Result<V, Self::Error>
-        where V: Deserialize
+    fn visit_unit(self) -> Result<(), Self::Error> {
+        <() as de::Deserialize>::deserialize(self)
+    }
+
+    fn visit_newtype_seed<T>(self, seed: T) -> Result<T::Value, Self::Error>
+        where T: de::DeserializeSeed
     {
-        <V as Deserialize>::deserialize(self)
+        seed.deserialize(self)
     }
 
-    fn visit_unit(&mut self) -> Result<(), Self::Error> {
-        <() as Deserialize>::deserialize(self)
-    }
-
-    fn visit_newtype<T>(&mut self) -> Result<T, Self::Error>
-        where T: Deserialize
+    fn visit_tuple<V>(self, len: usize, visitor: V) -> Result<V::Value, Self::Error>
+        where V: de::Visitor
     {
-        <T as Deserialize>::deserialize(self)
+        <Self as de::Deserializer>::deserialize_tuple(self, len, visitor)
     }
 
-    fn visit_tuple<V>(&mut self, len: usize, visitor: V) -> Result<V::Value, Self::Error>
-        where V: Visitor
-    {
-        <Self as SerdeDeserializer>::deserialize_tuple(self, len, visitor)
-    }
-
-    fn visit_struct<V>(&mut self,
+    fn visit_struct<V>(self,
                        fields: &'static [&'static str],
                        visitor: V)
                        -> Result<V::Value, Self::Error>
-        where V: Visitor
+        where V: de::Visitor
     {
         let name = "";
-        <Self as SerdeDeserializer>::deserialize_struct(self, name, fields, visitor)
+        <Self as de::Deserializer>::deserialize_struct(self, name, fields, visitor)
     }
 }
 
@@ -198,7 +207,6 @@ struct MapAndSeqVisitor<'a, I>
 {
     de: &'a mut Deserializer<I>,
     remaining: Option<usize>,
-    finished: bool,
 }
 
 impl<'a, I> MapAndSeqVisitor<'a, I>
@@ -208,72 +216,55 @@ impl<'a, I> MapAndSeqVisitor<'a, I>
         MapAndSeqVisitor {
             de: de,
             remaining: len,
-            finished: false,
         }
     }
 }
 
-impl<'a, I> SeqVisitor for MapAndSeqVisitor<'a, I>
+impl<'a, I> de::SeqVisitor for MapAndSeqVisitor<'a, I>
     where I: 'a + IntoIterator<Item = Result<PlistEvent, Error>>
 {
     type Error = Error;
 
-    fn visit<T>(&mut self) -> Result<Option<T>, Self::Error>
-        where T: Deserialize
+    fn visit_seed<T>(&mut self, seed: T) -> Result<Option<T::Value>, Self::Error>
+        where T: de::DeserializeSeed
     {
         match self.de.events.peek() {
-            Some(&Ok(PlistEvent::EndArray)) => {
-                self.de.events.next();
-                self.finished = true;
-                return Ok(None);
+            Some(&Ok(PlistEvent::EndArray)) => Ok(None),
+            _ => {
+                let ret = seed.deserialize(&mut *self.de).map(|k| Some(k));
+                self.remaining = self.remaining.map(|r| r.saturating_sub(1));
+                ret
             }
-            _ => <T as Deserialize>::deserialize(self.de).map(|k| Some(k)),
         }
-    }
-
-    fn end(&mut self) -> Result<(), Self::Error> {
-        if !self.finished {
-            self.finished = true;
-            expect!(self.de.events.next(), PlistEvent::EndArray);
-        }
-        Ok(())
     }
 
     fn size_hint(&self) -> (usize, Option<usize>) {
-        <Self as MapVisitor>::size_hint(self)
+        <Self as de::MapVisitor>::size_hint(self)
     }
 }
 
-impl<'a, I> MapVisitor for MapAndSeqVisitor<'a, I>
+impl<'a, I> de::MapVisitor for MapAndSeqVisitor<'a, I>
     where I: 'a + IntoIterator<Item = Result<PlistEvent, Error>>
 {
     type Error = Error;
 
-    fn visit_key<K>(&mut self) -> Result<Option<K>, Self::Error>
-        where K: Deserialize
+    fn visit_key_seed<K>(&mut self, seed: K) -> Result<Option<K::Value>, Self::Error>
+        where K: de::DeserializeSeed
     {
         match self.de.events.peek() {
-            Some(&Ok(PlistEvent::EndDictionary)) => {
-                self.de.events.next();
-                self.finished = true;
-                return Ok(None);
+            Some(&Ok(PlistEvent::EndDictionary)) => return Ok(None),
+            _ => {
+                let ret = seed.deserialize(&mut *self.de).map(|k| Some(k));
+                self.remaining = self.remaining.map(|r| r.saturating_sub(1));
+                ret
             }
-            _ => <K as Deserialize>::deserialize(self.de).map(|k| Some(k)),
         }
     }
 
-    fn visit_value<V>(&mut self) -> Result<V, Self::Error>
-        where V: Deserialize
+    fn visit_value_seed<V>(&mut self, seed: V) -> Result<V::Value, Self::Error>
+        where V: de::DeserializeSeed
     {
-        <V as Deserialize>::deserialize(self.de)
-    }
-
-    fn end(&mut self) -> Result<(), Self::Error> {
-        if !self.finished {
-            self.finished = true;
-            expect!(self.de.events.next(), PlistEvent::EndDictionary);
-        }
-        Ok(())
+        seed.deserialize(&mut *self.de)
     }
 
     fn size_hint(&self) -> (usize, Option<usize>) {
