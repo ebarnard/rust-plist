@@ -1,11 +1,11 @@
 [package]
 name = "plist"
-version = "0.0.16"
+version = "0.1.0"
 authors = ["Ed Barnard <eabarnard@gmail.com>"]
 description = "A rusty plist parser. Very much a work in progress."
 license = "MIT"
 repository = "https://github.com/ebarnard/rust-plist/"
-documentation = "https://docs.rs/plist/0.0.16/plist/"
+documentation = "https://docs.rs/plist/0.1.0/plist/"
 keywords = ["plist", "parser"]
 build = "build.rs"
 
