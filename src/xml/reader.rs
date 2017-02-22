@@ -3,7 +3,6 @@ use chrono::format::ParseError as ChronoParseError;
 use rustc_serialize::base64::FromBase64;
 use std::io::Read;
 use std::str::FromStr;
-use std::collections::HashMap;
 use xml_rs::reader::{EventReader as XmlEventReader, ParserConfig, XmlEvent};
 
 use {Error, Result, PlistEvent};
@@ -23,14 +22,12 @@ pub struct EventReader<R: Read> {
 
 impl<R: Read> EventReader<R> {
     pub fn new(reader: R) -> EventReader<R> {
-        let config = ParserConfig {
-            trim_whitespace: false,
-            whitespace_to_characters: true,
-            cdata_to_characters: true,
-            ignore_comments: true,
-            coalesce_characters: true,
-            extra_entities: HashMap::default(),
-        };
+        let config = ParserConfig::new()
+            .trim_whitespace(false)
+            .whitespace_to_characters(true)
+            .cdata_to_characters(true)
+            .ignore_comments(true)
+            .coalesce_characters(true);
 
         EventReader {
             xml_reader: XmlEventReader::new_with_config(reader, config),

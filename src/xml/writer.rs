@@ -38,17 +38,15 @@ pub struct EventWriter<W: Write> {
 
 impl<W: Write> EventWriter<W> {
     pub fn new(writer: W) -> EventWriter<W> {
-        let config = EmitterConfig {
-            line_separator: "\n".into(),
-            indent_string: "    ".into(),
-            perform_indent: true,
-            perform_escaping: true,
-            write_document_declaration: true,
-            normalize_empty_elements: true,
-            cdata_to_characters: true,
-            keep_element_names_stack: false,
-            autopad_comments: true,
-        };
+        let config = EmitterConfig::new()
+            .line_separator("\n")
+            .indent_string("    ")
+            .perform_indent(true)
+            .write_document_declaration(true)
+            .normalize_empty_elements(true)
+            .cdata_to_characters(true)
+            .keep_element_names_stack(false)
+            .autopad_comments(true);
 
         EventWriter {
             xml_writer: XmlEventWriter::new_with_config(writer, config),
