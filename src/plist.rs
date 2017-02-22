@@ -199,107 +199,159 @@ impl Plist {
 }
 
 impl From<Vec<Plist>> for Plist {
-    fn from(from: Vec<Plist>) -> Plist { Plist::Array(from) }
+    fn from(from: Vec<Plist>) -> Plist {
+        Plist::Array(from)
+    }
 }
 
 impl From<BTreeMap<String, Plist>> for Plist {
-    fn from(from: BTreeMap<String, Plist>) -> Plist { Plist::Dictionary(from) }
+    fn from(from: BTreeMap<String, Plist>) -> Plist {
+        Plist::Dictionary(from)
+    }
 }
 
 impl From<bool> for Plist {
-    fn from(from: bool) -> Plist { Plist::Boolean(from) }
+    fn from(from: bool) -> Plist {
+        Plist::Boolean(from)
+    }
 }
 
 impl<'a> From<&'a bool> for Plist {
-    fn from(from: &'a bool) -> Plist { Plist::Boolean(*from) }
+    fn from(from: &'a bool) -> Plist {
+        Plist::Boolean(*from)
+    }
 }
 
 impl From<DateTime<UTC>> for Plist {
-    fn from(from: DateTime<UTC>) -> Plist { Plist::Date(from) }
+    fn from(from: DateTime<UTC>) -> Plist {
+        Plist::Date(from)
+    }
 }
 
 impl<'a> From<&'a DateTime<UTC>> for Plist {
-    fn from(from: &'a DateTime<UTC>) -> Plist { Plist::Date(from.clone()) }
+    fn from(from: &'a DateTime<UTC>) -> Plist {
+        Plist::Date(from.clone())
+    }
 }
 
 impl From<f64> for Plist {
-    fn from(from: f64) -> Plist { Plist::Real(from) }
+    fn from(from: f64) -> Plist {
+        Plist::Real(from)
+    }
 }
 
 impl From<f32> for Plist {
-    fn from(from: f32) -> Plist { Plist::Real(from as f64) }
+    fn from(from: f32) -> Plist {
+        Plist::Real(from as f64)
+    }
 }
 
 impl From<i64> for Plist {
-    fn from(from: i64) -> Plist { Plist::Integer(from) }
+    fn from(from: i64) -> Plist {
+        Plist::Integer(from)
+    }
 }
 
 impl From<i32> for Plist {
-    fn from(from: i32) -> Plist { Plist::Integer(from as i64) }
+    fn from(from: i32) -> Plist {
+        Plist::Integer(from as i64)
+    }
 }
 
 impl From<i16> for Plist {
-    fn from(from: i16) -> Plist { Plist::Integer(from as i64) }
+    fn from(from: i16) -> Plist {
+        Plist::Integer(from as i64)
+    }
 }
 
 impl From<i8> for Plist {
-    fn from(from: i8) -> Plist { Plist::Integer(from as i64) }
+    fn from(from: i8) -> Plist {
+        Plist::Integer(from as i64)
+    }
 }
 
 impl From<u32> for Plist {
-    fn from(from: u32) -> Plist { Plist::Integer(from as i64) }
+    fn from(from: u32) -> Plist {
+        Plist::Integer(from as i64)
+    }
 }
 
 impl From<u16> for Plist {
-    fn from(from: u16) -> Plist { Plist::Integer(from as i64) }
+    fn from(from: u16) -> Plist {
+        Plist::Integer(from as i64)
+    }
 }
 
 impl From<u8> for Plist {
-    fn from(from: u8) -> Plist { Plist::Integer(from as i64) }
+    fn from(from: u8) -> Plist {
+        Plist::Integer(from as i64)
+    }
 }
 
 impl<'a> From<&'a f64> for Plist {
-    fn from(from: &'a f64) -> Plist { Plist::Real(*from) }
+    fn from(from: &'a f64) -> Plist {
+        Plist::Real(*from)
+    }
 }
 
 impl<'a> From<&'a f32> for Plist {
-    fn from(from: &'a f32) -> Plist { Plist::Real(*from as f64) }
+    fn from(from: &'a f32) -> Plist {
+        Plist::Real(*from as f64)
+    }
 }
 
 impl<'a> From<&'a i64> for Plist {
-    fn from(from: &'a i64) -> Plist { Plist::Integer(*from) }
+    fn from(from: &'a i64) -> Plist {
+        Plist::Integer(*from)
+    }
 }
 
 impl<'a> From<&'a i32> for Plist {
-    fn from(from: &'a i32) -> Plist { Plist::Integer(*from as i64) }
+    fn from(from: &'a i32) -> Plist {
+        Plist::Integer(*from as i64)
+    }
 }
 
 impl<'a> From<&'a i16> for Plist {
-    fn from(from: &'a i16) -> Plist { Plist::Integer(*from as i64) }
+    fn from(from: &'a i16) -> Plist {
+        Plist::Integer(*from as i64)
+    }
 }
 
 impl<'a> From<&'a i8> for Plist {
-    fn from(from: &'a i8) -> Plist { Plist::Integer(*from as i64) }
+    fn from(from: &'a i8) -> Plist {
+        Plist::Integer(*from as i64)
+    }
 }
 
 impl<'a> From<&'a u32> for Plist {
-    fn from(from: &'a u32) -> Plist { Plist::Integer(*from as i64) }
+    fn from(from: &'a u32) -> Plist {
+        Plist::Integer(*from as i64)
+    }
 }
 
 impl<'a> From<&'a u16> for Plist {
-    fn from(from: &'a u16) -> Plist { Plist::Integer(*from as i64) }
+    fn from(from: &'a u16) -> Plist {
+        Plist::Integer(*from as i64)
+    }
 }
 
 impl<'a> From<&'a u8> for Plist {
-    fn from(from: &'a u8) -> Plist { Plist::Integer(*from as i64) }
+    fn from(from: &'a u8) -> Plist {
+        Plist::Integer(*from as i64)
+    }
 }
 
 impl From<String> for Plist {
-    fn from(from: String) -> Plist { Plist::String(from) }
+    fn from(from: String) -> Plist {
+        Plist::String(from)
+    }
 }
 
 impl<'a> From<&'a str> for Plist {
-    fn from(from: &'a str) -> Plist { Plist::String(from.into()) }
+    fn from(from: &'a str) -> Plist {
+        Plist::String(from.into())
+    }
 }
 
 #[cfg(test)]

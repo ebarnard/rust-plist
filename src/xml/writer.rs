@@ -85,7 +85,8 @@ impl<W: Write> EventWriter<W> {
         // If there are no more open tags then write the </plist> element
         if self.stack.len() == 1 {
             try!(self.end_element("plist"));
-            if let Some(Element::Root) = self.stack.pop() {} else {
+            if let Some(Element::Root) = self.stack.pop() {
+            } else {
                 return Err(Error::InvalidData);
             }
         }
@@ -140,7 +141,8 @@ impl<W: Write> PlistEventWriter for EventWriter<W> {
             }
             PlistEvent::EndArray => {
                 try!(self.end_element("array"));
-                if let Some(Element::Array) = self.stack.pop() {} else {
+                if let Some(Element::Array) = self.stack.pop() {
+                } else {
                     return Err(Error::InvalidData);
                 }
             }

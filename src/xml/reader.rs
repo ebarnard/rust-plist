@@ -88,19 +88,15 @@ impl<R: Read> EventReader<R> {
                             }))
                         }
                         "integer" => {
-                            return Some(self.read_content(|s| {
-                                match FromStr::from_str(&s) {
-                                    Ok(i) => Ok(PlistEvent::IntegerValue(i)),
-                                    Err(_) => Err(Error::InvalidData),
-                                }
+                            return Some(self.read_content(|s| match FromStr::from_str(&s) {
+                                Ok(i) => Ok(PlistEvent::IntegerValue(i)),
+                                Err(_) => Err(Error::InvalidData),
                             }))
                         }
                         "real" => {
-                            return Some(self.read_content(|s| {
-                                match FromStr::from_str(&s) {
-                                    Ok(f) => Ok(PlistEvent::RealValue(f)),
-                                    Err(_) => Err(Error::InvalidData),
-                                }
+                            return Some(self.read_content(|s| match FromStr::from_str(&s) {
+                                Ok(f) => Ok(PlistEvent::RealValue(f)),
+                                Err(_) => Err(Error::InvalidData),
                             }))
                         }
                         "string" => {
