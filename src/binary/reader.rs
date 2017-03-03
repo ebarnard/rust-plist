@@ -1,6 +1,7 @@
 use byteorder::{BigEndian, ReadBytesExt};
 use chrono::{Duration, TimeZone, UTC};
-use std::io::{Cursor, Read, Seek, SeekFrom};
+use std::io::{Read, Seek, SeekFrom};
+use std::mem;
 use std::string::{FromUtf8Error, FromUtf16Error};
 
 use {Error, Result, PlistEvent, u64_to_usize};
@@ -36,6 +37,9 @@ pub struct EventReader<R> {
     reader: R,
     ref_size: u8,
     finished: bool,
+    // The largest single allocation allowed for this Plist.
+    // Equal to the number of bytes in the Plist minus the magic and trailer.
+    max_allocation: u64,
 }
 
 impl<R: Read + Seek> EventReader<R> {
@@ -46,6 +50,21 @@ impl<R: Read + Seek> EventReader<R> {
             reader: reader,
             ref_size: 0,
             finished: false,
+            max_allocation: 0
+        }
+    }
+
+    fn can_allocate<T>(&self, len: u64) -> bool {
+        let byte_len = len.saturating_mul(mem::size_of::<T>() as u64);
+        byte_len <= self.max_allocation
+    }
+
+    fn allocate_vec<T>(&self, len: u64) -> Result<Vec<T>> {
+        if self.can_allocate::<T>(len) {
+            let len = u64_to_usize(len)?;
+            Ok(Vec::with_capacity(len))
+        } else {
+            Err(Error::InvalidData)
         }
     }
 
@@ -58,12 +77,16 @@ impl<R: Read + Seek> EventReader<R> {
         }
 
         // Trailer starts with 6 bytes of padding
-        try!(self.reader.seek(SeekFrom::End(-32 + 6)));
+        let trailer_start = try!(self.reader.seek(SeekFrom::End(-32 + 6)));
+
         let offset_size = try!(self.reader.read_u8());
         self.ref_size = try!(self.reader.read_u8());
         let num_objects = try!(self.reader.read_u64::<BigEndian>());
         let top_object = try!(self.reader.read_u64::<BigEndian>());
         let offset_table_offset = try!(self.reader.read_u64::<BigEndian>());
+
+        // File size minus trailer and header
+        self.max_allocation = trailer_start.saturating_sub(6 + 8);
 
         // Read offset table
         try!(self.reader.seek(SeekFrom::Start(offset_table_offset)));
@@ -79,9 +102,7 @@ impl<R: Read + Seek> EventReader<R> {
     }
 
     fn read_ints(&mut self, len: u64, size: u8) -> Result<Vec<u64>> {
-        let len = try!(u64_to_usize(len));
-        let mut ints = Vec::with_capacity(len);
-        // TODO: Is the match hoisted out of the loop?
+        let mut ints = self.allocate_vec(len)?;
         for _ in 0..len {
             match size {
                 1 => ints.push(try!(self.reader.read_u8()) as u64),
@@ -115,18 +136,10 @@ impl<R: Read + Seek> EventReader<R> {
     }
 
     fn read_data(&mut self, len: u64) -> Result<Vec<u8>> {
-        let len = try!(u64_to_usize(len));
-        let mut data = vec![0; len];
-        let mut total_read = 0;
-
-        while total_read < len {
-            let read = try!(self.reader.read(&mut data[total_read..]));
-            if read == 0 {
-                return Err(Error::UnexpectedEof);
-            }
-            total_read += read;
-        }
-
+        let mut data = self.allocate_vec::<u8>(len)?;
+        // Safe as u8 is a Copy type and we have already know len has been allocated.
+        unsafe { data.set_len(len as usize) }
+        self.reader.read_exact(&mut data)?;
         Ok(data)
     }
 
@@ -226,16 +239,11 @@ impl<R: Read + Seek> EventReader<R> {
             }
             (0x6, n) => {
                 // UTF-16 string
-                // n is the length of 16 bit code units
-                // len is the number of bytes
-                let len = try!(self.read_object_len(n)) * 2;
-                let raw = try!(self.read_data(len));
-                let mut cursor = Cursor::new(raw);
+                let len_utf16_codepoints = try!(self.read_object_len(n));
+                let mut raw_utf16 = self.allocate_vec(len_utf16_codepoints)?;
 
-                let len_div_2 = try!(u64_to_usize(len / 2));
-                let mut raw_utf16 = Vec::with_capacity(len_div_2);
-                while cursor.position() < len {
-                    raw_utf16.push(try!(cursor.read_u16::<BigEndian>()))
+                for _ in 0..len_utf16_codepoints {
+                    raw_utf16.push(try!(self.reader.read_u16::<BigEndian>()));
                 }
 
                 let string = try!(String::from_utf16(&raw_utf16));
@@ -261,11 +269,8 @@ impl<R: Read + Seek> EventReader<R> {
                 let key_refs = try!(self.read_refs(len));
                 let value_refs = try!(self.read_refs(len));
 
-                let len_mul_2 = try!(u64_to_usize(len * 2));
-                let len = try!(u64_to_usize(len));
-
-                let mut object_refs = Vec::with_capacity(len_mul_2);
-
+                let mut object_refs = self.allocate_vec(len * 2)?;
+                let len = key_refs.len();
                 for i in 1..len + 1 {
                     // Reverse so we can pop off the end of the stack in order
                     object_refs.push(value_refs[len - i]);
