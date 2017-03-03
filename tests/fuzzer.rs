@@ -15,6 +15,12 @@ fn too_large_allocation_2() {
     test_fuzzer_data_err(data);
 }
 
+#[test]
+fn empty_offset_table() {
+    let data = b"bplist00;\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00<)\x9fXTX(";
+    test_fuzzer_data_err(data);
+}
+
 fn test_fuzzer_data_err(data: &[u8]) {
     let cursor = Cursor::new(data);
     let res = Plist::read(cursor);

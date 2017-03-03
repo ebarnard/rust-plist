@@ -145,7 +145,7 @@ impl<R: Read + Seek> EventReader<R> {
 
     fn seek_to_object(&mut self, object_ref: u64) -> Result<u64> {
         let object_ref = try!(u64_to_usize(object_ref));
-        let offset = *&self.object_offsets[object_ref];
+        let offset = *self.object_offsets.get(object_ref).ok_or(Error::InvalidData)?;
         let pos = try!(self.reader.seek(SeekFrom::Start(offset)));
         Ok(pos)
     }
