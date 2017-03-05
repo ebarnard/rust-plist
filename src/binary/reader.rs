@@ -39,7 +39,7 @@ pub struct EventReader<R> {
     finished: bool,
     // The largest single allocation allowed for this Plist.
     // Equal to the number of bytes in the Plist minus the magic and trailer.
-    max_allocation: u64,
+    max_allocation: usize,
 }
 
 impl<R: Read + Seek> EventReader<R> {
@@ -56,13 +56,12 @@ impl<R: Read + Seek> EventReader<R> {
 
     fn can_allocate<T>(&self, len: u64) -> bool {
         let byte_len = len.saturating_mul(mem::size_of::<T>() as u64);
-        byte_len <= self.max_allocation
+        byte_len <= self.max_allocation as u64
     }
 
     fn allocate_vec<T>(&self, len: u64) -> Result<Vec<T>> {
         if self.can_allocate::<T>(len) {
-            let len = u64_to_usize(len)?;
-            Ok(Vec::with_capacity(len))
+            Ok(Vec::with_capacity(len as usize))
         } else {
             Err(Error::InvalidData)
         }
@@ -86,7 +85,8 @@ impl<R: Read + Seek> EventReader<R> {
         let offset_table_offset = try!(self.reader.read_u64::<BigEndian>());
 
         // File size minus trailer and header
-        self.max_allocation = trailer_start.saturating_sub(6 + 8);
+        // Truncated to max(usize)
+        self.max_allocation = trailer_start.saturating_sub(6 + 8) as usize;
 
         // Read offset table
         try!(self.reader.seek(SeekFrom::Start(offset_table_offset)));
