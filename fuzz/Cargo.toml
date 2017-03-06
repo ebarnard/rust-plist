@@ -5,13 +5,22 @@ version = "0.0.1"
 authors = ["Automatically generated"]
 publish = false
 
+[package.metadata]
+cargo-fuzz = true
+
 [dependencies.plist]
 path = ".."
+[dependencies.libfuzzer-sys]
+git = "https://github.com/rust-fuzz/libfuzzer-sys.git"
 
 # Prevent this from interfering with workspaces
 [workspace]
 members = ["."]
 
 [[bin]]
-name = "fuzzer_script_1"
-path = "fuzzers/fuzzer_script_1.rs"
+name = "binary_reader"
+path = "fuzzers/binary_reader.rs"
+
+[[bin]]
+name = "xml_reader"
+path = "fuzzers/xml_reader.rs"
