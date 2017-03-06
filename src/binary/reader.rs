@@ -40,6 +40,11 @@ pub struct EventReader<R> {
     // The largest single allocation allowed for this Plist.
     // Equal to the number of bytes in the Plist minus the magic and trailer.
     max_allocation: usize,
+    // The maximum number of objects that can be created. Default 10 * object_offsets.len().
+    // Binary plists can contain circular references.
+    max_objects: usize,
+    // The number of objects created so far.
+    current_objects: usize,
 }
 
 impl<R: Read + Seek> EventReader<R> {
@@ -50,7 +55,9 @@ impl<R: Read + Seek> EventReader<R> {
             reader: reader,
             ref_size: 0,
             finished: false,
-            max_allocation: 0
+            max_allocation: 0,
+            max_objects: 0,
+            current_objects: 0,
         }
     }
 
@@ -91,6 +98,8 @@ impl<R: Read + Seek> EventReader<R> {
         // Read offset table
         try!(self.reader.seek(SeekFrom::Start(offset_table_offset)));
         self.object_offsets = try!(self.read_ints(num_objects, offset_size));
+
+        self.max_objects = self.object_offsets.len() * 10;
 
         // Seek to top object
         self.stack.push(StackItem {
@@ -164,6 +173,10 @@ impl<R: Read + Seek> EventReader<R> {
 
         match object_ref {
             Some(object_ref) => {
+                if self.current_objects > self.max_objects {
+                    return Err(Error::InvalidData);
+                }
+                self.current_objects += 1;
                 try!(self.seek_to_object(object_ref));
             }
             None => {
