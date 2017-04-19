@@ -1,6 +1,6 @@
 [package]
 name = "plist"
-version = "0.1.3"
+version = "0.1.4"
 authors = ["Ed Barnard <eabarnard@gmail.com>"]
 description = "A rusty plist parser. Supports Serde serialization."
 license = "MIT"
