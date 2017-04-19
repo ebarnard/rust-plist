@@ -1,7 +1,7 @@
 extern crate plist;
 
 use std::io::Cursor;
-use plist::Plist;
+use plist::{Plist, Result};
 
 #[test]
 fn too_large_allocation() {
@@ -27,8 +27,22 @@ fn binary_circular_reference() {
     test_fuzzer_data_err(data);
 }
 
-fn test_fuzzer_data_err(data: &[u8]) {
+// Issue 20 - not found by fuzzing but this is a convenient place to put the test.
+#[test]
+fn binary_with_data_in_trailer() {
+    let data = b"bplist00\xd0\x08\0\0\0\0\0\0\x01\x01\0\0\0\0\0\0\0\x01\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\t";
+    test_fuzzer_data_ok(data);
+}
+
+fn test_fuzzer_data(data: &[u8]) -> Result<Plist> {
     let cursor = Cursor::new(data);
-    let res = Plist::read(cursor);
-    assert!(res.is_err());
+    Plist::read(cursor)
+}
+
+fn test_fuzzer_data_ok(data: &[u8]) {
+    assert!(test_fuzzer_data(data).is_ok());
+}
+
+fn test_fuzzer_data_err(data: &[u8]) {
+    assert!(test_fuzzer_data(data).is_err());
 }

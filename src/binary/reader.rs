@@ -93,7 +93,7 @@ impl<R: Read + Seek> EventReader<R> {
 
         // File size minus trailer and header
         // Truncated to max(usize)
-        self.max_allocation = trailer_start.saturating_sub(6 + 8) as usize;
+        self.max_allocation = trailer_start.saturating_sub(8) as usize;
 
         // Read offset table
         try!(self.reader.seek(SeekFrom::Start(offset_table_offset)));
