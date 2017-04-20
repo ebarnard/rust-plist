@@ -85,7 +85,7 @@ impl<'a, I> de::Deserializer for &'a mut Deserializer<I>
 
             PlistEvent::BooleanValue(v) => visitor.visit_bool(v),
             PlistEvent::DataValue(v) => visitor.visit_byte_buf(v),
-            PlistEvent::DateValue(v) => visitor.visit_string(v.to_rfc3339()),
+            PlistEvent::DateValue(v) => visitor.visit_string(v.to_string()),
             PlistEvent::IntegerValue(v) if v.is_positive() => visitor.visit_u64(v as u64),
             PlistEvent::IntegerValue(v) => visitor.visit_i64(v as i64),
             PlistEvent::RealValue(v) => visitor.visit_f64(v),

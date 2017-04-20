@@ -1,10 +1,9 @@
-use chrono::{DateTime, UTC};
 use rustc_serialize::base64::{STANDARD, ToBase64};
 use rustc_serialize::json::Json as RustcJson;
 use std::collections::BTreeMap;
 use std::io::{Read, Seek};
 
-use {builder, EventReader, PlistEvent, Result};
+use {builder, Date, EventReader, PlistEvent, Result};
 
 #[derive(Clone, Debug, PartialEq)]
 pub enum Plist {
@@ -12,7 +11,7 @@ pub enum Plist {
     Dictionary(BTreeMap<String, Plist>),
     Boolean(bool),
     Data(Vec<u8>),
-    Date(DateTime<UTC>),
+    Date(Date),
     Real(f64),
     Integer(i64),
     String(String),
@@ -76,7 +75,7 @@ impl Plist {
             }
             Plist::Boolean(value) => RustcJson::Boolean(value),
             Plist::Data(value) => RustcJson::String(value.to_base64(STANDARD)),
-            Plist::Date(value) => RustcJson::String(value.to_rfc3339()),
+            Plist::Date(value) => RustcJson::String(value.to_string()),
             Plist::Real(value) => RustcJson::F64(value),
             Plist::Integer(value) => RustcJson::I64(value),
             Plist::String(value) => RustcJson::String(value),
@@ -151,9 +150,9 @@ impl Plist {
 
     /// If the `Plist` is a Date, returns the associated DateTime.
     /// Returns None otherwise.
-    pub fn as_date(&self) -> Option<DateTime<UTC>> {
+    pub fn as_date(&self) -> Option<&Date> {
         match self {
-            &Plist::Date(date) => Some(date),
+            &Plist::Date(ref date) => Some(date),
             _ => None,
         }
     }
@@ -222,14 +221,14 @@ impl<'a> From<&'a bool> for Plist {
     }
 }
 
-impl From<DateTime<UTC>> for Plist {
-    fn from(from: DateTime<UTC>) -> Plist {
+impl From<Date> for Plist {
+    fn from(from: Date) -> Plist {
         Plist::Date(from)
     }
 }
 
-impl<'a> From<&'a DateTime<UTC>> for Plist {
-    fn from(from: &'a DateTime<UTC>) -> Plist {
+impl<'a> From<&'a Date> for Plist {
+    fn from(from: &'a Date) -> Plist {
         Plist::Date(from.clone())
     }
 }
@@ -362,6 +361,7 @@ mod tests {
     fn test_plist_access() {
         use std::collections::BTreeMap;
         use chrono::*;
+        use super::Date;
 
         let vec = vec![Plist::Real(0.0)];
         let mut array = Plist::Array(vec.clone());
@@ -381,8 +381,8 @@ mod tests {
         assert_eq!(Plist::Data(slice.to_vec()).into_data(),
                    Some(slice.to_vec()));
 
-        let date: DateTime<UTC> = UTC::now();
-        assert_eq!(Plist::Date(date).as_date(), Some(date));
+        let date: Date = UTC::now().into();
+        assert_eq!(Plist::Date(date.clone()).as_date(), Some(&date));
 
         assert_eq!(Plist::Real(0.0).as_real(), Some(0.0));
         assert_eq!(Plist::Integer(1).as_integer(), Some(1));

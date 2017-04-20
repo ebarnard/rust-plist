@@ -1,17 +1,9 @@
-use chrono::{DateTime, UTC};
-use chrono::format::ParseError as ChronoParseError;
 use rustc_serialize::base64::FromBase64;
 use std::io::Read;
 use std::str::FromStr;
 use xml_rs::reader::{EventReader as XmlEventReader, ParserConfig, XmlEvent};
 
-use {Error, Result, PlistEvent};
-
-impl From<ChronoParseError> for Error {
-    fn from(_: ChronoParseError) -> Error {
-        Error::InvalidData
-    }
-}
+use {Date, Error, Result, PlistEvent};
 
 pub struct EventReader<R: Read> {
     xml_reader: XmlEventReader<R>,
@@ -83,8 +75,7 @@ impl<R: Read> EventReader<R> {
                         }
                         "date" => {
                             return Some(self.read_content(|s| {
-                                let date = try!(DateTime::parse_from_rfc3339(&s));
-                                Ok(PlistEvent::DateValue(date.with_timezone(&UTC)))
+                                Ok(PlistEvent::DateValue(Date::from_str(&s).map_err(|_| Error::InvalidData)?))
                             }))
                         }
                         "integer" => {
@@ -187,7 +178,7 @@ mod tests {
                            StringValue("Data".to_owned()),
                            DataValue(vec![0, 0, 0, 190, 0, 0, 0, 3, 0, 0, 0, 30, 0, 0, 0]),
                            StringValue("Birthdate".to_owned()),
-                           DateValue(UTC.ymd(1981, 05, 16).and_hms(11, 32, 06)),
+                           DateValue(UTC.ymd(1981, 05, 16).and_hms(11, 32, 06).into()),
                            StringValue("Blank".to_owned()),
                            StringValue("".to_owned()),
                            EndDictionary];

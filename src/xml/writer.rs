@@ -166,8 +166,7 @@ impl<W: Write> PlistEventWriter for EventWriter<W> {
                 try!(self.write_element_and_value("data", &base64_data));
             }
             PlistEvent::DateValue(ref value) => {
-                let date = format!("{:?}", value);
-                try!(self.write_element_and_value("date", &date));
+                try!(self.write_element_and_value("date", &value.to_string()));
             }
             PlistEvent::IntegerValue(ref value) => {
                 try!(self.write_element_and_value("integer", &value.to_string()))
@@ -212,7 +211,7 @@ mod tests {
                       StringValue("Data".to_owned()),
                       DataValue(vec![0, 0, 0, 190, 0, 0, 0, 3, 0, 0, 0, 30, 0, 0, 0]),
                       StringValue("Birthdate".to_owned()),
-                      DateValue(UTC.ymd(1981, 05, 16).and_hms(11, 32, 06)),
+                      DateValue(UTC.ymd(1981, 05, 16).and_hms(11, 32, 06).into()),
                       EndDictionary];
 
         let mut cursor = Cursor::new(Vec::new());

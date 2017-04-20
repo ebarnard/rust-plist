@@ -58,8 +58,10 @@ pub mod binary;
 pub mod xml;
 
 mod builder;
+mod date;
 mod plist;
 
+pub use date::Date;
 pub use plist::Plist;
 
 // Optional serde module
@@ -69,7 +71,6 @@ extern crate serde as serde_base;
 #[cfg(feature = "serde")]
 pub mod serde;
 
-use chrono::{DateTime, UTC};
 use std::fmt;
 use std::io::{Read, Seek, SeekFrom};
 use std::io::Error as IoError;
@@ -100,7 +101,7 @@ pub enum PlistEvent {
 
     BooleanValue(bool),
     DataValue(Vec<u8>),
-    DateValue(DateTime<UTC>),
+    DateValue(Date),
     IntegerValue(i64),
     RealValue(f64),
     StringValue(String),

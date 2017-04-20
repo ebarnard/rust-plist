@@ -1,10 +1,9 @@
 use byteorder::{BigEndian, ReadBytesExt};
-use chrono::{Duration, TimeZone, UTC};
 use std::io::{Read, Seek, SeekFrom};
 use std::mem;
 use std::string::{FromUtf8Error, FromUtf16Error};
 
-use {Error, Result, PlistEvent, u64_to_usize};
+use {Date, Error, Result, PlistEvent, u64_to_usize};
 
 impl From<FromUtf8Error> for Error {
     fn from(_: FromUtf8Error) -> Error {
@@ -215,28 +214,10 @@ impl<R: Read + Seek> EventReader<R> {
             }
             (0x2, 3) => Some(PlistEvent::RealValue(try!(self.reader.read_f64::<BigEndian>()))),
             (0x2, _) => return Err(Error::InvalidData), // odd length float
-            (0x3, 3) => {;
-                // Date
-                // Seconds since 1/1/2001 00:00:00.
-                let timestamp = try!(self.reader.read_f64::<BigEndian>());
-
-                let millis = timestamp * 1_000.0;
-                // Chrono's Duration can only millisecond values between ::std::i64::MIN and
-                // ::std::i64::MAX.
-                if millis > ::std::i64::MAX as f64 || millis < ::std::i64::MIN as f64 {
-                    return Err(Error::InvalidData);
-                }
-
-                let whole_millis = millis.floor();
-                let submilli_nanos = ((millis - whole_millis) * 1_000_000.0).floor();
-
-                let dur = Duration::milliseconds(whole_millis as i64);
-                let dur = dur + Duration::nanoseconds(submilli_nanos as i64);
-
-                let plist_epoch = UTC.ymd(2001, 1, 1).and_hms(0, 0, 0);
-                let date = try!(plist_epoch.checked_add(dur).ok_or(Error::InvalidData));
-
-                Some(PlistEvent::DateValue(date))
+            (0x3, 3) => {
+                // Date. Seconds since 1/1/2001 00:00:00.
+                let secs = try!(self.reader.read_f64::<BigEndian>());
+                Some(PlistEvent::DateValue(Date::from_seconds_since_plist_epoch(secs)?))
             }
             (0x4, n) => {
                 // Data
@@ -354,7 +335,7 @@ mod tests {
                            StringValue("Height".to_owned()),
                            RealValue(1.60),
                            StringValue("Birthdate".to_owned()),
-                           DateValue(UTC.ymd(1981, 05, 16).and_hms(11, 32, 06)),
+                           DateValue(UTC.ymd(1981, 05, 16).and_hms(11, 32, 06).into()),
                            StringValue("Author".to_owned()),
                            StringValue("William Shakespeare".to_owned()),
                            StringValue("Data".to_owned()),
