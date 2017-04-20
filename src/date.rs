@@ -27,7 +27,7 @@ impl Date {
         let dur = dur + Duration::nanoseconds(submilli_nanos as i64);
 
         let plist_epoch = UTC.ymd(2001, 1, 1).and_hms(0, 0, 0);
-        let date = try!(plist_epoch.checked_add(dur).ok_or(Error::InvalidData));
+        let date = try!(plist_epoch.checked_add_signed(dur).ok_or(Error::InvalidData));
 
         Ok(Date {
             inner: date

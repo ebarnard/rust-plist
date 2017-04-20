@@ -14,10 +14,10 @@ default = ["serde_serialization"]
 serde_serialization = ["serde"]
 
 [dependencies]
-xml-rs = "0.3.6"
 base64 = "0.4.1"
-byteorder = "0.5.3"
-chrono = "0.2.22"
+byteorder = "1.0.0"
+chrono = "0.3.0"
+xml-rs = "0.4.1"
 serde = { version = "0.9.5", optional = true }
 
 [dev-dependencies]
