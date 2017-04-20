@@ -1,5 +1,3 @@
-use rustc_serialize::base64::{STANDARD, ToBase64};
-use rustc_serialize::json::Json as RustcJson;
 use std::collections::BTreeMap;
 use std::io::{Read, Seek};
 
@@ -60,25 +58,6 @@ impl Plist {
             Plist::Real(value) => events.push(PlistEvent::RealValue(value)),
             Plist::Integer(value) => events.push(PlistEvent::IntegerValue(value)),
             Plist::String(value) => events.push(PlistEvent::StringValue(value)),
-        }
-    }
-
-    pub fn into_rustc_serialize_json(self) -> RustcJson {
-        match self {
-            Plist::Array(value) => {
-                RustcJson::Array(value.into_iter().map(|p| p.into_rustc_serialize_json()).collect())
-            }
-            Plist::Dictionary(value) => {
-                RustcJson::Object(value.into_iter()
-                    .map(|(k, v)| (k, v.into_rustc_serialize_json()))
-                    .collect())
-            }
-            Plist::Boolean(value) => RustcJson::Boolean(value),
-            Plist::Data(value) => RustcJson::String(value.to_base64(STANDARD)),
-            Plist::Date(value) => RustcJson::String(value.to_string()),
-            Plist::Real(value) => RustcJson::F64(value),
-            Plist::Integer(value) => RustcJson::I64(value),
-            Plist::String(value) => RustcJson::String(value),
         }
     }
 

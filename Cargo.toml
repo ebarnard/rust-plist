@@ -14,8 +14,8 @@ default = ["serde_serialization"]
 serde_serialization = ["serde"]
 
 [dependencies]
-rustc-serialize = "0.3.19"
 xml-rs = "0.3.6"
+base64 = "0.4.1"
 byteorder = "0.5.3"
 chrono = "0.2.22"
 serde = { version = "0.9.5", optional = true }

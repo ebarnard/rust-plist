@@ -1,4 +1,4 @@
-use rustc_serialize::base64::{MIME, ToBase64};
+use base64;
 use std::borrow::Cow;
 use std::io::Write;
 use xml_rs::attribute::Attribute;
@@ -162,7 +162,7 @@ impl<W: Write> PlistEventWriter for EventWriter<W> {
                 try!(self.end_element("false"));
             }
             PlistEvent::DataValue(ref value) => {
-                let base64_data = value.to_base64(MIME);
+                let base64_data = base64::encode(&value);
                 try!(self.write_element_and_value("data", &base64_data));
             }
             PlistEvent::DateValue(ref value) => {

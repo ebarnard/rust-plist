@@ -49,9 +49,9 @@
 //! let info: Info = deserialize(file).unwrap();
 //! ```
 
+extern crate base64;
 extern crate byteorder;
 extern crate chrono;
-extern crate rustc_serialize;
 extern crate xml as xml_rs;
 
 pub mod binary;

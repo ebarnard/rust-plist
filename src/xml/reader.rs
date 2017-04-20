@@ -1,4 +1,4 @@
-use rustc_serialize::base64::FromBase64;
+use base64;
 use std::io::Read;
 use std::str::FromStr;
 use xml_rs::reader::{EventReader as XmlEventReader, ParserConfig, XmlEvent};
@@ -66,11 +66,8 @@ impl<R: Read> EventReader<R> {
                         "false" => return Some(Ok(PlistEvent::BooleanValue(false))),
                         "data" => {
                             return Some(self.read_content(|s| {
-                                let s: String = s.replace(" ", "").replace("\t", "");
-                                match FromBase64::from_base64(&s[..]) {
-                                    Ok(b) => Ok(PlistEvent::DataValue(b)),
-                                    Err(_) => Err(Error::InvalidData),
-                                }
+                                let data = base64::decode_ws(&s).map_err(|_| Error::InvalidData)?;
+                                Ok(PlistEvent::DataValue(data))
                             }))
                         }
                         "date" => {
