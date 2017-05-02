@@ -13,7 +13,7 @@ build = "build.rs"
 default = ["serde"]
 
 [dependencies]
-base64 = "0.4.1"
+base64 = "0.5.1"
 byteorder = "1.0.0"
 chrono = "0.3.0"
 xml-rs = "0.4.1"
