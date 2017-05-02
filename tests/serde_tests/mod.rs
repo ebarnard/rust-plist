@@ -1,7 +1,8 @@
 use plist::{EventWriter, PlistEvent, Result as PlistResult};
 use plist::serde::{Serializer, Deserializer};
 use plist::PlistEvent::*;
-use serde::{Deserialize, Serialize};
+use serde::de::DeserializeOwned;
+use serde::ser::Serialize;
 use std::fmt::Debug;
 
 struct VecWriter {
@@ -35,7 +36,7 @@ fn new_deserializer(events: Vec<PlistEvent>) -> Deserializer<Vec<PlistResult<Pli
 }
 
 fn assert_roundtrip<T>(obj: T, comparison: Option<&[PlistEvent]>)
-    where T: Debug + Deserialize + PartialEq + Serialize
+    where T: Debug + DeserializeOwned + PartialEq + Serialize
 {
     let mut se = new_serializer();
 

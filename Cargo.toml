@@ -17,7 +17,7 @@ base64 = "0.4.1"
 byteorder = "1.0.0"
 chrono = "0.3.0"
 xml-rs = "0.4.1"
-serde = { version = "0.9.5", optional = true }
+serde = { version = "1.0.2", optional = true }
 
 [dev-dependencies]
-serde_derive = { version = "0.9.5" }
+serde_derive = { version = "1.0.2" }
