@@ -10,8 +10,7 @@ keywords = ["plist", "parser"]
 build = "build.rs"
 
 [features]
-default = ["serde_serialization"]
-serde_serialization = ["serde"]
+default = ["serde"]
 
 [dependencies]
 base64 = "0.4.1"
