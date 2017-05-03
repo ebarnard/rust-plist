@@ -16,10 +16,10 @@ impl<T: Iterator<Item = Result<PlistEvent>>> Builder<T> {
     }
 
     pub fn build(mut self) -> Result<Plist> {
-        try!(self.bump());
+        self.bump()?;
 
-        let plist = try!(self.build_value());
-        try!(self.bump());
+        let plist = self.build_value()?;
+        self.bump()?;
         match self.token {
             None => (),
             // The stream should have finished
@@ -39,9 +39,9 @@ impl<T: Iterator<Item = Result<PlistEvent>>> Builder<T> {
 
     fn build_value(&mut self) -> Result<Plist> {
         match self.token.take() {
-            Some(PlistEvent::StartArray(len)) => Ok(Plist::Array(try!(self.build_array(len)))),
+            Some(PlistEvent::StartArray(len)) => Ok(Plist::Array(self.build_array(len)?)),
             Some(PlistEvent::StartDictionary(len)) => {
-                Ok(Plist::Dictionary(try!(self.build_dict(len))))
+                Ok(Plist::Dictionary(self.build_dict(len)?))
             }
 
             Some(PlistEvent::BooleanValue(b)) => Ok(Plist::Boolean(b)),
@@ -60,19 +60,19 @@ impl<T: Iterator<Item = Result<PlistEvent>>> Builder<T> {
     }
 
     fn build_array(&mut self, len: Option<u64>) -> Result<Vec<Plist>> {
-        let len = try!(u64_option_to_usize(len));
+        let len = u64_option_to_usize(len)?;
         let mut values = match len {
             Some(len) => Vec::with_capacity(len),
             None => Vec::new(),
         };
 
         loop {
-            try!(self.bump());
+            self.bump()?;
             if let Some(PlistEvent::EndArray) = self.token {
                 self.token.take();
                 return Ok(values);
             }
-            values.push(try!(self.build_value()));
+            values.push(self.build_value()?);
         }
     }
 
@@ -80,12 +80,12 @@ impl<T: Iterator<Item = Result<PlistEvent>>> Builder<T> {
         let mut values = BTreeMap::new();
 
         loop {
-            try!(self.bump());
+            self.bump()?;
             match self.token.take() {
                 Some(PlistEvent::EndDictionary) => return Ok(values),
                 Some(PlistEvent::StringValue(s)) => {
-                    try!(self.bump());
-                    values.insert(s, try!(self.build_value()));
+                    self.bump()?;
+                    values.insert(s, self.build_value()?);
                 }
                 _ => {
                     // Only string keys are supported in plists

@@ -43,13 +43,13 @@ impl<W: EventWriter> Serializer<W> {
 
     // Emit {key: value}
     fn single_key_dict(&mut self, key: String) -> Result<(), Error> {
-        try!(self.emit(PlistEvent::StartDictionary(Some(1))));
-        try!(self.emit(PlistEvent::StringValue(key)));
+        self.emit(PlistEvent::StartDictionary(Some(1)))?;
+        self.emit(PlistEvent::StringValue(key))?;
         Ok(())
     }
 
     fn single_key_dict_end(&mut self) -> Result<(), Error> {
-        try!(self.emit(PlistEvent::EndDictionary));
+        self.emit(PlistEvent::EndDictionary)?;
         Ok(())
     }
 }

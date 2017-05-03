@@ -56,35 +56,35 @@ impl<W: Write> EventWriter<W> {
     }
 
     fn write_element_and_value(&mut self, name: &str, value: &str) -> Result<()> {
-        try!(self.start_element(name));
-        try!(self.write_value(value));
-        try!(self.end_element(name));
+        self.start_element(name)?;
+        self.write_value(value)?;
+        self.end_element(name)?;
         Ok(())
     }
 
     fn start_element(&mut self, name: &str) -> Result<()> {
-        try!(self.xml_writer.write(WriteXmlEvent::StartElement {
+        self.xml_writer.write(WriteXmlEvent::StartElement {
             name: Name::local(name),
             attributes: Cow::Borrowed(&[]),
             namespace: Cow::Borrowed(&self.empty_namespace),
-        }));
+        })?;
         Ok(())
     }
 
     fn end_element(&mut self, name: &str) -> Result<()> {
-        try!(self.xml_writer.write(WriteXmlEvent::EndElement { name: Some(Name::local(name)) }));
+        self.xml_writer.write(WriteXmlEvent::EndElement { name: Some(Name::local(name)) })?;
         Ok(())
     }
 
     fn write_value(&mut self, value: &str) -> Result<()> {
-        try!(self.xml_writer.write(WriteXmlEvent::Characters(value)));
+        self.xml_writer.write(WriteXmlEvent::Characters(value))?;
         Ok(())
     }
 
     fn maybe_end_plist(&mut self) -> Result<()> {
         // If there are no more open tags then write the </plist> element
         if self.stack.len() == 1 {
-            try!(self.end_element("plist"));
+            self.end_element("plist")?;
             if let Some(Element::Root) = self.stack.pop() {
             } else {
                 return Err(Error::InvalidData);
@@ -104,13 +104,13 @@ impl<W: Write> PlistEventWriter for EventWriter<W> {
             Some(Element::Dictionary(DictionaryState::ExpectKey)) => {
                 match *event {
                     PlistEvent::StringValue(ref value) => {
-                        try!(self.write_element_and_value("key", &*value));
+                        self.write_element_and_value("key", &*value)?;
                         self.stack.push(Element::Dictionary(DictionaryState::ExpectValue));
                     }
                     PlistEvent::EndDictionary => {
-                        try!(self.end_element("dict"));
+                        self.end_element("dict")?;
                         // We might be closing the last tag here as well
-                        try!(self.maybe_end_plist());
+                        self.maybe_end_plist()?;
                     }
                     _ => return Err(Error::InvalidData),
                 };
@@ -124,11 +124,11 @@ impl<W: Write> PlistEventWriter for EventWriter<W> {
                 let version_name = Name::local("version");
                 let version_attr = Attribute::new(version_name, "1.0");
 
-                try!(self.xml_writer.write(WriteXmlEvent::StartElement {
+                self.xml_writer.write(WriteXmlEvent::StartElement {
                     name: Name::local("plist"),
                     attributes: Cow::Borrowed(&[version_attr]),
                     namespace: Cow::Borrowed(&self.empty_namespace),
-                }));
+                })?;
 
                 self.stack.push(Element::Root);
             }
@@ -136,11 +136,11 @@ impl<W: Write> PlistEventWriter for EventWriter<W> {
 
         match *event {
             PlistEvent::StartArray(_) => {
-                try!(self.start_element("array"));
+                self.start_element("array")?;
                 self.stack.push(Element::Array);
             }
             PlistEvent::EndArray => {
-                try!(self.end_element("array"));
+                self.end_element("array")?;
                 if let Some(Element::Array) = self.stack.pop() {
                 } else {
                     return Err(Error::InvalidData);
@@ -148,38 +148,38 @@ impl<W: Write> PlistEventWriter for EventWriter<W> {
             }
 
             PlistEvent::StartDictionary(_) => {
-                try!(self.start_element("dict"));
+                self.start_element("dict")?;
                 self.stack.push(Element::Dictionary(DictionaryState::ExpectKey));
             }
             PlistEvent::EndDictionary => return Err(Error::InvalidData),
 
             PlistEvent::BooleanValue(true) => {
-                try!(self.start_element("true"));
-                try!(self.end_element("true"));
+                self.start_element("true")?;
+                self.end_element("true")?;
             }
             PlistEvent::BooleanValue(false) => {
-                try!(self.start_element("false"));
-                try!(self.end_element("false"));
+                self.start_element("false")?;
+                self.end_element("false")?;
             }
             PlistEvent::DataValue(ref value) => {
                 let base64_data = base64::encode_config(&value, base64::MIME);
-                try!(self.write_element_and_value("data", &base64_data));
+                self.write_element_and_value("data", &base64_data)?;
             }
             PlistEvent::DateValue(ref value) => {
-                try!(self.write_element_and_value("date", &value.to_string()));
+                self.write_element_and_value("date", &value.to_string())?
             }
             PlistEvent::IntegerValue(ref value) => {
-                try!(self.write_element_and_value("integer", &value.to_string()))
+                self.write_element_and_value("integer", &value.to_string())?
             }
             PlistEvent::RealValue(ref value) => {
-                try!(self.write_element_and_value("real", &value.to_string()))
+                self.write_element_and_value("real", &value.to_string())?
             }
             PlistEvent::StringValue(ref value) => {
-                try!(self.write_element_and_value("string", &*value))
+                self.write_element_and_value("string", &*value)?
             }
         };
 
-        try!(self.maybe_end_plist());
+        self.maybe_end_plist()?;
 
         Ok(())
     }

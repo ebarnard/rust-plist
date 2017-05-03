@@ -164,10 +164,10 @@ impl<R: Read + Seek> EventReader<R> {
     }
 
     fn is_binary(reader: &mut R) -> Result<bool> {
-        try!(reader.seek(SeekFrom::Start(0)));
+        reader.seek(SeekFrom::Start(0))?;
         let mut magic = [0; 8];
-        try!(reader.read(&mut magic));
-        try!(reader.seek(SeekFrom::Start(0)));
+        reader.read(&mut magic)?;
+        reader.seek(SeekFrom::Start(0))?;
 
         Ok(if &magic == b"bplist00" { true } else { false })
     }
@@ -212,7 +212,7 @@ fn u64_to_usize(len_u64: u64) -> Result<usize> {
 
 fn u64_option_to_usize(len: Option<u64>) -> Result<Option<usize>> {
     match len {
-        Some(len) => Ok(Some(try!(u64_to_usize(len)))),
+        Some(len) => Ok(Some(u64_to_usize(len)?)),
         None => Ok(None),
     }
 }

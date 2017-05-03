@@ -74,29 +74,29 @@ impl<R: Read + Seek> EventReader<R> {
     }
 
     fn read_trailer(&mut self) -> Result<()> {
-        try!(self.reader.seek(SeekFrom::Start(0)));
+        self.reader.seek(SeekFrom::Start(0))?;
         let mut magic = [0; 8];
-        try!(self.reader.read(&mut magic));
+        self.reader.read(&mut magic)?;
         if &magic != b"bplist00" {
             return Err(Error::InvalidData);
         }
 
         // Trailer starts with 6 bytes of padding
-        let trailer_start = try!(self.reader.seek(SeekFrom::End(-32 + 6)));
+        let trailer_start = self.reader.seek(SeekFrom::End(-32 + 6))?;
 
-        let offset_size = try!(self.reader.read_u8());
-        self.ref_size = try!(self.reader.read_u8());
-        let num_objects = try!(self.reader.read_u64::<BigEndian>());
-        let top_object = try!(self.reader.read_u64::<BigEndian>());
-        let offset_table_offset = try!(self.reader.read_u64::<BigEndian>());
+        let offset_size = self.reader.read_u8()?;
+        self.ref_size = self.reader.read_u8()?;
+        let num_objects = self.reader.read_u64::<BigEndian>()?;
+        let top_object = self.reader.read_u64::<BigEndian>()?;
+        let offset_table_offset = self.reader.read_u64::<BigEndian>()?;
 
         // File size minus trailer and header
         // Truncated to max(usize)
         self.max_allocation = trailer_start.saturating_sub(8) as usize;
 
         // Read offset table
-        try!(self.reader.seek(SeekFrom::Start(offset_table_offset)));
-        self.object_offsets = try!(self.read_ints(num_objects, offset_size));
+        self.reader.seek(SeekFrom::Start(offset_table_offset))?;
+        self.object_offsets = self.read_ints(num_objects, offset_size)?;
 
         self.max_objects = self.object_offsets.len() * 10;
 
@@ -113,10 +113,10 @@ impl<R: Read + Seek> EventReader<R> {
         let mut ints = self.allocate_vec(len)?;
         for _ in 0..len {
             match size {
-                1 => ints.push(try!(self.reader.read_u8()) as u64),
-                2 => ints.push(try!(self.reader.read_u16::<BigEndian>()) as u64),
-                4 => ints.push(try!(self.reader.read_u32::<BigEndian>()) as u64),
-                8 => ints.push(try!(self.reader.read_u64::<BigEndian>()) as u64),
+                1 => ints.push(self.reader.read_u8()? as u64),
+                2 => ints.push(self.reader.read_u16::<BigEndian>()? as u64),
+                4 => ints.push(self.reader.read_u32::<BigEndian>()? as u64),
+                8 => ints.push(self.reader.read_u64::<BigEndian>()? as u64),
                 _ => return Err(Error::InvalidData),
             }
         }
@@ -130,12 +130,12 @@ impl<R: Read + Seek> EventReader<R> {
 
     fn read_object_len(&mut self, len: u8) -> Result<u64> {
         if (len & 0x0f) == 0x0f {
-            let len_power_of_two = try!(self.reader.read_u8()) & 0x03;
+            let len_power_of_two = self.reader.read_u8()? & 0x03;
             Ok(match len_power_of_two {
-                0 => try!(self.reader.read_u8()) as u64,
-                1 => try!(self.reader.read_u16::<BigEndian>()) as u64,
-                2 => try!(self.reader.read_u32::<BigEndian>()) as u64,
-                3 => try!(self.reader.read_u64::<BigEndian>()),
+                0 => self.reader.read_u8()? as u64,
+                1 => self.reader.read_u16::<BigEndian>()? as u64,
+                2 => self.reader.read_u32::<BigEndian>()? as u64,
+                3 => self.reader.read_u64::<BigEndian>()?,
                 _ => return Err(Error::InvalidData),
             })
         } else {
@@ -152,16 +152,15 @@ impl<R: Read + Seek> EventReader<R> {
     }
 
     fn seek_to_object(&mut self, object_ref: u64) -> Result<u64> {
-        let object_ref = try!(u64_to_usize(object_ref));
+        let object_ref = u64_to_usize(object_ref)?;
         let offset = *self.object_offsets.get(object_ref).ok_or(Error::InvalidData)?;
-        let pos = try!(self.reader.seek(SeekFrom::Start(offset)));
-        Ok(pos)
+        Ok(self.reader.seek(SeekFrom::Start(offset))?)
     }
 
     fn read_next(&mut self) -> Result<Option<PlistEvent>> {
         if self.ref_size == 0 {
             // Initialise here rather than in new
-            try!(self.read_trailer());
+            self.read_trailer()?;
         }
 
         let object_ref = match self.stack.last_mut() {
@@ -176,7 +175,7 @@ impl<R: Read + Seek> EventReader<R> {
                     return Err(Error::InvalidData);
                 }
                 self.current_objects += 1;
-                try!(self.seek_to_object(object_ref));
+                self.seek_to_object(object_ref)?;
             }
             None => {
                 // We're at the end of an array or dict. Pop the top stack item and return
@@ -190,7 +189,7 @@ impl<R: Read + Seek> EventReader<R> {
             }
         }
 
-        let token = try!(self.reader.read_u8());
+        let token = self.reader.read_u8()?;
         let ty = (token & 0xf0) >> 4;
         let size = token & 0x0f;
 
@@ -199,54 +198,54 @@ impl<R: Read + Seek> EventReader<R> {
             (0x0, 0x08) => Some(PlistEvent::BooleanValue(false)),
             (0x0, 0x09) => Some(PlistEvent::BooleanValue(true)),
             (0x0, 0x0f) => return Err(Error::InvalidData), // fill
-            (0x1, 0) => Some(PlistEvent::IntegerValue(try!(self.reader.read_u8()) as i64)),
+            (0x1, 0) => Some(PlistEvent::IntegerValue(self.reader.read_u8()? as i64)),
             (0x1, 1) => {
-                Some(PlistEvent::IntegerValue(try!(self.reader.read_u16::<BigEndian>()) as i64))
+                Some(PlistEvent::IntegerValue(self.reader.read_u16::<BigEndian>()? as i64))
             }
             (0x1, 2) => {
-                Some(PlistEvent::IntegerValue(try!(self.reader.read_u32::<BigEndian>()) as i64))
+                Some(PlistEvent::IntegerValue(self.reader.read_u32::<BigEndian>()? as i64))
             }
-            (0x1, 3) => Some(PlistEvent::IntegerValue(try!(self.reader.read_i64::<BigEndian>()))),
+            (0x1, 3) => Some(PlistEvent::IntegerValue(self.reader.read_i64::<BigEndian>()?)),
             (0x1, 4) => return Err(Error::InvalidData), // 128 bit int
             (0x1, _) => return Err(Error::InvalidData), // variable length int
             (0x2, 2) => {
-                Some(PlistEvent::RealValue(try!(self.reader.read_f32::<BigEndian>()) as f64))
+                Some(PlistEvent::RealValue(self.reader.read_f32::<BigEndian>()? as f64))
             }
-            (0x2, 3) => Some(PlistEvent::RealValue(try!(self.reader.read_f64::<BigEndian>()))),
+            (0x2, 3) => Some(PlistEvent::RealValue(self.reader.read_f64::<BigEndian>()?)),
             (0x2, _) => return Err(Error::InvalidData), // odd length float
             (0x3, 3) => {
                 // Date. Seconds since 1/1/2001 00:00:00.
-                let secs = try!(self.reader.read_f64::<BigEndian>());
+                let secs = self.reader.read_f64::<BigEndian>()?;
                 Some(PlistEvent::DateValue(Date::from_seconds_since_plist_epoch(secs)?))
             }
             (0x4, n) => {
                 // Data
-                let len = try!(self.read_object_len(n));
-                Some(PlistEvent::DataValue(try!(self.read_data(len))))
+                let len = self.read_object_len(n)?;
+                Some(PlistEvent::DataValue(self.read_data(len)?))
             }
             (0x5, n) => {
                 // ASCII string
-                let len = try!(self.read_object_len(n));
-                let raw = try!(self.read_data(len));
-                let string = try!(String::from_utf8(raw));
+                let len = self.read_object_len(n)?;
+                let raw = self.read_data(len)?;
+                let string = String::from_utf8(raw)?;
                 Some(PlistEvent::StringValue(string))
             }
             (0x6, n) => {
                 // UTF-16 string
-                let len_utf16_codepoints = try!(self.read_object_len(n));
+                let len_utf16_codepoints = self.read_object_len(n)?;
                 let mut raw_utf16 = self.allocate_vec(len_utf16_codepoints)?;
 
                 for _ in 0..len_utf16_codepoints {
-                    raw_utf16.push(try!(self.reader.read_u16::<BigEndian>()));
+                    raw_utf16.push(self.reader.read_u16::<BigEndian>()?);
                 }
 
-                let string = try!(String::from_utf16(&raw_utf16));
+                let string = String::from_utf16(&raw_utf16)?;
                 Some(PlistEvent::StringValue(string))
             }
             (0xa, n) => {
                 // Array
-                let len = try!(self.read_object_len(n));
-                let mut object_refs = try!(self.read_refs(len));
+                let len = self.read_object_len(n)?;
+                let mut object_refs = self.read_refs(len)?;
                 // Reverse so we can pop off the end of the stack in order
                 object_refs.reverse();
 
@@ -259,9 +258,9 @@ impl<R: Read + Seek> EventReader<R> {
             }
             (0xd, n) => {
                 // Dict
-                let len = try!(self.read_object_len(n));
-                let key_refs = try!(self.read_refs(len));
-                let value_refs = try!(self.read_refs(len));
+                let len = self.read_object_len(n)?;
+                let key_refs = self.read_refs(len)?;
+                let value_refs = self.read_refs(len)?;
 
                 let mut object_refs = self.allocate_vec(len * 2)?;
                 let len = key_refs.len();

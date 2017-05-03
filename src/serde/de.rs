@@ -68,7 +68,7 @@ impl<'de, 'a, I> de::Deserializer<'de> for &'a mut Deserializer<I>
     {
         match try_next!(self.events.next()) {
             PlistEvent::StartArray(len) => {
-                let len = try!(u64_option_to_usize(len));
+                let len = u64_option_to_usize(len)?;
                 let ret = visitor.visit_seq(MapAndSeqAccess::new(self, false, len))?;
                 expect!(self.events.next(), PlistEvent::EndArray);
                 Ok(ret)
@@ -76,7 +76,7 @@ impl<'de, 'a, I> de::Deserializer<'de> for &'a mut Deserializer<I>
             PlistEvent::EndArray => return Err(event_mismatch_error()),
 
             PlistEvent::StartDictionary(len) => {
-                let len = try!(u64_option_to_usize(len));
+                let len = u64_option_to_usize(len)?;
                 let ret = visitor.visit_map(MapAndSeqAccess::new(self, false, len))?;
                 expect!(self.events.next(), PlistEvent::EndDictionary);
                 Ok(ret)
@@ -157,7 +157,7 @@ impl<'de, 'a, I> de::Deserializer<'de> for &'a mut Deserializer<I>
         where V: de::Visitor<'de>
     {
         expect!(self.events.next(), PlistEvent::StartDictionary(_));
-        let ret = try!(visitor.visit_enum(&mut *self));
+        let ret = visitor.visit_enum(&mut *self)?;
         expect!(self.events.next(), PlistEvent::EndDictionary);
         Ok(ret)
     }
