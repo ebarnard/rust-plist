@@ -107,10 +107,10 @@ fn dog() {
 
     let comparison = &[StartDictionary(Some(1)),
                        StringValue("Dog".to_owned()),
-                       StartDictionary(Some(1)),
+                       StartDictionary(None),
                        StringValue("inner".to_owned()),
                        StartArray(Some(1)),
-                       StartDictionary(Some(3)),
+                       StartDictionary(None),
                        StringValue("a".to_owned()),
                        StringValue("".to_owned()),
                        StringValue("b".to_owned()),
@@ -165,14 +165,12 @@ fn cat() {
 
     let comparison = &[StartDictionary(Some(1)),
                        StringValue("Cat".to_owned()),
-                       StartDictionary(Some(3)),
+                       StartDictionary(None),
                        StringValue("age".to_owned()),
                        IntegerValue(12),
                        StringValue("name".to_owned()),
                        StringValue("Paws".to_owned()),
                        StringValue("firmware".to_owned()),
-                       StartDictionary(Some(1)),
-                       StringValue("Some".to_owned()),
                        StartArray(Some(9)),
                        IntegerValue(0),
                        IntegerValue(1),
@@ -184,7 +182,6 @@ fn cat() {
                        IntegerValue(7),
                        IntegerValue(8),
                        EndArray,
-                       EndDictionary,
                        EndDictionary,
                        EndDictionary];
 
@@ -205,4 +202,38 @@ fn newtype_struct() {
         &[StartArray(Some(3)), IntegerValue(34), IntegerValue(32), IntegerValue(13), EndArray];
 
     assert_roundtrip(newtype, Some(comparison));
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+struct TypeWithOptions {
+    a: Option<String>,
+    b: Option<u32>,
+    c: Option<Box<TypeWithOptions>>
+}
+
+#[test]
+fn type_with_options() {
+    let inner = TypeWithOptions {
+        a: None,
+        b: Some(12),
+        c: None
+    };
+
+    let ty = TypeWithOptions {
+        a: Some("hello".to_owned()),
+        b: None,
+        c: Some(Box::new(inner))
+    };
+
+    let comparison = &[StartDictionary(None),
+                       StringValue("a".to_owned()),
+                       StringValue("hello".to_owned()),
+                       StringValue("c".to_owned()),
+                       StartDictionary(None),
+                       StringValue("b".to_owned()),
+                       IntegerValue(12),
+                       EndDictionary,
+                       EndDictionary];
+
+    assert_roundtrip(ty, Some(comparison));
 }

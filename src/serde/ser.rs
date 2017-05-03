@@ -14,14 +14,26 @@ impl ser::Error for Error {
 
 pub struct Serializer<W: EventWriter> {
     writer: W,
+    // We don't want to serialize None if the Option is in a struct field as this is how null
+    // fields are represented in plists. This is fragile but results in minimal code duplication.
+    // TODO: This is fragile. Use distinct types instead.
+    maybe_option_field_name: Option<&'static str>
 }
 
 impl<W: EventWriter> Serializer<W> {
     pub fn new(writer: W) -> Serializer<W> {
-        Serializer { writer: writer }
+        Serializer {
+            writer: writer,
+            maybe_option_field_name: None
+        }
     }
 
     fn emit(&mut self, event: PlistEvent) -> Result<(), Error> {
+        // Write a waiting struct field name.
+        // TODO: This is fragile. Use distinct types instead.
+        if let Some(field_name) = self.maybe_option_field_name.take() {
+            self.emit(PlistEvent::StringValue(field_name.to_owned()))?;
+        }
         Ok(self.writer.write(&event)?)
     }
 
@@ -111,15 +123,28 @@ impl<'a, W: EventWriter> ser::Serializer for &'a mut Serializer<W> {
     }
 
     fn serialize_none(self) -> Result<(), Self::Error> {
-        self.single_key_dict("None".to_owned())?;
-        self.serialize_unit()?;
-        self.single_key_dict_end()
+        // Don't write a dict for None if the Option is a struct field.
+        // TODO: This is fragile. Use distinct types instead.
+        if let None = self.maybe_option_field_name.take() {
+            self.single_key_dict("None".to_owned())?;
+            self.serialize_unit()?;
+            self.single_key_dict_end()?;
+        }
+        Ok(())
     }
 
     fn serialize_some<T: ?Sized + ser::Serialize>(self, value: &T) -> Result<(), Self::Error> {
-        self.single_key_dict("Some".to_owned())?;
-        value.serialize(&mut *self)?;
-        self.single_key_dict_end()
+        // Don't write a dict for None if the Option is a struct field.
+        // Can't use the write in emit here in case there is a Some(None).
+        // TODO: This is fragile. Use distinct types instead.
+        if let Some(field_name) = self.maybe_option_field_name.take() {
+            self.emit(PlistEvent::StringValue(field_name.to_owned()))?;
+            value.serialize(&mut *self)
+        } else {
+            self.single_key_dict("Some".to_owned())?;
+            value.serialize(&mut *self)?;
+            self.single_key_dict_end()
+        }
     }
 
     fn serialize_unit(self) -> Result<(), Self::Error> {
@@ -195,9 +220,10 @@ impl<'a, W: EventWriter> ser::Serializer for &'a mut Serializer<W> {
 
     fn serialize_struct(self,
                         _name: &'static str,
-                        len: usize)
+                        _len: usize)
                         -> Result<Self::SerializeStruct, Self::Error> {
-        self.serialize_map(Some(len))
+        // The number of struct fields is not known as fields with None values are ignored.
+        self.serialize_map(None)
     }
 
     fn serialize_struct_variant(self,
@@ -304,7 +330,10 @@ impl<'a, W: EventWriter> ser::SerializeStruct for Compound<'a, W> {
                                                    key: &'static str,
                                                    value: &T)
                                                    -> Result<(), Self::Error> {
-        <Self as ser::SerializeMap>::serialize_entry(self, key, value)
+        // Don't write a dict for None if the Option is a struct field.
+        // TODO: This is fragile. Use distinct types instead.
+        self.ser.maybe_option_field_name = Some(key);
+        value.serialize(&mut *self.ser)
     }
 
     fn end(self) -> Result<Self::Ok, Self::Error> {
