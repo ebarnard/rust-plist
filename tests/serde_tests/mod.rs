@@ -1,4 +1,5 @@
-use plist::{EventWriter, PlistEvent, Result as PlistResult};
+use chrono::{TimeZone, UTC};
+use plist::{Date, EventWriter, PlistEvent, Result as PlistResult};
 use plist::serde::{Serializer, Deserializer};
 use plist::PlistEvent::*;
 use serde::de::DeserializeOwned;
@@ -219,7 +220,7 @@ fn type_with_options() {
         c: None
     };
 
-    let ty = TypeWithOptions {
+    let obj = TypeWithOptions {
         a: Some("hello".to_owned()),
         b: None,
         c: Some(Box::new(inner))
@@ -235,5 +236,30 @@ fn type_with_options() {
                        EndDictionary,
                        EndDictionary];
 
-    assert_roundtrip(ty, Some(comparison));
+    assert_roundtrip(obj, Some(comparison));
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+struct TypeWithDate {
+    a: Option<i32>,
+    b: Option<Date>
+}
+
+#[test]
+fn type_with_date() {
+    let date: Date = UTC.ymd(1981, 05, 16).and_hms(11, 32, 06).into();
+
+    let obj = TypeWithDate {
+        a: Some(28),
+        b: Some(date.clone()),
+    };
+
+    let comparison = &[StartDictionary(None),
+                       StringValue("a".to_owned()),
+                       IntegerValue(28),
+                       StringValue("b".to_owned()),
+                       DateValue(date),
+                       EndDictionary];
+
+    assert_roundtrip(obj, Some(comparison));
 }

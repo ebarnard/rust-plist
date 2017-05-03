@@ -65,3 +65,62 @@ impl FromStr for Date {
         })
     }
 }
+
+#[cfg(feature = "serde")]
+mod serde_impls {
+    use serde_base::de::{Deserialize, Deserializer, Error, Visitor, Unexpected};
+    use serde_base::ser::{Serialize, Serializer};
+    use std::fmt;
+    use std::str::FromStr;
+
+    use Date;
+
+    impl Serialize for Date {
+        fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+            where S: Serializer,
+        {
+            let date_str = self.to_string();
+            serializer.serialize_newtype_struct("PLIST-DATE", &date_str)
+        }
+    }
+
+    struct DateNewtypeVisitor;
+
+    impl<'de> Visitor<'de> for DateNewtypeVisitor {
+        type Value = Date;
+
+        fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
+            formatter.write_str("a plist date newtype")
+        }
+
+        fn visit_newtype_struct<D>(self, deserializer: D) -> Result<Self::Value, D::Error>
+            where D: Deserializer<'de>,
+        {
+            deserializer.deserialize_str(DateStrVisitor)
+        }
+    }
+
+    struct DateStrVisitor;
+
+    impl<'de> Visitor<'de> for DateStrVisitor {
+        type Value = Date;
+
+        fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
+            formatter.write_str("a plist date string")
+        }
+
+        fn visit_str<E>(self, v: &str) -> Result<Self::Value, E>
+            where E: Error,
+        {
+            Date::from_str(v).map_err(|_| E::invalid_value(Unexpected::Str(v), &self))
+        }
+    }
+
+    impl<'de> Deserialize<'de> for Date {
+        fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+            where D: Deserializer<'de>,
+        {
+            deserializer.deserialize_newtype_struct("PLIST-DATE", DateNewtypeVisitor)
+        }
+    }
+}

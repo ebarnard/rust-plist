@@ -3,8 +3,9 @@
 
 use serde_base::ser;
 use std::fmt::Display;
+use std::str::FromStr;
 
-use {Error, EventWriter, PlistEvent};
+use {Date, Error, EventWriter, PlistEvent};
 
 impl ser::Error for Error {
     fn custom<T: Display>(msg: T) -> Self {
@@ -17,14 +18,16 @@ pub struct Serializer<W: EventWriter> {
     // We don't want to serialize None if the Option is in a struct field as this is how null
     // fields are represented in plists. This is fragile but results in minimal code duplication.
     // TODO: This is fragile. Use distinct types instead.
-    maybe_option_field_name: Option<&'static str>
+    maybe_option_field_name: Option<&'static str>,
+    expecting_date: bool
 }
 
 impl<W: EventWriter> Serializer<W> {
     pub fn new(writer: W) -> Serializer<W> {
         Serializer {
             writer: writer,
-            maybe_option_field_name: None
+            maybe_option_field_name: None,
+            expecting_date: false
         }
     }
 
@@ -33,6 +36,9 @@ impl<W: EventWriter> Serializer<W> {
         // TODO: This is fragile. Use distinct types instead.
         if let Some(field_name) = self.maybe_option_field_name.take() {
             self.emit(PlistEvent::StringValue(field_name.to_owned()))?;
+        }
+        if self.expecting_date {
+            panic!("Expecting date");
         }
         Ok(self.writer.write(&event)?)
     }
@@ -115,7 +121,12 @@ impl<'a, W: EventWriter> ser::Serializer for &'a mut Serializer<W> {
     }
 
     fn serialize_str(self, value: &str) -> Result<(), Self::Error> {
-        self.emit(PlistEvent::StringValue(value.to_owned()))
+        if self.expecting_date {
+            self.expecting_date = false;
+            self.emit(PlistEvent::DateValue(Date::from_str(value).expect("Invalid date format")))
+        } else {
+            self.emit(PlistEvent::StringValue(value.to_owned()))
+        }
     }
 
     fn serialize_bytes(self, value: &[u8]) -> Result<(), Self::Error> {
@@ -171,6 +182,9 @@ impl<'a, W: EventWriter> ser::Serializer for &'a mut Serializer<W> {
                                                             _name: &'static str,
                                                             value: &T)
                                                             -> Result<(), Self::Error> {
+        if _name == "PLIST-DATE" {
+            self.expecting_date = true;
+        }
         value.serialize(self)
     }
 
