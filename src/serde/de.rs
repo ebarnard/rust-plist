@@ -116,9 +116,7 @@ impl<'de, 'a, I> de::Deserializer<'de> for &'a mut Deserializer<I>
                 expect!(self.events.next(), PlistEvent::StringValue(_));
                 visitor.visit_none::<Self::Error>()?
             }
-            PlistEvent::StringValue(ref s) if &s[..] == "Some" => {
-                visitor.visit_some(&mut *self)?
-            }
+            PlistEvent::StringValue(ref s) if &s[..] == "Some" => visitor.visit_some(&mut *self)?,
             _ => return Err(event_mismatch_error()),
         };
 
@@ -140,7 +138,7 @@ impl<'de, 'a, I> de::Deserializer<'de> for &'a mut Deserializer<I>
                              _name: &'static str,
                              _fields: &'static [&'static str],
                              visitor: V)
-                            -> Result<V::Value, Self::Error>
+                             -> Result<V::Value, Self::Error>
         where V: de::Visitor<'de>
     {
         expect!(self.events.next(), PlistEvent::StartDictionary(_));
@@ -198,9 +196,9 @@ impl<'de, 'a, I> de::VariantAccess<'de> for &'a mut Deserializer<I>
     }
 
     fn struct_variant<V>(self,
-                       fields: &'static [&'static str],
-                       visitor: V)
-                       -> Result<V::Value, Self::Error>
+                         fields: &'static [&'static str],
+                         visitor: V)
+                         -> Result<V::Value, Self::Error>
         where V: de::Visitor<'de>
     {
         let name = "";
@@ -211,7 +209,7 @@ impl<'de, 'a, I> de::VariantAccess<'de> for &'a mut Deserializer<I>
 pub struct StructValueDeserializer<'a, I: 'a>
     where I: IntoIterator<Item = Result<PlistEvent, Error>>
 {
-    de: &'a mut Deserializer<I>
+    de: &'a mut Deserializer<I>,
 }
 
 impl<'de, 'a, I> de::Deserializer<'de> for StructValueDeserializer<'a, I>
@@ -257,7 +255,7 @@ impl<'de, 'a, I> de::Deserializer<'de> for StructValueDeserializer<'a, I>
                              name: &'static str,
                              fields: &'static [&'static str],
                              visitor: V)
-                            -> Result<V::Value, Self::Error>
+                             -> Result<V::Value, Self::Error>
         where V: de::Visitor<'de>
     {
         self.de.deserialize_struct(name, fields, visitor)
@@ -285,7 +283,10 @@ struct MapAndSeqAccess<'a, I>
 impl<'a, I> MapAndSeqAccess<'a, I>
     where I: 'a + IntoIterator<Item = Result<PlistEvent, Error>>
 {
-    fn new(de: &'a mut Deserializer<I>, is_struct: bool, len: Option<usize>) -> MapAndSeqAccess<'a, I> {
+    fn new(de: &'a mut Deserializer<I>,
+           is_struct: bool,
+           len: Option<usize>)
+           -> MapAndSeqAccess<'a, I> {
         MapAndSeqAccess {
             de: de,
             is_struct: is_struct,

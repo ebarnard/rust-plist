@@ -199,8 +199,11 @@ struct NewtypeInner(u8, u8, u8);
 fn newtype_struct() {
     let newtype = NewtypeStruct(NewtypeInner(34, 32, 13));
 
-    let comparison =
-        &[StartArray(Some(3)), IntegerValue(34), IntegerValue(32), IntegerValue(13), EndArray];
+    let comparison = &[StartArray(Some(3)),
+                       IntegerValue(34),
+                       IntegerValue(32),
+                       IntegerValue(13),
+                       EndArray];
 
     assert_roundtrip(newtype, Some(comparison));
 }
@@ -209,7 +212,7 @@ fn newtype_struct() {
 struct TypeWithOptions {
     a: Option<String>,
     b: Option<u32>,
-    c: Option<Box<TypeWithOptions>>
+    c: Option<Box<TypeWithOptions>>,
 }
 
 #[test]
@@ -217,13 +220,13 @@ fn type_with_options() {
     let inner = TypeWithOptions {
         a: None,
         b: Some(12),
-        c: None
+        c: None,
     };
 
     let obj = TypeWithOptions {
         a: Some("hello".to_owned()),
         b: None,
-        c: Some(Box::new(inner))
+        c: Some(Box::new(inner)),
     };
 
     let comparison = &[StartDictionary(None),
@@ -242,7 +245,7 @@ fn type_with_options() {
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 struct TypeWithDate {
     a: Option<i32>,
-    b: Option<Date>
+    b: Option<Date>,
 }
 
 #[test]

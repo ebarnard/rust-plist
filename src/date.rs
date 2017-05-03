@@ -6,7 +6,7 @@ use {Error, Result};
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct Date {
-    inner: DateTime<UTC>
+    inner: DateTime<UTC>,
 }
 
 impl Date {
@@ -29,17 +29,13 @@ impl Date {
         let plist_epoch = UTC.ymd(2001, 1, 1).and_hms(0, 0, 0);
         let date = plist_epoch.checked_add_signed(dur).ok_or(Error::InvalidData)?;
 
-        Ok(Date {
-            inner: date
-        })
+        Ok(Date { inner: date })
     }
 }
 
 impl From<DateTime<UTC>> for Date {
     fn from(date: DateTime<UTC>) -> Self {
-        Date {
-            inner: date
-        }
+        Date { inner: date }
     }
 }
 
@@ -60,9 +56,7 @@ impl FromStr for Date {
 
     fn from_str(s: &str) -> ::std::result::Result<Self, Self::Err> {
         let date = DateTime::parse_from_rfc3339(&s).map_err(|_| ())?;
-        Ok(Date {
-            inner: date.with_timezone(&UTC)
-        })
+        Ok(Date { inner: date.with_timezone(&UTC) })
     }
 }
 
@@ -77,7 +71,7 @@ mod serde_impls {
 
     impl Serialize for Date {
         fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-            where S: Serializer,
+            where S: Serializer
         {
             let date_str = self.to_string();
             serializer.serialize_newtype_struct("PLIST-DATE", &date_str)
@@ -94,7 +88,7 @@ mod serde_impls {
         }
 
         fn visit_newtype_struct<D>(self, deserializer: D) -> Result<Self::Value, D::Error>
-            where D: Deserializer<'de>,
+            where D: Deserializer<'de>
         {
             deserializer.deserialize_str(DateStrVisitor)
         }
@@ -110,7 +104,7 @@ mod serde_impls {
         }
 
         fn visit_str<E>(self, v: &str) -> Result<Self::Value, E>
-            where E: Error,
+            where E: Error
         {
             Date::from_str(v).map_err(|_| E::invalid_value(Unexpected::Str(v), &self))
         }
@@ -118,7 +112,7 @@ mod serde_impls {
 
     impl<'de> Deserialize<'de> for Date {
         fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-            where D: Deserializer<'de>,
+            where D: Deserializer<'de>
         {
             deserializer.deserialize_newtype_struct("PLIST-DATE", DateNewtypeVisitor)
         }

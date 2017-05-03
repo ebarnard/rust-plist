@@ -19,7 +19,7 @@ pub struct Serializer<W: EventWriter> {
     // fields are represented in plists. This is fragile but results in minimal code duplication.
     // TODO: This is fragile. Use distinct types instead.
     maybe_option_field_name: Option<&'static str>,
-    expecting_date: bool
+    expecting_date: bool,
 }
 
 impl<W: EventWriter> Serializer<W> {
@@ -27,7 +27,7 @@ impl<W: EventWriter> Serializer<W> {
         Serializer {
             writer: writer,
             maybe_option_field_name: None,
-            expecting_date: false
+            expecting_date: false,
         }
     }
 

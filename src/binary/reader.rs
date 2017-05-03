@@ -199,18 +199,12 @@ impl<R: Read + Seek> EventReader<R> {
             (0x0, 0x09) => Some(PlistEvent::BooleanValue(true)),
             (0x0, 0x0f) => return Err(Error::InvalidData), // fill
             (0x1, 0) => Some(PlistEvent::IntegerValue(self.reader.read_u8()? as i64)),
-            (0x1, 1) => {
-                Some(PlistEvent::IntegerValue(self.reader.read_u16::<BigEndian>()? as i64))
-            }
-            (0x1, 2) => {
-                Some(PlistEvent::IntegerValue(self.reader.read_u32::<BigEndian>()? as i64))
-            }
+            (0x1, 1) => Some(PlistEvent::IntegerValue(self.reader.read_u16::<BigEndian>()? as i64)),
+            (0x1, 2) => Some(PlistEvent::IntegerValue(self.reader.read_u32::<BigEndian>()? as i64)),
             (0x1, 3) => Some(PlistEvent::IntegerValue(self.reader.read_i64::<BigEndian>()?)),
             (0x1, 4) => return Err(Error::InvalidData), // 128 bit int
             (0x1, _) => return Err(Error::InvalidData), // variable length int
-            (0x2, 2) => {
-                Some(PlistEvent::RealValue(self.reader.read_f32::<BigEndian>()? as f64))
-            }
+            (0x2, 2) => Some(PlistEvent::RealValue(self.reader.read_f32::<BigEndian>()? as f64)),
             (0x2, 3) => Some(PlistEvent::RealValue(self.reader.read_f64::<BigEndian>()?)),
             (0x2, _) => return Err(Error::InvalidData), // odd length float
             (0x3, 3) => {

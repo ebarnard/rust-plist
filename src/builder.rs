@@ -40,9 +40,7 @@ impl<T: Iterator<Item = Result<PlistEvent>>> Builder<T> {
     fn build_value(&mut self) -> Result<Plist> {
         match self.token.take() {
             Some(PlistEvent::StartArray(len)) => Ok(Plist::Array(self.build_array(len)?)),
-            Some(PlistEvent::StartDictionary(len)) => {
-                Ok(Plist::Dictionary(self.build_dict(len)?))
-            }
+            Some(PlistEvent::StartDictionary(len)) => Ok(Plist::Dictionary(self.build_dict(len)?)),
 
             Some(PlistEvent::BooleanValue(b)) => Ok(Plist::Boolean(b)),
             Some(PlistEvent::DataValue(d)) => Ok(Plist::Data(d)),
