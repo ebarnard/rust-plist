@@ -1,6 +1,3 @@
-// Tests for the serializer and deserializer are located in tests/serde_/mod.rs.
-// They can be run with `cargo test --features serde_tests`.
-
 use serde_base::de;
 use std::iter::Peekable;
 use std::fmt::Display;
