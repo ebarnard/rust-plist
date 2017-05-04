@@ -10,6 +10,7 @@ pub struct Date {
 }
 
 impl Date {
+    #[doc(hidden)]
     pub fn from_seconds_since_plist_epoch(timestamp: f64) -> Result<Date> {
         // Seconds since 1/1/2001 00:00:00.
 
