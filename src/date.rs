@@ -4,6 +4,7 @@ use std::str::FromStr;
 
 use {Error, Result};
 
+/// A UTC timestamp. Used for serialization to and from the plist date type.
 #[derive(Clone, Debug, PartialEq)]
 pub struct Date {
     inner: DateTime<UTC>,
