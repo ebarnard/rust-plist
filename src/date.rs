@@ -62,7 +62,7 @@ impl FromStr for Date {
 }
 
 #[cfg(feature = "serde")]
-mod serde_impls {
+pub mod serde_impls {
     use serde_base::de::{Deserialize, Deserializer, Error, Visitor, Unexpected};
     use serde_base::ser::{Serialize, Serializer};
     use std::fmt;
@@ -70,12 +70,14 @@ mod serde_impls {
 
     use Date;
 
+    pub const DATE_NEWTYPE_STRUCT_NAME: &'static str = "PLIST-DATE";
+
     impl Serialize for Date {
         fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
             where S: Serializer
         {
             let date_str = self.to_string();
-            serializer.serialize_newtype_struct("PLIST-DATE", &date_str)
+            serializer.serialize_newtype_struct(DATE_NEWTYPE_STRUCT_NAME, &date_str)
         }
     }
 
@@ -115,7 +117,7 @@ mod serde_impls {
         fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
             where D: Deserializer<'de>
         {
-            deserializer.deserialize_newtype_struct("PLIST-DATE", DateNewtypeVisitor)
+            deserializer.deserialize_newtype_struct(DATE_NEWTYPE_STRUCT_NAME, DateNewtypeVisitor)
         }
     }
 }
