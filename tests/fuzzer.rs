@@ -29,8 +29,14 @@ fn binary_circular_reference() {
 
 // Issue 20 - not found by fuzzing but this is a convenient place to put the test.
 #[test]
-fn binary_with_data_in_trailer() {
+fn issue_20_binary_with_data_in_trailer() {
     let data = b"bplist00\xd0\x08\0\0\0\0\0\0\x01\x01\0\0\0\0\0\0\0\x01\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\t";
+    test_fuzzer_data_ok(data);
+}
+
+#[test]
+fn issue_22_binary_with_byte_ref_size() {
+    let data = b"bplist00\xd1\x01\x02TTestQ1\x08\x0b\x10\x00\x00\x00\x00\x00\x00\x01\x01\x00\x00\x00\x00\x00\x00\x00\x03\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x12";
     test_fuzzer_data_ok(data);
 }
 

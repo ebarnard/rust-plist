@@ -1,6 +1,6 @@
 use byteorder::{BigEndian, ReadBytesExt};
 use std::io::{Read, Seek, SeekFrom};
-use std::mem;
+use std::mem::size_of;
 use std::string::{FromUtf8Error, FromUtf16Error};
 
 use {Date, Error, Result, PlistEvent, u64_to_usize};
@@ -38,7 +38,7 @@ pub struct EventReader<R> {
     finished: bool,
     // The largest single allocation allowed for this Plist.
     // Equal to the number of bytes in the Plist minus the magic and trailer.
-    max_allocation: usize,
+    max_allocation_bytes: usize,
     // The maximum number of objects that can be created. Default 10 * object_offsets.len().
     // Binary plists can contain circular references.
     max_objects: usize,
@@ -54,19 +54,19 @@ impl<R: Read + Seek> EventReader<R> {
             reader: reader,
             ref_size: 0,
             finished: false,
-            max_allocation: 0,
+            max_allocation_bytes: 0,
             max_objects: 0,
             current_objects: 0,
         }
     }
 
-    fn can_allocate<T>(&self, len: u64) -> bool {
-        let byte_len = len.saturating_mul(mem::size_of::<T>() as u64);
-        byte_len <= self.max_allocation as u64
+    fn can_allocate(&self, len: u64, size: usize) -> bool {
+        let byte_len = len.saturating_mul(size as u64);
+        byte_len <= self.max_allocation_bytes as u64
     }
 
-    fn allocate_vec<T>(&self, len: u64) -> Result<Vec<T>> {
-        if self.can_allocate::<T>(len) {
+    fn allocate_vec<T>(&self, len: u64, size: usize) -> Result<Vec<T>> {
+        if self.can_allocate(len, size) {
             Ok(Vec::with_capacity(len as usize))
         } else {
             Err(Error::InvalidData)
@@ -86,13 +86,17 @@ impl<R: Read + Seek> EventReader<R> {
 
         let offset_size = self.reader.read_u8()?;
         self.ref_size = self.reader.read_u8()?;
+        match self.ref_size {
+            1 | 2 | 4 | 8 => (),
+            _ => return Err(Error::InvalidData)
+        }
         let num_objects = self.reader.read_u64::<BigEndian>()?;
         let top_object = self.reader.read_u64::<BigEndian>()?;
         let offset_table_offset = self.reader.read_u64::<BigEndian>()?;
 
         // File size minus trailer and header
         // Truncated to max(usize)
-        self.max_allocation = trailer_start.saturating_sub(8) as usize;
+        self.max_allocation_bytes = trailer_start.saturating_sub(8) as usize;
 
         // Read offset table
         self.reader.seek(SeekFrom::Start(offset_table_offset))?;
@@ -110,7 +114,7 @@ impl<R: Read + Seek> EventReader<R> {
     }
 
     fn read_ints(&mut self, len: u64, size: u8) -> Result<Vec<u64>> {
-        let mut ints = self.allocate_vec(len)?;
+        let mut ints = self.allocate_vec(len, size as usize)?;
         for _ in 0..len {
             match size {
                 1 => ints.push(self.reader.read_u8()? as u64),
@@ -144,7 +148,7 @@ impl<R: Read + Seek> EventReader<R> {
     }
 
     fn read_data(&mut self, len: u64) -> Result<Vec<u8>> {
-        let mut data = self.allocate_vec::<u8>(len)?;
+        let mut data = self.allocate_vec(len, size_of::<u8>())?;
         // Safe as u8 is a Copy type and we have already know len has been allocated.
         unsafe { data.set_len(len as usize) }
         self.reader.read_exact(&mut data)?;
@@ -227,7 +231,7 @@ impl<R: Read + Seek> EventReader<R> {
             (0x6, n) => {
                 // UTF-16 string
                 let len_utf16_codepoints = self.read_object_len(n)?;
-                let mut raw_utf16 = self.allocate_vec(len_utf16_codepoints)?;
+                let mut raw_utf16 = self.allocate_vec(len_utf16_codepoints, size_of::<u16>())?;
 
                 for _ in 0..len_utf16_codepoints {
                     raw_utf16.push(self.reader.read_u16::<BigEndian>()?);
@@ -256,7 +260,7 @@ impl<R: Read + Seek> EventReader<R> {
                 let key_refs = self.read_refs(len)?;
                 let value_refs = self.read_refs(len)?;
 
-                let mut object_refs = self.allocate_vec(len * 2)?;
+                let mut object_refs = self.allocate_vec(len * 2, self.ref_size as usize)?;
                 let len = key_refs.len();
                 for i in 1..len + 1 {
                     // Reverse so we can pop off the end of the stack in order
