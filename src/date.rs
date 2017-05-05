@@ -15,6 +15,10 @@ impl Date {
     pub fn from_seconds_since_plist_epoch(timestamp: f64) -> Result<Date> {
         // Seconds since 1/1/2001 00:00:00.
 
+        if timestamp.is_nan() {
+            return Err(Error::InvalidData);
+        }
+
         let millis = timestamp * 1_000.0;
         // Chrono's Duration can only millisecond values between ::std::i64::MIN and
         // ::std::i64::MAX.
