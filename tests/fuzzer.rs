@@ -39,6 +39,12 @@ fn binary_nan_date() {
     test_fuzzer_data_err(data);
 }
 
+#[test]
+fn binary_circular_array() {
+    let data = include_bytes!("data/binary_circular_array.plist");
+    test_fuzzer_data_err(data);
+}
+
 // Issue 20 - not found by fuzzing but this is a convenient place to put the test.
 #[test]
 fn issue_20_binary_with_data_in_trailer() {

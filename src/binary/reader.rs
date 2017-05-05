@@ -39,6 +39,8 @@ pub struct EventReader<R> {
     // The largest single allocation allowed for this Plist.
     // Equal to the number of bytes in the Plist minus the magic and trailer.
     max_allocation_bytes: usize,
+    // The maximum number of nested arrays and dicts allowed in the plist.
+    max_stack_depth: usize,
     // The maximum number of objects that can be created. Default 10 * object_offsets.len().
     // Binary plists can contain circular references.
     max_objects: usize,
@@ -55,6 +57,7 @@ impl<R: Read + Seek> EventReader<R> {
             ref_size: 0,
             finished: false,
             max_allocation_bytes: 0,
+            max_stack_depth: 200,
             max_objects: 0,
             current_objects: 0,
         }
@@ -283,6 +286,11 @@ impl<R: Read + Seek> EventReader<R> {
             }
             (_, _) => return Err(Error::InvalidData),
         };
+
+        // Prevent stack overflows when recursively parsing plist.
+        if self.stack.len() > self.max_stack_depth {
+            return Err(Error::InvalidData);
+        }
 
         Ok(result)
     }
