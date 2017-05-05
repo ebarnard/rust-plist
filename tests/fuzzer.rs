@@ -27,6 +27,12 @@ fn binary_circular_reference() {
     test_fuzzer_data_err(data);
 }
 
+#[test]
+fn binary_zero_offset_size() {
+    let data = include_bytes!("data/binary_zero_offset_size.plist");
+    test_fuzzer_data_err(data);
+}
+
 // Issue 20 - not found by fuzzing but this is a convenient place to put the test.
 #[test]
 fn issue_20_binary_with_data_in_trailer() {

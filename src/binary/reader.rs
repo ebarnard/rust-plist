@@ -85,11 +85,17 @@ impl<R: Read + Seek> EventReader<R> {
         let trailer_start = self.reader.seek(SeekFrom::End(-32 + 6))?;
 
         let offset_size = self.reader.read_u8()?;
+        match offset_size {
+            1 | 2 | 4 | 8 => (),
+            _ => return Err(Error::InvalidData)
+        }
+
         self.ref_size = self.reader.read_u8()?;
         match self.ref_size {
             1 | 2 | 4 | 8 => (),
             _ => return Err(Error::InvalidData)
         }
+
         let num_objects = self.reader.read_u64::<BigEndian>()?;
         let top_object = self.reader.read_u64::<BigEndian>()?;
         let offset_table_offset = self.reader.read_u64::<BigEndian>()?;
