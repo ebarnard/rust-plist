@@ -61,7 +61,7 @@ impl FromStr for Date {
     type Err = ();
 
     fn from_str(s: &str) -> ::std::result::Result<Self, Self::Err> {
-        let date = DateTime::parse_from_rfc3339(&s).map_err(|_| ())?;
+        let date = DateTime::parse_from_rfc3339(s).map_err(|_| ())?;
         Ok(Date { inner: date.with_timezone(&UTC) })
     }
 }

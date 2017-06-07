@@ -39,14 +39,14 @@ impl Plist {
         match self {
             Plist::Array(array) => {
                 events.push(PlistEvent::StartArray(Some(array.len() as u64)));
-                for value in array.into_iter() {
+                for value in array {
                     value.into_events_inner(events);
                 }
                 events.push(PlistEvent::EndArray);
             }
             Plist::Dictionary(dict) => {
                 events.push(PlistEvent::StartDictionary(Some(dict.len() as u64)));
-                for (key, value) in dict.into_iter() {
+                for (key, value) in dict {
                     events.push(PlistEvent::StringValue(key));
                     value.into_events_inner(events);
                 }
@@ -64,8 +64,8 @@ impl Plist {
     /// If the `Plist` is an Array, returns the associated Vec.
     /// Returns None otherwise.
     pub fn as_array(&self) -> Option<&Vec<Plist>> {
-        match self {
-            &Plist::Array(ref array) => Some(array),
+        match *self {
+            Plist::Array(ref array) => Some(array),
             _ => None,
         }
     }
@@ -73,8 +73,8 @@ impl Plist {
     /// If the `Plist` is an Array, returns the associated mutable Vec.
     /// Returns None otherwise.
     pub fn as_array_mut(&mut self) -> Option<&mut Vec<Plist>> {
-        match self {
-            &mut Plist::Array(ref mut array) => Some(array),
+        match *self {
+            Plist::Array(ref mut array) => Some(array),
             _ => None,
         }
     }
@@ -82,8 +82,8 @@ impl Plist {
     /// If the `Plist` is a Dictionary, returns the associated BTreeMap.
     /// Returns None otherwise.
     pub fn as_dictionary(&self) -> Option<&BTreeMap<String, Plist>> {
-        match self {
-            &Plist::Dictionary(ref map) => Some(map),
+        match *self {
+            Plist::Dictionary(ref map) => Some(map),
             _ => None,
         }
     }
@@ -91,8 +91,8 @@ impl Plist {
     /// If the `Plist` is a Dictionary, returns the associated mutable BTreeMap.
     /// Returns None otherwise.
     pub fn as_dictionary_mut(&mut self) -> Option<&mut BTreeMap<String, Plist>> {
-        match self {
-            &mut Plist::Dictionary(ref mut map) => Some(map),
+        match *self {
+            Plist::Dictionary(ref mut map) => Some(map),
             _ => None,
         }
     }
@@ -100,8 +100,8 @@ impl Plist {
     /// If the `Plist` is a Boolean, returns the associated bool.
     /// Returns None otherwise.
     pub fn as_boolean(&self) -> Option<bool> {
-        match self {
-            &Plist::Boolean(v) => Some(v),
+        match *self {
+            Plist::Boolean(v) => Some(v),
             _ => None,
         }
     }
@@ -121,8 +121,8 @@ impl Plist {
     /// If the `Plist` is a Data, returns the associated Vec.
     /// Returns None otherwise.
     pub fn as_data(&self) -> Option<&[u8]> {
-        match self {
-            &Plist::Data(ref data) => Some(data),
+        match *self {
+            Plist::Data(ref data) => Some(data),
             _ => None,
         }
     }
@@ -130,8 +130,8 @@ impl Plist {
     /// If the `Plist` is a Date, returns the associated DateTime.
     /// Returns None otherwise.
     pub fn as_date(&self) -> Option<&Date> {
-        match self {
-            &Plist::Date(ref date) => Some(date),
+        match *self {
+            Plist::Date(ref date) => Some(date),
             _ => None,
         }
     }
@@ -139,8 +139,8 @@ impl Plist {
     /// If the `Plist` is a Real, returns the associated f64.
     /// Returns None otherwise.
     pub fn as_real(&self) -> Option<f64> {
-        match self {
-            &Plist::Real(v) => Some(v),
+        match *self {
+            Plist::Real(v) => Some(v),
             _ => None,
         }
     }
@@ -148,8 +148,8 @@ impl Plist {
     /// If the `Plist` is an Integer, returns the associated i64.
     /// Returns None otherwise.
     pub fn as_integer(&self) -> Option<i64> {
-        match self {
-            &Plist::Integer(v) => Some(v),
+        match *self {
+            Plist::Integer(v) => Some(v),
             _ => None,
         }
     }
@@ -169,8 +169,8 @@ impl Plist {
     /// If the `Plist` is a String, returns the associated str.
     /// Returns None otherwise.
     pub fn as_string(&self) -> Option<&str> {
-        match self {
-            &Plist::String(ref v) => Some(v),
+        match *self {
+            Plist::String(ref v) => Some(v),
             _ => None,
         }
     }

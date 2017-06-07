@@ -70,7 +70,7 @@ impl<'de, 'a, I> de::Deserializer<'de> for &'a mut Deserializer<I>
                 expect!(self.events.next(), PlistEvent::EndArray);
                 Ok(ret)
             }
-            PlistEvent::EndArray => return Err(event_mismatch_error()),
+            PlistEvent::EndArray => Err(event_mismatch_error()),
 
             PlistEvent::StartDictionary(len) => {
                 let len = u64_option_to_usize(len)?;
@@ -78,7 +78,7 @@ impl<'de, 'a, I> de::Deserializer<'de> for &'a mut Deserializer<I>
                 expect!(self.events.next(), PlistEvent::EndDictionary);
                 Ok(ret)
             }
-            PlistEvent::EndDictionary => return Err(event_mismatch_error()),
+            PlistEvent::EndDictionary => Err(event_mismatch_error()),
 
             PlistEvent::BooleanValue(v) => visitor.visit_bool(v),
             PlistEvent::DataValue(v) => visitor.visit_byte_buf(v),

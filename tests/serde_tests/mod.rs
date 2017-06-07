@@ -32,7 +32,7 @@ fn new_serializer() -> Serializer<VecWriter> {
 }
 
 fn new_deserializer(events: Vec<PlistEvent>) -> Deserializer<Vec<PlistResult<PlistEvent>>> {
-    let result_events = events.into_iter().map(|e| Ok(e)).collect();
+    let result_events = events.into_iter().map(Ok).collect();
     Deserializer::new(result_events)
 }
 
@@ -45,11 +45,8 @@ fn assert_roundtrip<T>(obj: T, comparison: Option<&[PlistEvent]>)
 
     let events = se.into_inner().into_inner();
 
-    match comparison {
-        Some(comparison) => {
-            assert_eq!(&events[..], comparison);
-        }
-        None => (),
+    if let Some(comparison) = comparison {
+        assert_eq!(&events[..], comparison);
     }
 
     let mut de = new_deserializer(events);

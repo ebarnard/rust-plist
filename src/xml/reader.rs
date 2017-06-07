@@ -109,9 +109,10 @@ impl<R: Read> EventReader<R> {
                     }
                 }
                 Ok(XmlEvent::EndDocument) => {
-                    match self.element_stack.is_empty() {
-                        true => return None,
-                        false => return Some(Err(Error::UnexpectedEof)),
+                    if self.element_stack.is_empty() {
+                        return None;
+                    } else {
+                        return Some(Err(Error::UnexpectedEof));
                     }
                 }
                 Err(_) => return Some(Err(Error::InvalidData)),

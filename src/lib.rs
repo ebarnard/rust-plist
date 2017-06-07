@@ -169,7 +169,7 @@ impl<R: Read + Seek> EventReader<R> {
         reader.read_exact(&mut magic)?;
         reader.seek(SeekFrom::Start(0))?;
 
-        Ok(if &magic == b"bplist00" { true } else { false })
+        Ok(&magic == b"bplist00")
     }
 }
 
