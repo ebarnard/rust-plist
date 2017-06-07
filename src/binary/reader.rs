@@ -79,7 +79,7 @@ impl<R: Read + Seek> EventReader<R> {
     fn read_trailer(&mut self) -> Result<()> {
         self.reader.seek(SeekFrom::Start(0))?;
         let mut magic = [0; 8];
-        self.reader.read(&mut magic)?;
+        self.reader.read_exact(&mut magic)?;
         if &magic != b"bplist00" {
             return Err(Error::InvalidData);
         }

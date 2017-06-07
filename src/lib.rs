@@ -166,7 +166,7 @@ impl<R: Read + Seek> EventReader<R> {
     fn is_binary(reader: &mut R) -> Result<bool> {
         reader.seek(SeekFrom::Start(0))?;
         let mut magic = [0; 8];
-        reader.read(&mut magic)?;
+        reader.read_exact(&mut magic)?;
         reader.seek(SeekFrom::Start(0))?;
 
         Ok(if &magic == b"bplist00" { true } else { false })
