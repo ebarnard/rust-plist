@@ -146,7 +146,7 @@ impl<R: Read> Iterator for EventReader<R> {
 
 #[cfg(test)]
 mod tests {
-    use chrono::{TimeZone, UTC};
+    use chrono::{TimeZone, Utc};
     use std::fs::File;
     use std::path::Path;
 
@@ -176,7 +176,7 @@ mod tests {
                            StringValue("Data".to_owned()),
                            DataValue(vec![0, 0, 0, 190, 0, 0, 0, 3, 0, 0, 0, 30, 0, 0, 0]),
                            StringValue("Birthdate".to_owned()),
-                           DateValue(UTC.ymd(1981, 05, 16).and_hms(11, 32, 06).into()),
+                           DateValue(Utc.ymd(1981, 05, 16).and_hms(11, 32, 06).into()),
                            StringValue("Blank".to_owned()),
                            StringValue("".to_owned()),
                            EndDictionary];
