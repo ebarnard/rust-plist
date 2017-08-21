@@ -15,7 +15,7 @@ default = ["serde"]
 [dependencies]
 base64 = "0.5.1"
 byteorder = "1.0.0"
-chrono = "0.3.0"
+chrono = "0.4.0"
 xml-rs = "0.4.1"
 serde = { version = "1.0.2", optional = true }
 

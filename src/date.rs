@@ -1,4 +1,4 @@
-use chrono::{DateTime, Duration, TimeZone, UTC};
+use chrono::{DateTime, Duration, TimeZone, Utc};
 use std::fmt;
 use std::str::FromStr;
 
@@ -7,7 +7,7 @@ use {Error, Result};
 /// A UTC timestamp. Used for serialization to and from the plist date type.
 #[derive(Clone, Debug, PartialEq)]
 pub struct Date {
-    inner: DateTime<UTC>,
+    inner: DateTime<Utc>,
 }
 
 impl Date {
@@ -32,21 +32,21 @@ impl Date {
         let dur = Duration::milliseconds(whole_millis as i64);
         let dur = dur + Duration::nanoseconds(submilli_nanos as i64);
 
-        let plist_epoch = UTC.ymd(2001, 1, 1).and_hms(0, 0, 0);
+        let plist_epoch = Utc.ymd(2001, 1, 1).and_hms(0, 0, 0);
         let date = plist_epoch.checked_add_signed(dur).ok_or(Error::InvalidData)?;
 
         Ok(Date { inner: date })
     }
 }
 
-impl From<DateTime<UTC>> for Date {
-    fn from(date: DateTime<UTC>) -> Self {
+impl From<DateTime<Utc>> for Date {
+    fn from(date: DateTime<Utc>) -> Self {
         Date { inner: date }
     }
 }
 
-impl Into<DateTime<UTC>> for Date {
-    fn into(self) -> DateTime<UTC> {
+impl Into<DateTime<Utc>> for Date {
+    fn into(self) -> DateTime<Utc> {
         self.inner
     }
 }
@@ -62,7 +62,7 @@ impl FromStr for Date {
 
     fn from_str(s: &str) -> ::std::result::Result<Self, Self::Err> {
         let date = DateTime::parse_from_rfc3339(s).map_err(|_| ())?;
-        Ok(Date { inner: date.with_timezone(&UTC) })
+        Ok(Date { inner: date.with_timezone(&Utc) })
     }
 }
 

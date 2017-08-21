@@ -339,7 +339,7 @@ mod tests {
     #[test]
     fn test_plist_access() {
         use std::collections::BTreeMap;
-        use chrono::*;
+        use chrono::prelude::*;
         use super::Date;
 
         let vec = vec![Plist::Real(0.0)];
@@ -360,7 +360,7 @@ mod tests {
         assert_eq!(Plist::Data(slice.to_vec()).into_data(),
                    Some(slice.to_vec()));
 
-        let date: Date = UTC::now().into();
+        let date: Date = Utc::now().into();
         assert_eq!(Plist::Date(date.clone()).as_date(), Some(&date));
 
         assert_eq!(Plist::Real(0.0).as_real(), Some(0.0));
