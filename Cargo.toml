@@ -13,10 +13,10 @@ build = "build.rs"
 default = ["serde"]
 
 [dependencies]
-base64 = "0.6.0"
-byteorder = "1.0.0"
+base64 = "0.8.0"
+byteorder = "1.1.0"
 chrono = "0.4.0"
-xml-rs = "0.6.1"
+xml-rs = "0.7.0"
 serde = { version = "1.0.2", optional = true }
 
 [dev-dependencies]
