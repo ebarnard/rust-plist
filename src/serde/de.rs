@@ -87,6 +87,7 @@ impl<'de, 'a, I> de::Deserializer<'de> for &'a mut Deserializer<I>
             PlistEvent::IntegerValue(v) => visitor.visit_i64(v as i64),
             PlistEvent::RealValue(v) => visitor.visit_f64(v),
             PlistEvent::StringValue(v) => visitor.visit_string(v),
+            PlistEvent::UidValue(v) => visitor.visit_u64(v),
         }
     }
 

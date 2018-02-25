@@ -177,6 +177,7 @@ impl<W: Write> PlistEventWriter for EventWriter<W> {
             PlistEvent::StringValue(ref value) => {
                 self.write_element_and_value("string", &*value)?
             }
+            PlistEvent::UidValue(_) => return Err(Error::InvalidData),
         };
 
         self.maybe_end_plist()?;

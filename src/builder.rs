@@ -48,6 +48,7 @@ impl<T: Iterator<Item = Result<PlistEvent>>> Builder<T> {
             Some(PlistEvent::IntegerValue(i)) => Ok(Plist::Integer(i)),
             Some(PlistEvent::RealValue(f)) => Ok(Plist::Real(f)),
             Some(PlistEvent::StringValue(s)) => Ok(Plist::String(s)),
+            Some(PlistEvent::UidValue(u)) => Ok(Plist::Uid(u)),
 
             Some(PlistEvent::EndArray) => Err(Error::InvalidData),
             Some(PlistEvent::EndDictionary) => Err(Error::InvalidData),
