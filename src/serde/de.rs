@@ -1,6 +1,8 @@
 use serde_base::de;
 use std::iter::Peekable;
 use std::fmt::Display;
+use std::io::{Read, Seek};
+use EventReader;
 
 use {Error, PlistEvent, u64_option_to_usize};
 
@@ -169,6 +171,16 @@ impl<'de, 'a, I> de::EnumAccess<'de> for &'a mut Deserializer<I>
         where V: de::DeserializeSeed<'de>
     {
         Ok((seed.deserialize(&mut *self)?, self))
+    }
+}
+
+impl<R> Deserializer<EventReader<R>>
+where
+    R: Read + Seek,
+{
+    /// Creates a JSON deserializer from an `io::Read`.
+    pub fn from_reader(reader: R) -> Self {
+        Deserializer::new(EventReader::new(reader))
     }
 }
 
