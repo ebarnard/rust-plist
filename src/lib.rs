@@ -105,6 +105,7 @@ pub enum PlistEvent {
     IntegerValue(i64),
     RealValue(f64),
     StringValue(String),
+    UidValue(u64),
 }
 
 pub type Result<T> = ::std::result::Result<T, Error>;

@@ -13,6 +13,7 @@ pub enum Plist {
     Real(f64),
     Integer(i64),
     String(String),
+    Uid(u64),
 }
 
 impl Plist {
@@ -58,6 +59,7 @@ impl Plist {
             Plist::Real(value) => events.push(PlistEvent::RealValue(value)),
             Plist::Integer(value) => events.push(PlistEvent::IntegerValue(value)),
             Plist::String(value) => events.push(PlistEvent::StringValue(value)),
+            Plist::Uid(value) => events.push(PlistEvent::UidValue(value)),
         }
     }
 

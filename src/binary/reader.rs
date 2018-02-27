@@ -248,7 +248,11 @@ impl<R: Read + Seek> EventReader<R> {
 
                 let string = String::from_utf16(&raw_utf16)?;
                 Some(PlistEvent::StringValue(string))
-            }
+            },
+            (0x8, 0) => Some(PlistEvent::UidValue(self.reader.read_u8()? as u64)),
+            (0x8, 1) => Some(PlistEvent::UidValue(self.reader.read_u16::<BigEndian>()? as u64)),
+            (0x8, 3) => Some(PlistEvent::UidValue(self.reader.read_u32::<BigEndian>()? as u64)),
+            (0x8, 7) => Some(PlistEvent::UidValue(self.reader.read_u64::<BigEndian>()?)),
             (0xa, n) => {
                 // Array
                 let len = self.read_object_len(n)?;
