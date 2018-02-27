@@ -1,10 +1,10 @@
-use chrono::{TimeZone, Utc};
 use plist::{Date, EventWriter, PlistEvent, Result as PlistResult};
 use plist::serde::{Serializer, Deserializer};
 use plist::PlistEvent::*;
 use serde::de::DeserializeOwned;
 use serde::ser::Serialize;
 use std::fmt::Debug;
+use std::time::SystemTime;
 
 struct VecWriter {
     events: Vec<PlistEvent>,
@@ -247,7 +247,7 @@ struct TypeWithDate {
 
 #[test]
 fn type_with_date() {
-    let date: Date = Utc.ymd(1981, 05, 16).and_hms(11, 32, 06).into();
+    let date: Date = SystemTime::now().into();
 
     let obj = TypeWithDate {
         a: Some(28),

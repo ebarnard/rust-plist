@@ -72,7 +72,7 @@ impl<R: Read> EventReader<R> {
                         }
                         "date" => {
                             return Some(self.read_content(|s| {
-                                Ok(PlistEvent::DateValue(Date::from_str(&s).map_err(|_| Error::InvalidData)?))
+                                Ok(PlistEvent::DateValue(Date::from_rfc3339(&s)?))
                             }))
                         }
                         "integer" => {
@@ -176,7 +176,7 @@ mod tests {
                            StringValue("Data".to_owned()),
                            DataValue(vec![0, 0, 0, 190, 0, 0, 0, 3, 0, 0, 0, 30, 0, 0, 0]),
                            StringValue("Birthdate".to_owned()),
-                           DateValue(Utc.ymd(1981, 05, 16).and_hms(11, 32, 06).into()),
+                           DateValue(Date::from_chrono(Utc.ymd(1981, 05, 16).and_hms(11, 32, 06))),
                            StringValue("Blank".to_owned()),
                            StringValue("".to_owned()),
                            EndDictionary];

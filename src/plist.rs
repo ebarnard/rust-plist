@@ -334,14 +334,13 @@ impl<'a> From<&'a str> for Plist {
 
 #[cfg(test)]
 mod tests {
-    use super::Plist;
+    use std::collections::BTreeMap;
+    use std::time::SystemTime;
+
+    use {Date, Plist};
 
     #[test]
     fn test_plist_access() {
-        use std::collections::BTreeMap;
-        use chrono::prelude::*;
-        use super::Date;
-
         let vec = vec![Plist::Real(0.0)];
         let mut array = Plist::Array(vec.clone());
         assert_eq!(array.as_array(), Some(&vec.clone()));
@@ -360,7 +359,7 @@ mod tests {
         assert_eq!(Plist::Data(slice.to_vec()).into_data(),
                    Some(slice.to_vec()));
 
-        let date: Date = Utc::now().into();
+        let date: Date = SystemTime::now().into();
         assert_eq!(Plist::Date(date.clone()).as_date(), Some(&date));
 
         assert_eq!(Plist::Real(0.0).as_real(), Some(0.0));

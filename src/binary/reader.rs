@@ -346,7 +346,7 @@ mod tests {
                            StringValue("Height".to_owned()),
                            RealValue(1.60),
                            StringValue("Birthdate".to_owned()),
-                           DateValue(Utc.ymd(1981, 05, 16).and_hms(11, 32, 06).into()),
+                           DateValue(Date::from_chrono(Utc.ymd(1981, 05, 16).and_hms(11, 32, 06))),
                            StringValue("Author".to_owned()),
                            StringValue("William Shakespeare".to_owned()),
                            StringValue("Data".to_owned()),

@@ -1,6 +1,5 @@
 use serde_base::ser;
 use std::fmt::Display;
-use std::str::FromStr;
 
 use {Date, Error, EventWriter, PlistEvent};
 use date::serde_impls::DATE_NEWTYPE_STRUCT_NAME;
@@ -455,7 +454,7 @@ impl<'a, W: EventWriter> ser::Serializer for DateSerializer<'a, W> {
     }
 
     fn serialize_str(self, v: &str) -> Result<(), Self::Error> {
-        let date = Date::from_str(v).map_err(|_| self.expecting_date_error())?;
+        let date = Date::from_rfc3339(v).map_err(|_| self.expecting_date_error())?;
         self.ser.emit(PlistEvent::DateValue(date))
     }
 

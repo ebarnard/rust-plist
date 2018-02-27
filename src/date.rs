@@ -1,6 +1,5 @@
 use chrono::{DateTime, Duration, TimeZone, Utc};
-use std::fmt;
-use std::str::FromStr;
+use std::time::SystemTime;
 
 use {Error, Result};
 
@@ -11,8 +10,18 @@ pub struct Date {
 }
 
 impl Date {
-    #[doc(hidden)]
-    pub fn from_seconds_since_plist_epoch(timestamp: f64) -> Result<Date> {
+    pub(crate) fn from_rfc3339(date: &str) -> Result<Self> {
+        let date = DateTime::parse_from_rfc3339(date).map_err(|_| Error::InvalidData)?;
+        Ok(Date {
+            inner: date.with_timezone(&Utc),
+        })
+    }
+
+    pub(crate) fn to_rfc3339(&self) -> String {
+        format!("{:?}", self.inner)
+    }
+
+    pub(crate) fn from_seconds_since_plist_epoch(timestamp: f64) -> Result<Date> {
         // Seconds since 1/1/2001 00:00:00.
 
         if timestamp.is_nan() {
@@ -37,32 +46,22 @@ impl Date {
 
         Ok(Date { inner: date })
     }
-}
 
-impl From<DateTime<Utc>> for Date {
-    fn from(date: DateTime<Utc>) -> Self {
+    #[cfg(test)]
+    pub(crate) fn from_chrono(date: DateTime<Utc>) -> Date {
         Date { inner: date }
     }
 }
 
-impl Into<DateTime<Utc>> for Date {
-    fn into(self) -> DateTime<Utc> {
-        self.inner
+impl From<SystemTime> for Date {
+    fn from(date: SystemTime) -> Self {
+        Date { inner: date.into() }
     }
 }
 
-impl fmt::Display for Date {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "{:?}", self.inner)
-    }
-}
-
-impl FromStr for Date {
-    type Err = ();
-
-    fn from_str(s: &str) -> ::std::result::Result<Self, Self::Err> {
-        let date = DateTime::parse_from_rfc3339(s).map_err(|_| ())?;
-        Ok(Date { inner: date.with_timezone(&Utc) })
+impl Into<SystemTime> for Date {
+    fn into(self) -> SystemTime {
+        self.inner.into()
     }
 }
 
@@ -71,7 +70,6 @@ pub mod serde_impls {
     use serde_base::de::{Deserialize, Deserializer, Error, Visitor, Unexpected};
     use serde_base::ser::{Serialize, Serializer};
     use std::fmt;
-    use std::str::FromStr;
 
     use Date;
 
@@ -81,7 +79,7 @@ pub mod serde_impls {
         fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
             where S: Serializer
         {
-            let date_str = self.to_string();
+            let date_str = self.to_rfc3339();
             serializer.serialize_newtype_struct(DATE_NEWTYPE_STRUCT_NAME, &date_str)
         }
     }
@@ -114,7 +112,7 @@ pub mod serde_impls {
         fn visit_str<E>(self, v: &str) -> Result<Self::Value, E>
             where E: Error
         {
-            Date::from_str(v).map_err(|_| E::invalid_value(Unexpected::Str(v), &self))
+            Date::from_rfc3339(v).map_err(|_| E::invalid_value(Unexpected::Str(v), &self))
         }
     }
 

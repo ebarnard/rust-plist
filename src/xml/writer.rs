@@ -166,7 +166,7 @@ impl<W: Write> PlistEventWriter for EventWriter<W> {
                 self.write_element_and_value("data", &base64_data)?;
             }
             PlistEvent::DateValue(ref value) => {
-                self.write_element_and_value("date", &value.to_string())?
+                self.write_element_and_value("date", &value.to_rfc3339())?
             }
             PlistEvent::IntegerValue(ref value) => {
                 self.write_element_and_value("integer", &value.to_string())?
@@ -190,6 +190,7 @@ mod tests {
     use chrono::{TimeZone, Utc};
     use std::io::Cursor;
 
+    use Date;
     use super::*;
 
     #[test]
@@ -211,7 +212,7 @@ mod tests {
                       StringValue("Data".to_owned()),
                       DataValue(vec![0, 0, 0, 190, 0, 0, 0, 3, 0, 0, 0, 30, 0, 0, 0]),
                       StringValue("Birthdate".to_owned()),
-                      DateValue(Utc.ymd(1981, 05, 16).and_hms(11, 32, 06).into()),
+                      DateValue(Date::from_chrono(Utc.ymd(1981, 05, 16).and_hms(11, 32, 06))),
                       EndDictionary];
 
         let mut cursor = Cursor::new(Vec::new());
