@@ -1,10 +1,12 @@
 use chrono::{DateTime, Duration, TimeZone, Utc};
+use std::fmt;
+use std::result::Result as StdResult;
 use std::time::SystemTime;
 
 use {Error, Result};
 
 /// A UTC timestamp. Used for serialization to and from the plist date type.
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, PartialEq)]
 pub struct Date {
     inner: DateTime<Utc>,
 }
@@ -52,6 +54,12 @@ impl Date {
     #[cfg(test)]
     pub(crate) fn from_chrono(date: DateTime<Utc>) -> Date {
         Date { inner: date }
+    }
+}
+
+impl fmt::Debug for Date {
+    fn fmt(&self, f: &mut fmt::Formatter) -> StdResult<(), fmt::Error> {
+        self.inner.fmt(f)
     }
 }
 
