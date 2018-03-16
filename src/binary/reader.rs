@@ -1,9 +1,9 @@
 use byteorder::{BigEndian, ReadBytesExt};
 use std::io::{Read, Seek, SeekFrom};
 use std::mem::size_of;
-use std::string::{FromUtf8Error, FromUtf16Error};
+use std::string::{FromUtf16Error, FromUtf8Error};
 
-use {Date, Error, Result, PlistEvent, u64_to_usize};
+use {Date, Error, PlistEvent, Result, u64_to_usize};
 
 impl From<FromUtf8Error> for Error {
     fn from(_: FromUtf8Error) -> Error {
@@ -90,13 +90,13 @@ impl<R: Read + Seek> EventReader<R> {
         let offset_size = self.reader.read_u8()?;
         match offset_size {
             1 | 2 | 4 | 8 => (),
-            _ => return Err(Error::InvalidData)
+            _ => return Err(Error::InvalidData),
         }
 
         self.ref_size = self.reader.read_u8()?;
         match self.ref_size {
             1 | 2 | 4 | 8 => (),
-            _ => return Err(Error::InvalidData)
+            _ => return Err(Error::InvalidData),
         }
 
         let num_objects = self.reader.read_u64::<BigEndian>()?;
@@ -166,7 +166,9 @@ impl<R: Read + Seek> EventReader<R> {
 
     fn seek_to_object(&mut self, object_ref: u64) -> Result<u64> {
         let object_ref = u64_to_usize(object_ref)?;
-        let offset = *self.object_offsets.get(object_ref).ok_or(Error::InvalidData)?;
+        let offset = *self.object_offsets
+            .get(object_ref)
+            .ok_or(Error::InvalidData)?;
         Ok(self.reader.seek(SeekFrom::Start(offset))?)
     }
 
@@ -212,8 +214,12 @@ impl<R: Read + Seek> EventReader<R> {
             (0x0, 0x09) => Some(PlistEvent::BooleanValue(true)),
             (0x0, 0x0f) => return Err(Error::InvalidData), // fill
             (0x1, 0) => Some(PlistEvent::IntegerValue(self.reader.read_u8()? as i64)),
-            (0x1, 1) => Some(PlistEvent::IntegerValue(self.reader.read_u16::<BigEndian>()? as i64)),
-            (0x1, 2) => Some(PlistEvent::IntegerValue(self.reader.read_u32::<BigEndian>()? as i64)),
+            (0x1, 1) => Some(PlistEvent::IntegerValue(
+                self.reader.read_u16::<BigEndian>()? as i64,
+            )),
+            (0x1, 2) => Some(PlistEvent::IntegerValue(
+                self.reader.read_u32::<BigEndian>()? as i64,
+            )),
             (0x1, 3) => Some(PlistEvent::IntegerValue(self.reader.read_i64::<BigEndian>()?)),
             (0x1, 4) => return Err(Error::InvalidData), // 128 bit int
             (0x1, _) => return Err(Error::InvalidData), // variable length int
@@ -223,7 +229,9 @@ impl<R: Read + Seek> EventReader<R> {
             (0x3, 3) => {
                 // Date. Seconds since 1/1/2001 00:00:00.
                 let secs = self.reader.read_f64::<BigEndian>()?;
-                Some(PlistEvent::DateValue(Date::from_seconds_since_plist_epoch(secs)?))
+                Some(PlistEvent::DateValue(
+                    Date::from_seconds_since_plist_epoch(secs)?,
+                ))
             }
             (0x4, n) => {
                 // Data
@@ -335,23 +343,25 @@ mod tests {
         let streaming_parser = EventReader::new(reader);
         let events: Vec<PlistEvent> = streaming_parser.map(|e| e.unwrap()).collect();
 
-        let comparison = &[StartDictionary(Some(6)),
-                           StringValue("Lines".to_owned()),
-                           StartArray(Some(2)),
-                           StringValue("It is a tale told by an idiot,".to_owned()),
-                           StringValue("Full of sound and fury, signifying nothing.".to_owned()),
-                           EndArray,
-                           StringValue("Death".to_owned()),
-                           IntegerValue(1564),
-                           StringValue("Height".to_owned()),
-                           RealValue(1.60),
-                           StringValue("Birthdate".to_owned()),
-                           DateValue(Date::from_chrono(Utc.ymd(1981, 05, 16).and_hms(11, 32, 06))),
-                           StringValue("Author".to_owned()),
-                           StringValue("William Shakespeare".to_owned()),
-                           StringValue("Data".to_owned()),
-                           DataValue(vec![0, 0, 0, 190, 0, 0, 0, 3, 0, 0, 0, 30, 0, 0, 0]),
-                           EndDictionary];
+        let comparison = &[
+            StartDictionary(Some(6)),
+            StringValue("Lines".to_owned()),
+            StartArray(Some(2)),
+            StringValue("It is a tale told by an idiot,".to_owned()),
+            StringValue("Full of sound and fury, signifying nothing.".to_owned()),
+            EndArray,
+            StringValue("Death".to_owned()),
+            IntegerValue(1564),
+            StringValue("Height".to_owned()),
+            RealValue(1.60),
+            StringValue("Birthdate".to_owned()),
+            DateValue(Date::from_chrono(Utc.ymd(1981, 05, 16).and_hms(11, 32, 06))),
+            StringValue("Author".to_owned()),
+            StringValue("William Shakespeare".to_owned()),
+            StringValue("Data".to_owned()),
+            DataValue(vec![0, 0, 0, 190, 0, 0, 0, 3, 0, 0, 0, 30, 0, 0, 0]),
+            EndDictionary,
+        ];
 
         assert_eq!(events, comparison);
     }

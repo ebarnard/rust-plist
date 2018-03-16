@@ -42,7 +42,9 @@ impl Date {
         let dur = dur + Duration::nanoseconds(submilli_nanos as i64);
 
         let plist_epoch = Utc.ymd(2001, 1, 1).and_hms(0, 0, 0);
-        let date = plist_epoch.checked_add_signed(dur).ok_or(Error::InvalidData)?;
+        let date = plist_epoch
+            .checked_add_signed(dur)
+            .ok_or(Error::InvalidData)?;
 
         Ok(Date { inner: date })
     }
@@ -67,7 +69,7 @@ impl Into<SystemTime> for Date {
 
 #[cfg(feature = "serde")]
 pub mod serde_impls {
-    use serde_base::de::{Deserialize, Deserializer, Error, Visitor, Unexpected};
+    use serde_base::de::{Deserialize, Deserializer, Error, Unexpected, Visitor};
     use serde_base::ser::{Serialize, Serializer};
     use std::fmt;
 
@@ -77,7 +79,8 @@ pub mod serde_impls {
 
     impl Serialize for Date {
         fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-            where S: Serializer
+        where
+            S: Serializer,
         {
             let date_str = self.to_rfc3339();
             serializer.serialize_newtype_struct(DATE_NEWTYPE_STRUCT_NAME, &date_str)
@@ -94,7 +97,8 @@ pub mod serde_impls {
         }
 
         fn visit_newtype_struct<D>(self, deserializer: D) -> Result<Self::Value, D::Error>
-            where D: Deserializer<'de>
+        where
+            D: Deserializer<'de>,
         {
             deserializer.deserialize_str(DateStrVisitor)
         }
@@ -110,7 +114,8 @@ pub mod serde_impls {
         }
 
         fn visit_str<E>(self, v: &str) -> Result<Self::Value, E>
-            where E: Error
+        where
+            E: Error,
         {
             Date::from_rfc3339(v).map_err(|_| E::invalid_value(Unexpected::Str(v), &self))
         }
@@ -118,7 +123,8 @@ pub mod serde_impls {
 
     impl<'de> Deserialize<'de> for Date {
         fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-            where D: Deserializer<'de>
+        where
+            D: Deserializer<'de>,
         {
             deserializer.deserialize_newtype_struct(DATE_NEWTYPE_STRUCT_NAME, DateNewtypeVisitor)
         }

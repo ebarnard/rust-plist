@@ -3,7 +3,7 @@ use std::io::Read;
 use std::str::FromStr;
 use xml_rs::reader::{EventReader as XmlEventReader, ParserConfig, XmlEvent};
 
-use {Date, Error, Result, PlistEvent};
+use {Date, Error, PlistEvent, Result};
 
 pub struct EventReader<R: Read> {
     xml_reader: XmlEventReader<R>,
@@ -30,7 +30,8 @@ impl<R: Read> EventReader<R> {
     }
 
     fn read_content<F>(&mut self, f: F) -> Result<PlistEvent>
-        where F: FnOnce(String) -> Result<PlistEvent>
+    where
+        F: FnOnce(String) -> Result<PlistEvent>,
     {
         match self.xml_reader.next() {
             Ok(XmlEvent::Characters(s)) => f(s),
@@ -66,7 +67,8 @@ impl<R: Read> EventReader<R> {
                         "false" => return Some(Ok(PlistEvent::BooleanValue(false))),
                         "data" => {
                             return Some(self.read_content(|s| {
-                                let data = base64::decode_config(&s, base64::MIME).map_err(|_| Error::InvalidData)?;
+                                let data = base64::decode_config(&s, base64::MIME)
+                                    .map_err(|_| Error::InvalidData)?;
                                 Ok(PlistEvent::DataValue(data))
                             }))
                         }
@@ -161,25 +163,27 @@ mod tests {
         let streaming_parser = EventReader::new(reader);
         let events: Vec<PlistEvent> = streaming_parser.map(|e| e.unwrap()).collect();
 
-        let comparison = &[StartDictionary(None),
-                           StringValue("Author".to_owned()),
-                           StringValue("William Shakespeare".to_owned()),
-                           StringValue("Lines".to_owned()),
-                           StartArray(None),
-                           StringValue("It is a tale told by an idiot,".to_owned()),
-                           StringValue("Full of sound and fury, signifying nothing.".to_owned()),
-                           EndArray,
-                           StringValue("Death".to_owned()),
-                           IntegerValue(1564),
-                           StringValue("Height".to_owned()),
-                           RealValue(1.60),
-                           StringValue("Data".to_owned()),
-                           DataValue(vec![0, 0, 0, 190, 0, 0, 0, 3, 0, 0, 0, 30, 0, 0, 0]),
-                           StringValue("Birthdate".to_owned()),
-                           DateValue(Date::from_chrono(Utc.ymd(1981, 05, 16).and_hms(11, 32, 06))),
-                           StringValue("Blank".to_owned()),
-                           StringValue("".to_owned()),
-                           EndDictionary];
+        let comparison = &[
+            StartDictionary(None),
+            StringValue("Author".to_owned()),
+            StringValue("William Shakespeare".to_owned()),
+            StringValue("Lines".to_owned()),
+            StartArray(None),
+            StringValue("It is a tale told by an idiot,".to_owned()),
+            StringValue("Full of sound and fury, signifying nothing.".to_owned()),
+            EndArray,
+            StringValue("Death".to_owned()),
+            IntegerValue(1564),
+            StringValue("Height".to_owned()),
+            RealValue(1.60),
+            StringValue("Data".to_owned()),
+            DataValue(vec![0, 0, 0, 190, 0, 0, 0, 3, 0, 0, 0, 30, 0, 0, 0]),
+            StringValue("Birthdate".to_owned()),
+            DateValue(Date::from_chrono(Utc.ymd(1981, 05, 16).and_hms(11, 32, 06))),
+            StringValue("Blank".to_owned()),
+            StringValue("".to_owned()),
+            EndDictionary,
+        ];
 
         assert_eq!(events, comparison);
     }

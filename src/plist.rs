@@ -22,7 +22,8 @@ impl Plist {
     }
 
     pub fn from_events<T>(events: T) -> Result<Plist>
-        where T: IntoIterator<Item = Result<PlistEvent>>
+    where
+        T: IntoIterator<Item = Result<PlistEvent>>,
     {
         let iter = events.into_iter();
         let builder = builder::Builder::new(iter);
@@ -356,8 +357,10 @@ mod tests {
 
         let slice: &[u8] = &[1, 2, 3];
         assert_eq!(Plist::Data(slice.to_vec()).as_data(), Some(slice));
-        assert_eq!(Plist::Data(slice.to_vec()).into_data(),
-                   Some(slice.to_vec()));
+        assert_eq!(
+            Plist::Data(slice.to_vec()).into_data(),
+            Some(slice.to_vec())
+        );
 
         let date: Date = SystemTime::now().into();
         assert_eq!(Plist::Date(date.clone()).as_date(), Some(&date));
@@ -365,7 +368,9 @@ mod tests {
         assert_eq!(Plist::Real(0.0).as_real(), Some(0.0));
         assert_eq!(Plist::Integer(1).as_integer(), Some(1));
         assert_eq!(Plist::String("2".to_owned()).as_string(), Some("2"));
-        assert_eq!(Plist::String("t".to_owned()).into_string(),
-                   Some("t".to_owned()));
+        assert_eq!(
+            Plist::String("t".to_owned()).into_string(),
+            Some("t".to_owned())
+        );
     }
 }

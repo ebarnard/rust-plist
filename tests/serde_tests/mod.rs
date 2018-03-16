@@ -1,5 +1,5 @@
 use plist::{Date, EventWriter, PlistEvent, Result as PlistResult};
-use plist::serde::{Serializer, Deserializer};
+use plist::serde::{Deserializer, Serializer};
 use plist::PlistEvent::*;
 use serde::de::DeserializeOwned;
 use serde::ser::Serialize;
@@ -37,7 +37,8 @@ fn new_deserializer(events: Vec<PlistEvent>) -> Deserializer<Vec<PlistResult<Pli
 }
 
 fn assert_roundtrip<T>(obj: T, comparison: Option<&[PlistEvent]>)
-    where T: Debug + DeserializeOwned + PartialEq + Serialize
+where
+    T: Debug + DeserializeOwned + PartialEq + Serialize,
 {
     let mut se = new_serializer();
 
@@ -84,74 +85,81 @@ struct DogInner {
 fn cow() {
     let cow = Animal::Cow;
 
-    let comparison = &[StartDictionary(Some(1)),
-                       StringValue("Cow".to_owned()),
-                       StringValue("".to_owned()),
-                       EndDictionary];
+    let comparison = &[
+        StartDictionary(Some(1)),
+        StringValue("Cow".to_owned()),
+        StringValue("".to_owned()),
+        EndDictionary,
+    ];
 
     assert_roundtrip(cow, Some(comparison));
 }
 
-
 #[test]
 fn dog() {
     let dog = Animal::Dog(DogOuter {
-        inner: vec![DogInner {
-                        a: (),
-                        b: 12,
-                        c: vec!["a".to_string(), "b".to_string()],
-                    }],
+        inner: vec![
+            DogInner {
+                a: (),
+                b: 12,
+                c: vec!["a".to_string(), "b".to_string()],
+            },
+        ],
     });
 
-    let comparison = &[StartDictionary(Some(1)),
-                       StringValue("Dog".to_owned()),
-                       StartDictionary(None),
-                       StringValue("inner".to_owned()),
-                       StartArray(Some(1)),
-                       StartDictionary(None),
-                       StringValue("a".to_owned()),
-                       StringValue("".to_owned()),
-                       StringValue("b".to_owned()),
-                       IntegerValue(12),
-                       StringValue("c".to_owned()),
-                       StartArray(Some(2)),
-                       StringValue("a".to_owned()),
-                       StringValue("b".to_owned()),
-                       EndArray,
-                       EndDictionary,
-                       EndArray,
-                       EndDictionary,
-                       EndDictionary];
+    let comparison = &[
+        StartDictionary(Some(1)),
+        StringValue("Dog".to_owned()),
+        StartDictionary(None),
+        StringValue("inner".to_owned()),
+        StartArray(Some(1)),
+        StartDictionary(None),
+        StringValue("a".to_owned()),
+        StringValue("".to_owned()),
+        StringValue("b".to_owned()),
+        IntegerValue(12),
+        StringValue("c".to_owned()),
+        StartArray(Some(2)),
+        StringValue("a".to_owned()),
+        StringValue("b".to_owned()),
+        EndArray,
+        EndDictionary,
+        EndArray,
+        EndDictionary,
+        EndDictionary,
+    ];
 
     assert_roundtrip(dog, Some(comparison));
 }
 
-
 #[test]
 fn frog() {
-    let frog = Animal::Frog(Ok("hello".to_owned()),
-                            vec![1.0, 2.0, 3.14159, 0.000000001, 1.27e31]);
+    let frog = Animal::Frog(
+        Ok("hello".to_owned()),
+        vec![1.0, 2.0, 3.14159, 0.000000001, 1.27e31],
+    );
 
-    let comparison = &[StartDictionary(Some(1)),
-                       StringValue("Frog".to_owned()),
-                       StartArray(Some(2)),
-                       StartDictionary(Some(1)),
-                       StringValue("Ok".to_owned()),
-                       StringValue("hello".to_owned()),
-                       EndDictionary,
-                       StartArray(Some(5)),
-                       RealValue(1.0),
-                       RealValue(2.0),
-                       RealValue(3.14159),
-                       RealValue(0.000000001),
-                       RealValue(1.27e31),
-                       EndArray,
-                       EndArray,
-                       EndDictionary];
+    let comparison = &[
+        StartDictionary(Some(1)),
+        StringValue("Frog".to_owned()),
+        StartArray(Some(2)),
+        StartDictionary(Some(1)),
+        StringValue("Ok".to_owned()),
+        StringValue("hello".to_owned()),
+        EndDictionary,
+        StartArray(Some(5)),
+        RealValue(1.0),
+        RealValue(2.0),
+        RealValue(3.14159),
+        RealValue(0.000000001),
+        RealValue(1.27e31),
+        EndArray,
+        EndArray,
+        EndDictionary,
+    ];
 
     assert_roundtrip(frog, Some(comparison));
 }
-
 
 #[test]
 fn cat() {
@@ -161,27 +169,29 @@ fn cat() {
         firmware: Some(vec![0, 1, 2, 3, 4, 5, 6, 7, 8]),
     };
 
-    let comparison = &[StartDictionary(Some(1)),
-                       StringValue("Cat".to_owned()),
-                       StartDictionary(None),
-                       StringValue("age".to_owned()),
-                       IntegerValue(12),
-                       StringValue("name".to_owned()),
-                       StringValue("Paws".to_owned()),
-                       StringValue("firmware".to_owned()),
-                       StartArray(Some(9)),
-                       IntegerValue(0),
-                       IntegerValue(1),
-                       IntegerValue(2),
-                       IntegerValue(3),
-                       IntegerValue(4),
-                       IntegerValue(5),
-                       IntegerValue(6),
-                       IntegerValue(7),
-                       IntegerValue(8),
-                       EndArray,
-                       EndDictionary,
-                       EndDictionary];
+    let comparison = &[
+        StartDictionary(Some(1)),
+        StringValue("Cat".to_owned()),
+        StartDictionary(None),
+        StringValue("age".to_owned()),
+        IntegerValue(12),
+        StringValue("name".to_owned()),
+        StringValue("Paws".to_owned()),
+        StringValue("firmware".to_owned()),
+        StartArray(Some(9)),
+        IntegerValue(0),
+        IntegerValue(1),
+        IntegerValue(2),
+        IntegerValue(3),
+        IntegerValue(4),
+        IntegerValue(5),
+        IntegerValue(6),
+        IntegerValue(7),
+        IntegerValue(8),
+        EndArray,
+        EndDictionary,
+        EndDictionary,
+    ];
 
     assert_roundtrip(cat, Some(comparison));
 }
@@ -196,11 +206,13 @@ struct NewtypeInner(u8, u8, u8);
 fn newtype_struct() {
     let newtype = NewtypeStruct(NewtypeInner(34, 32, 13));
 
-    let comparison = &[StartArray(Some(3)),
-                       IntegerValue(34),
-                       IntegerValue(32),
-                       IntegerValue(13),
-                       EndArray];
+    let comparison = &[
+        StartArray(Some(3)),
+        IntegerValue(34),
+        IntegerValue(32),
+        IntegerValue(13),
+        EndArray,
+    ];
 
     assert_roundtrip(newtype, Some(comparison));
 }
@@ -226,15 +238,17 @@ fn type_with_options() {
         c: Some(Box::new(inner)),
     };
 
-    let comparison = &[StartDictionary(None),
-                       StringValue("a".to_owned()),
-                       StringValue("hello".to_owned()),
-                       StringValue("c".to_owned()),
-                       StartDictionary(None),
-                       StringValue("b".to_owned()),
-                       IntegerValue(12),
-                       EndDictionary,
-                       EndDictionary];
+    let comparison = &[
+        StartDictionary(None),
+        StringValue("a".to_owned()),
+        StringValue("hello".to_owned()),
+        StringValue("c".to_owned()),
+        StartDictionary(None),
+        StringValue("b".to_owned()),
+        IntegerValue(12),
+        EndDictionary,
+        EndDictionary,
+    ];
 
     assert_roundtrip(obj, Some(comparison));
 }
@@ -254,12 +268,14 @@ fn type_with_date() {
         b: Some(date.clone()),
     };
 
-    let comparison = &[StartDictionary(None),
-                       StringValue("a".to_owned()),
-                       IntegerValue(28),
-                       StringValue("b".to_owned()),
-                       DateValue(date),
-                       EndDictionary];
+    let comparison = &[
+        StartDictionary(None),
+        StringValue("a".to_owned()),
+        IntegerValue(28),
+        StringValue("b".to_owned()),
+        DateValue(date),
+        EndDictionary,
+    ];
 
     assert_roundtrip(obj, Some(comparison));
 }

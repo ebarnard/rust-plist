@@ -4,7 +4,7 @@ use std::io::Write;
 use xml_rs::attribute::Attribute;
 use xml_rs::name::Name;
 use xml_rs::namespace::Namespace;
-use xml_rs::writer::{Error as XmlWriterError, EventWriter as XmlEventWriter, EmitterConfig};
+use xml_rs::writer::{EmitterConfig, Error as XmlWriterError, EventWriter as XmlEventWriter};
 use xml_rs::writer::events::XmlEvent as WriteXmlEvent;
 
 use {Error, EventWriter as PlistEventWriter, PlistEvent, Result};
@@ -72,7 +72,9 @@ impl<W: Write> EventWriter<W> {
     }
 
     fn end_element(&mut self, name: &str) -> Result<()> {
-        self.xml_writer.write(WriteXmlEvent::EndElement { name: Some(Name::local(name)) })?;
+        self.xml_writer.write(WriteXmlEvent::EndElement {
+            name: Some(Name::local(name)),
+        })?;
         Ok(())
     }
 
@@ -105,7 +107,8 @@ impl<W: Write> PlistEventWriter for EventWriter<W> {
                 match *event {
                     PlistEvent::StringValue(ref value) => {
                         self.write_element_and_value("key", &*value)?;
-                        self.stack.push(Element::Dictionary(DictionaryState::ExpectValue));
+                        self.stack
+                            .push(Element::Dictionary(DictionaryState::ExpectValue));
                     }
                     PlistEvent::EndDictionary => {
                         self.end_element("dict")?;
@@ -116,9 +119,8 @@ impl<W: Write> PlistEventWriter for EventWriter<W> {
                 };
                 return Ok(());
             }
-            Some(Element::Dictionary(DictionaryState::ExpectValue)) => {
-                self.stack.push(Element::Dictionary(DictionaryState::ExpectKey))
-            }
+            Some(Element::Dictionary(DictionaryState::ExpectValue)) => self.stack
+                .push(Element::Dictionary(DictionaryState::ExpectKey)),
             Some(other) => self.stack.push(other),
             None => {
                 let version_name = Name::local("version");
@@ -149,7 +151,8 @@ impl<W: Write> PlistEventWriter for EventWriter<W> {
 
             PlistEvent::StartDictionary(_) => {
                 self.start_element("dict")?;
-                self.stack.push(Element::Dictionary(DictionaryState::ExpectKey));
+                self.stack
+                    .push(Element::Dictionary(DictionaryState::ExpectKey));
             }
             PlistEvent::EndDictionary => return Err(Error::InvalidData),
 
@@ -174,9 +177,7 @@ impl<W: Write> PlistEventWriter for EventWriter<W> {
             PlistEvent::RealValue(ref value) => {
                 self.write_element_and_value("real", &value.to_string())?
             }
-            PlistEvent::StringValue(ref value) => {
-                self.write_element_and_value("string", &*value)?
-            }
+            PlistEvent::StringValue(ref value) => self.write_element_and_value("string", &*value)?,
         };
 
         self.maybe_end_plist()?;
@@ -197,23 +198,25 @@ mod tests {
     fn streaming_parser() {
         use PlistEvent::*;
 
-        let plist = &[StartDictionary(None),
-                      StringValue("Author".to_owned()),
-                      StringValue("William Shakespeare".to_owned()),
-                      StringValue("Lines".to_owned()),
-                      StartArray(None),
-                      StringValue("It is a tale told by an idiot,".to_owned()),
-                      StringValue("Full of sound and fury, signifying nothing.".to_owned()),
-                      EndArray,
-                      StringValue("Death".to_owned()),
-                      IntegerValue(1564),
-                      StringValue("Height".to_owned()),
-                      RealValue(1.60),
-                      StringValue("Data".to_owned()),
-                      DataValue(vec![0, 0, 0, 190, 0, 0, 0, 3, 0, 0, 0, 30, 0, 0, 0]),
-                      StringValue("Birthdate".to_owned()),
-                      DateValue(Date::from_chrono(Utc.ymd(1981, 05, 16).and_hms(11, 32, 06))),
-                      EndDictionary];
+        let plist = &[
+            StartDictionary(None),
+            StringValue("Author".to_owned()),
+            StringValue("William Shakespeare".to_owned()),
+            StringValue("Lines".to_owned()),
+            StartArray(None),
+            StringValue("It is a tale told by an idiot,".to_owned()),
+            StringValue("Full of sound and fury, signifying nothing.".to_owned()),
+            EndArray,
+            StringValue("Death".to_owned()),
+            IntegerValue(1564),
+            StringValue("Height".to_owned()),
+            RealValue(1.60),
+            StringValue("Data".to_owned()),
+            DataValue(vec![0, 0, 0, 190, 0, 0, 0, 3, 0, 0, 0, 30, 0, 0, 0]),
+            StringValue("Birthdate".to_owned()),
+            DateValue(Date::from_chrono(Utc.ymd(1981, 05, 16).and_hms(11, 32, 06))),
+            EndDictionary,
+        ];
 
         let mut cursor = Cursor::new(Vec::new());
 

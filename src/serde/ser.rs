@@ -130,21 +130,23 @@ impl<'a, W: EventWriter> ser::Serializer for &'a mut Serializer<W> {
         self.serialize_unit()
     }
 
-    fn serialize_unit_variant(self,
-                              _name: &'static str,
-                              _variant_index: u32,
-                              variant: &'static str)
-                              -> Result<(), Self::Error> {
+    fn serialize_unit_variant(
+        self,
+        _name: &'static str,
+        _variant_index: u32,
+        variant: &'static str,
+    ) -> Result<(), Self::Error> {
         self.single_key_dict(variant.to_owned())?;
         self.serialize_unit()?;
         self.single_key_dict_end()?;
         Ok(())
     }
 
-    fn serialize_newtype_struct<T: ?Sized + ser::Serialize>(self,
-                                                            name: &'static str,
-                                                            value: &T)
-                                                            -> Result<(), Self::Error> {
+    fn serialize_newtype_struct<T: ?Sized + ser::Serialize>(
+        self,
+        name: &'static str,
+        value: &T,
+    ) -> Result<(), Self::Error> {
         if name == DATE_NEWTYPE_STRUCT_NAME {
             value.serialize(DateSerializer { ser: &mut *self })
         } else {
@@ -152,12 +154,13 @@ impl<'a, W: EventWriter> ser::Serializer for &'a mut Serializer<W> {
         }
     }
 
-    fn serialize_newtype_variant<T: ?Sized + ser::Serialize>(self,
-                                                             _name: &'static str,
-                                                             _variant_index: u32,
-                                                             variant: &'static str,
-                                                             value: &T)
-                                                             -> Result<(), Self::Error> {
+    fn serialize_newtype_variant<T: ?Sized + ser::Serialize>(
+        self,
+        _name: &'static str,
+        _variant_index: u32,
+        variant: &'static str,
+        value: &T,
+    ) -> Result<(), Self::Error> {
         self.single_key_dict(variant.to_owned())?;
         value.serialize(&mut *self)?;
         self.single_key_dict_end()
@@ -173,19 +176,21 @@ impl<'a, W: EventWriter> ser::Serializer for &'a mut Serializer<W> {
         self.serialize_seq(Some(len))
     }
 
-    fn serialize_tuple_struct(self,
-                              _name: &'static str,
-                              len: usize)
-                              -> Result<Self::SerializeTupleStruct, Self::Error> {
+    fn serialize_tuple_struct(
+        self,
+        _name: &'static str,
+        len: usize,
+    ) -> Result<Self::SerializeTupleStruct, Self::Error> {
         self.serialize_tuple(len)
     }
 
-    fn serialize_tuple_variant(self,
-                               _name: &'static str,
-                               _variant_index: u32,
-                               variant: &'static str,
-                               len: usize)
-                               -> Result<Self::SerializeTupleVariant, Self::Error> {
+    fn serialize_tuple_variant(
+        self,
+        _name: &'static str,
+        _variant_index: u32,
+        variant: &'static str,
+        len: usize,
+    ) -> Result<Self::SerializeTupleVariant, Self::Error> {
         self.single_key_dict(variant.to_owned())?;
         self.serialize_tuple(len)
     }
@@ -196,20 +201,22 @@ impl<'a, W: EventWriter> ser::Serializer for &'a mut Serializer<W> {
         Ok(Compound { ser: self })
     }
 
-    fn serialize_struct(self,
-                        _name: &'static str,
-                        _len: usize)
-                        -> Result<Self::SerializeStruct, Self::Error> {
+    fn serialize_struct(
+        self,
+        _name: &'static str,
+        _len: usize,
+    ) -> Result<Self::SerializeStruct, Self::Error> {
         // The number of struct fields is not known as fields with None values are ignored.
         self.serialize_map(None)
     }
 
-    fn serialize_struct_variant(self,
-                                name: &'static str,
-                                _variant_index: u32,
-                                variant: &'static str,
-                                len: usize)
-                                -> Result<Self::SerializeStructVariant, Self::Error> {
+    fn serialize_struct_variant(
+        self,
+        name: &'static str,
+        _variant_index: u32,
+        variant: &'static str,
+        len: usize,
+    ) -> Result<Self::SerializeStructVariant, Self::Error> {
         self.single_key_dict(variant.to_owned())?;
         self.serialize_struct(name, len)
     }
@@ -223,7 +230,8 @@ struct StructFieldSerializer<'a, W: 'a + EventWriter> {
 impl<'a, W: EventWriter> StructFieldSerializer<'a, W> {
     fn use_ser(self) -> Result<&'a mut Serializer<W>, Error> {
         // We are going to serialize something so write the struct field name.
-        self.ser.emit(PlistEvent::StringValue(self.field_name.to_owned()))?;
+        self.ser
+            .emit(PlistEvent::StringValue(self.field_name.to_owned()))?;
         Ok(self.ser)
     }
 }
@@ -314,28 +322,33 @@ impl<'a, W: EventWriter> ser::Serializer for StructFieldSerializer<'a, W> {
         self.use_ser()?.serialize_unit_struct(name)
     }
 
-    fn serialize_unit_variant(self,
-                              name: &'static str,
-                              variant_index: u32,
-                              variant: &'static str)
-                              -> Result<(), Self::Error> {
-        self.use_ser()?.serialize_unit_variant(name, variant_index, variant)
+    fn serialize_unit_variant(
+        self,
+        name: &'static str,
+        variant_index: u32,
+        variant: &'static str,
+    ) -> Result<(), Self::Error> {
+        self.use_ser()?
+            .serialize_unit_variant(name, variant_index, variant)
     }
 
-    fn serialize_newtype_struct<T: ?Sized + ser::Serialize>(self,
-                                                            name: &'static str,
-                                                            value: &T)
-                                                            -> Result<(), Self::Error> {
+    fn serialize_newtype_struct<T: ?Sized + ser::Serialize>(
+        self,
+        name: &'static str,
+        value: &T,
+    ) -> Result<(), Self::Error> {
         self.use_ser()?.serialize_newtype_struct(name, value)
     }
 
-    fn serialize_newtype_variant<T: ?Sized + ser::Serialize>(self,
-                                                             name: &'static str,
-                                                             variant_index: u32,
-                                                             variant: &'static str,
-                                                             value: &T)
-                                                             -> Result<(), Self::Error> {
-        self.use_ser()?.serialize_newtype_variant(name, variant_index, variant, value)
+    fn serialize_newtype_variant<T: ?Sized + ser::Serialize>(
+        self,
+        name: &'static str,
+        variant_index: u32,
+        variant: &'static str,
+        value: &T,
+    ) -> Result<(), Self::Error> {
+        self.use_ser()?
+            .serialize_newtype_variant(name, variant_index, variant, value)
     }
 
     fn serialize_seq(self, len: Option<usize>) -> Result<Self::SerializeSeq, Self::Error> {
@@ -346,40 +359,46 @@ impl<'a, W: EventWriter> ser::Serializer for StructFieldSerializer<'a, W> {
         self.use_ser()?.serialize_tuple(len)
     }
 
-    fn serialize_tuple_struct(self,
-                              name: &'static str,
-                              len: usize)
-                              -> Result<Self::SerializeTupleStruct, Self::Error> {
+    fn serialize_tuple_struct(
+        self,
+        name: &'static str,
+        len: usize,
+    ) -> Result<Self::SerializeTupleStruct, Self::Error> {
         self.use_ser()?.serialize_tuple_struct(name, len)
     }
 
-    fn serialize_tuple_variant(self,
-                               name: &'static str,
-                               variant_index: u32,
-                               variant: &'static str,
-                               len: usize)
-                               -> Result<Self::SerializeTupleVariant, Self::Error> {
-        self.use_ser()?.serialize_tuple_variant(name, variant_index, variant, len)
+    fn serialize_tuple_variant(
+        self,
+        name: &'static str,
+        variant_index: u32,
+        variant: &'static str,
+        len: usize,
+    ) -> Result<Self::SerializeTupleVariant, Self::Error> {
+        self.use_ser()?
+            .serialize_tuple_variant(name, variant_index, variant, len)
     }
 
     fn serialize_map(self, len: Option<usize>) -> Result<Self::SerializeMap, Self::Error> {
         self.use_ser()?.serialize_map(len)
     }
 
-    fn serialize_struct(self,
-                        name: &'static str,
-                        len: usize)
-                        -> Result<Self::SerializeStruct, Self::Error> {
+    fn serialize_struct(
+        self,
+        name: &'static str,
+        len: usize,
+    ) -> Result<Self::SerializeStruct, Self::Error> {
         self.use_ser()?.serialize_struct(name, len)
     }
 
-    fn serialize_struct_variant(self,
-                                name: &'static str,
-                                variant_index: u32,
-                                variant: &'static str,
-                                len: usize)
-                                -> Result<Self::SerializeStructVariant, Self::Error> {
-        self.use_ser()?.serialize_struct_variant(name, variant_index, variant, len)
+    fn serialize_struct_variant(
+        self,
+        name: &'static str,
+        variant_index: u32,
+        variant: &'static str,
+        len: usize,
+    ) -> Result<Self::SerializeStructVariant, Self::Error> {
+        self.use_ser()?
+            .serialize_struct_variant(name, variant_index, variant, len)
     }
 }
 
@@ -478,27 +497,30 @@ impl<'a, W: EventWriter> ser::Serializer for DateSerializer<'a, W> {
         Err(self.expecting_date_error())
     }
 
-    fn serialize_unit_variant(self,
-                              _: &'static str,
-                              _: u32,
-                              _: &'static str)
-                              -> Result<(), Self::Error> {
+    fn serialize_unit_variant(
+        self,
+        _: &'static str,
+        _: u32,
+        _: &'static str,
+    ) -> Result<(), Self::Error> {
         Err(self.expecting_date_error())
     }
 
-    fn serialize_newtype_struct<T: ?Sized + ser::Serialize>(self,
-                                                            _: &'static str,
-                                                            _: &T)
-                                                            -> Result<(), Self::Error> {
+    fn serialize_newtype_struct<T: ?Sized + ser::Serialize>(
+        self,
+        _: &'static str,
+        _: &T,
+    ) -> Result<(), Self::Error> {
         Err(self.expecting_date_error())
     }
 
-    fn serialize_newtype_variant<T: ?Sized + ser::Serialize>(self,
-                                                             _: &'static str,
-                                                             _: u32,
-                                                             _: &'static str,
-                                                             _: &T)
-                                                             -> Result<(), Self::Error> {
+    fn serialize_newtype_variant<T: ?Sized + ser::Serialize>(
+        self,
+        _: &'static str,
+        _: u32,
+        _: &'static str,
+        _: &T,
+    ) -> Result<(), Self::Error> {
         Err(self.expecting_date_error())
     }
 
@@ -510,19 +532,21 @@ impl<'a, W: EventWriter> ser::Serializer for DateSerializer<'a, W> {
         Err(self.expecting_date_error())
     }
 
-    fn serialize_tuple_struct(self,
-                              _: &'static str,
-                              _: usize)
-                              -> Result<Self::SerializeTupleStruct, Self::Error> {
+    fn serialize_tuple_struct(
+        self,
+        _: &'static str,
+        _: usize,
+    ) -> Result<Self::SerializeTupleStruct, Self::Error> {
         Err(self.expecting_date_error())
     }
 
-    fn serialize_tuple_variant(self,
-                               _: &'static str,
-                               _: u32,
-                               _: &'static str,
-                               _: usize)
-                               -> Result<Self::SerializeTupleVariant, Self::Error> {
+    fn serialize_tuple_variant(
+        self,
+        _: &'static str,
+        _: u32,
+        _: &'static str,
+        _: usize,
+    ) -> Result<Self::SerializeTupleVariant, Self::Error> {
         Err(self.expecting_date_error())
     }
 
@@ -530,19 +554,21 @@ impl<'a, W: EventWriter> ser::Serializer for DateSerializer<'a, W> {
         Err(self.expecting_date_error())
     }
 
-    fn serialize_struct(self,
-                        _: &'static str,
-                        _: usize)
-                        -> Result<Self::SerializeStruct, Self::Error> {
+    fn serialize_struct(
+        self,
+        _: &'static str,
+        _: usize,
+    ) -> Result<Self::SerializeStruct, Self::Error> {
         Err(self.expecting_date_error())
     }
 
-    fn serialize_struct_variant(self,
-                                _: &'static str,
-                                _: u32,
-                                _: &'static str,
-                                _: usize)
-                                -> Result<Self::SerializeStructVariant, Self::Error> {
+    fn serialize_struct_variant(
+        self,
+        _: &'static str,
+        _: u32,
+        _: &'static str,
+        _: usize,
+    ) -> Result<Self::SerializeStructVariant, Self::Error> {
         Err(self.expecting_date_error())
     }
 }
@@ -556,9 +582,10 @@ impl<'a, W: EventWriter> ser::SerializeSeq for Compound<'a, W> {
     type Ok = ();
     type Error = Error;
 
-    fn serialize_element<T: ?Sized + ser::Serialize>(&mut self,
-                                                     value: &T)
-                                                     -> Result<(), Self::Error> {
+    fn serialize_element<T: ?Sized + ser::Serialize>(
+        &mut self,
+        value: &T,
+    ) -> Result<(), Self::Error> {
         value.serialize(&mut *self.ser)
     }
 
@@ -571,9 +598,10 @@ impl<'a, W: EventWriter> ser::SerializeTuple for Compound<'a, W> {
     type Ok = ();
     type Error = Error;
 
-    fn serialize_element<T: ?Sized + ser::Serialize>(&mut self,
-                                                     value: &T)
-                                                     -> Result<(), Self::Error> {
+    fn serialize_element<T: ?Sized + ser::Serialize>(
+        &mut self,
+        value: &T,
+    ) -> Result<(), Self::Error> {
         <Self as ser::SerializeSeq>::serialize_element(self, value)
     }
 
@@ -586,9 +614,10 @@ impl<'a, W: EventWriter> ser::SerializeTupleStruct for Compound<'a, W> {
     type Ok = ();
     type Error = Error;
 
-    fn serialize_field<T: ?Sized + ser::Serialize>(&mut self,
-                                                   value: &T)
-                                                   -> Result<(), Self::Error> {
+    fn serialize_field<T: ?Sized + ser::Serialize>(
+        &mut self,
+        value: &T,
+    ) -> Result<(), Self::Error> {
         <Self as ser::SerializeSeq>::serialize_element(self, value)
     }
 
@@ -601,9 +630,10 @@ impl<'a, W: EventWriter> ser::SerializeTupleVariant for Compound<'a, W> {
     type Ok = ();
     type Error = Error;
 
-    fn serialize_field<T: ?Sized + ser::Serialize>(&mut self,
-                                                   value: &T)
-                                                   -> Result<(), Self::Error> {
+    fn serialize_field<T: ?Sized + ser::Serialize>(
+        &mut self,
+        value: &T,
+    ) -> Result<(), Self::Error> {
         <Self as ser::SerializeSeq>::serialize_element(self, value)
     }
 
@@ -621,9 +651,10 @@ impl<'a, W: EventWriter> ser::SerializeMap for Compound<'a, W> {
         key.serialize(&mut *self.ser)
     }
 
-    fn serialize_value<T: ?Sized + ser::Serialize>(&mut self,
-                                                   value: &T)
-                                                   -> Result<(), Self::Error> {
+    fn serialize_value<T: ?Sized + ser::Serialize>(
+        &mut self,
+        value: &T,
+    ) -> Result<(), Self::Error> {
         value.serialize(&mut *self.ser)
     }
 
@@ -636,10 +667,11 @@ impl<'a, W: EventWriter> ser::SerializeStruct for Compound<'a, W> {
     type Ok = ();
     type Error = Error;
 
-    fn serialize_field<T: ?Sized + ser::Serialize>(&mut self,
-                                                   key: &'static str,
-                                                   value: &T)
-                                                   -> Result<(), Self::Error> {
+    fn serialize_field<T: ?Sized + ser::Serialize>(
+        &mut self,
+        key: &'static str,
+        value: &T,
+    ) -> Result<(), Self::Error> {
         // We don't want to serialize None if the Option is a struct field as this is how null
         // fields are represented in plists.
         value.serialize(StructFieldSerializer {
@@ -657,10 +689,11 @@ impl<'a, W: EventWriter> ser::SerializeStructVariant for Compound<'a, W> {
     type Ok = ();
     type Error = Error;
 
-    fn serialize_field<T: ?Sized + ser::Serialize>(&mut self,
-                                                   key: &'static str,
-                                                   value: &T)
-                                                   -> Result<(), Self::Error> {
+    fn serialize_field<T: ?Sized + ser::Serialize>(
+        &mut self,
+        key: &'static str,
+        value: &T,
+    ) -> Result<(), Self::Error> {
         <Self as ser::SerializeStruct>::serialize_field(self, key, value)
     }
 

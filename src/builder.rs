@@ -1,6 +1,6 @@
 use std::collections::BTreeMap;
 
-use {Error, Result, Plist, PlistEvent, u64_option_to_usize};
+use {Error, Plist, PlistEvent, Result, u64_option_to_usize};
 
 pub struct Builder<T> {
     stream: T,
@@ -107,19 +107,21 @@ mod tests {
 
         // Input
 
-        let events = vec![StartDictionary(None),
-                          StringValue("Author".to_owned()),
-                          StringValue("William Shakespeare".to_owned()),
-                          StringValue("Lines".to_owned()),
-                          StartArray(None),
-                          StringValue("It is a tale told by an idiot,".to_owned()),
-                          StringValue("Full of sound and fury, signifying nothing.".to_owned()),
-                          EndArray,
-                          StringValue("Birthdate".to_owned()),
-                          IntegerValue(1564),
-                          StringValue("Height".to_owned()),
-                          RealValue(1.60),
-                          EndDictionary];
+        let events = vec![
+            StartDictionary(None),
+            StringValue("Author".to_owned()),
+            StringValue("William Shakespeare".to_owned()),
+            StringValue("Lines".to_owned()),
+            StartArray(None),
+            StringValue("It is a tale told by an idiot,".to_owned()),
+            StringValue("Full of sound and fury, signifying nothing.".to_owned()),
+            EndArray,
+            StringValue("Birthdate".to_owned()),
+            IntegerValue(1564),
+            StringValue("Height".to_owned()),
+            RealValue(1.60),
+            EndDictionary,
+        ];
 
         let builder = Builder::new(events.into_iter().map(|e| Ok(e)));
         let plist = builder.build();
@@ -128,11 +130,15 @@ mod tests {
 
         let mut lines = Vec::new();
         lines.push(Plist::String("It is a tale told by an idiot,".to_owned()));
-        lines.push(Plist::String("Full of sound and fury, signifying nothing.".to_owned()));
+        lines.push(Plist::String(
+            "Full of sound and fury, signifying nothing.".to_owned(),
+        ));
 
         let mut dict = BTreeMap::new();
-        dict.insert("Author".to_owned(),
-                    Plist::String("William Shakespeare".to_owned()));
+        dict.insert(
+            "Author".to_owned(),
+            Plist::String("William Shakespeare".to_owned()),
+        );
         dict.insert("Lines".to_owned(), Plist::Array(lines));
         dict.insert("Birthdate".to_owned(), Plist::Integer(1564));
         dict.insert("Height".to_owned(), Plist::Real(1.60));

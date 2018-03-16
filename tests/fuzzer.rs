@@ -48,7 +48,8 @@ fn binary_circular_array() {
 // Issue 20 - not found by fuzzing but this is a convenient place to put the test.
 #[test]
 fn issue_20_binary_with_data_in_trailer() {
-    let data = b"bplist00\xd0\x08\0\0\0\0\0\0\x01\x01\0\0\0\0\0\0\0\x01\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\t";
+    let data =
+        b"bplist00\xd0\x08\0\0\0\0\0\0\x01\x01\0\0\0\0\0\0\0\x01\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\t";
     test_fuzzer_data_ok(data);
 }
 
