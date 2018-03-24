@@ -32,21 +32,30 @@
 //! }
 //! ```
 //!
-//! ```rust,ignore
+//! ```rust
+//! # #[cfg(feature = "serde")]
 //! #[macro_use]
 //! extern crate serde_derive;
+//! # extern crate plist;
 //!
+//! # #[cfg(feature = "serde")]
+//! # fn main() {
 //! use plist::serde::deserialize;
 //! use std::fs::File;
 //!
 //! #[derive(Deserialize)]
+//! #[serde(rename_all = "PascalCase")]
 //! struct Info {
-//!     name: String,
-//!     x: i32
+//!     author: String,
+//!     height: f32,
 //! }
 //!
 //! let file = File::open("tests/data/xml.plist").unwrap();
 //! let info: Info = deserialize(file).unwrap();
+//! # }
+//! #
+//! # #[cfg(not(feature = "serde"))]
+//! # fn main() {}
 //! ```
 
 extern crate base64;
