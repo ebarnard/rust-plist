@@ -19,8 +19,8 @@ members = ["."]
 
 [[bin]]
 name = "binary_reader"
-path = "fuzzers/binary_reader.rs"
+path = "fuzz_targets/binary_reader.rs"
 
 [[bin]]
 name = "xml_reader"
-path = "fuzzers/xml_reader.rs"
+path = "fuzz_targets/xml_reader.rs"
