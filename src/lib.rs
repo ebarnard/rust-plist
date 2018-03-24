@@ -51,8 +51,11 @@
 
 extern crate base64;
 extern crate byteorder;
-extern crate chrono;
+extern crate humantime;
 extern crate xml as xml_rs;
+
+#[cfg(test)]
+extern crate chrono;
 
 pub mod binary;
 pub mod xml;

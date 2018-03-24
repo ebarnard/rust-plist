@@ -1,65 +1,66 @@
-use chrono::{DateTime, Duration, TimeZone, Utc};
+use humantime;
 use std::fmt;
 use std::result::Result as StdResult;
-use std::time::SystemTime;
+use std::time::{Duration, SystemTime, UNIX_EPOCH};
+
+#[cfg(test)]
+use chrono::{DateTime, Utc};
 
 use {Error, Result};
 
 /// A UTC timestamp. Used for serialization to and from the plist date type.
 #[derive(Clone, PartialEq)]
 pub struct Date {
-    inner: DateTime<Utc>,
+    inner: SystemTime,
 }
 
 impl Date {
     pub(crate) fn from_rfc3339(date: &str) -> Result<Self> {
-        let date = DateTime::parse_from_rfc3339(date).map_err(|_| Error::InvalidData)?;
         Ok(Date {
-            inner: date.with_timezone(&Utc),
+            inner: humantime::parse_rfc3339(date).map_err(|_| Error::InvalidData)?,
         })
     }
 
     pub(crate) fn to_rfc3339(&self) -> String {
-        format!("{:?}", self.inner)
+        format!("{}", humantime::format_rfc3339(self.inner))
     }
 
     pub(crate) fn from_seconds_since_plist_epoch(timestamp: f64) -> Result<Date> {
-        // Seconds since 1/1/2001 00:00:00.
+        // `timestamp` is the number of seconds since the plist epoch of 1/1/2001 00:00:00.
+        // `PLIST_EPOCH_UNIX_TIMESTAMP` is the unix timestamp of the plist epoch.
+        const PLIST_EPOCH_UNIX_TIMESTAMP: u64 = 978307200;
+        let plist_epoch = UNIX_EPOCH + Duration::from_secs(PLIST_EPOCH_UNIX_TIMESTAMP);
 
-        if timestamp.is_nan() {
+        if !timestamp.is_finite() {
             return Err(Error::InvalidData);
         }
 
-        let millis = timestamp * 1_000.0;
-        // Chrono's Duration can only millisecond values between ::std::i64::MIN and
-        // ::std::i64::MAX.
-        if millis > ::std::i64::MAX as f64 || millis < ::std::i64::MIN as f64 {
-            return Err(Error::InvalidData);
-        }
+        let is_negative = timestamp < 0.0;
+        let timestamp = timestamp.abs();
+        let seconds = timestamp.floor() as u64;
+        let subsec_nanos = (timestamp.fract() * 1e9) as u32;
 
-        let whole_millis = millis.floor();
-        let submilli_nanos = ((millis - whole_millis) * 1_000_000.0).floor();
+        let dur_since_plist_epoch = Duration::new(seconds, subsec_nanos);
 
-        let dur = Duration::milliseconds(whole_millis as i64);
-        let dur = dur + Duration::nanoseconds(submilli_nanos as i64);
+        let inner = if is_negative {
+            plist_epoch - dur_since_plist_epoch
+        } else {
+            plist_epoch + dur_since_plist_epoch
+        };
 
-        let plist_epoch = Utc.ymd(2001, 1, 1).and_hms(0, 0, 0);
-        let date = plist_epoch
-            .checked_add_signed(dur)
-            .ok_or(Error::InvalidData)?;
-
-        Ok(Date { inner: date })
+        Ok(Date { inner })
     }
 
     #[cfg(test)]
     pub(crate) fn from_chrono(date: DateTime<Utc>) -> Date {
-        Date { inner: date }
+        Date { inner: date.into() }
     }
 }
 
 impl fmt::Debug for Date {
     fn fmt(&self, f: &mut fmt::Formatter) -> StdResult<(), fmt::Error> {
-        self.inner.fmt(f)
+        let rfc3339 = humantime::format_rfc3339(self.inner);
+        <humantime::Rfc3339Timestamp as fmt::Display>::fmt(&rfc3339, f)
     }
 }
 
