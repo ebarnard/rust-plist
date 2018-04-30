@@ -3,9 +3,6 @@ use std::fmt;
 use std::result::Result as StdResult;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
-#[cfg(test)]
-use chrono::{DateTime, Utc};
-
 use {Error, Result};
 
 /// A UTC timestamp. Used for serialization to and from the plist date type.
@@ -49,11 +46,6 @@ impl Date {
         };
 
         Ok(Date { inner })
-    }
-
-    #[cfg(test)]
-    pub(crate) fn from_chrono(date: DateTime<Utc>) -> Date {
-        Date { inner: date.into() }
     }
 }
 

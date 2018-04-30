@@ -1,4 +1,3 @@
-extern crate chrono;
 extern crate plist;
 
 #[cfg(feature = "serde")]
