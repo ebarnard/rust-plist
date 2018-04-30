@@ -81,8 +81,7 @@ extern crate serde as serde_base;
 pub mod serde;
 
 use std::fmt;
-use std::io::{Read, Seek, SeekFrom};
-use std::io::Error as IoError;
+use std::io::{self, Read, Seek, SeekFrom};
 
 /// An encoding of a plist as a flat structure.
 ///
@@ -116,13 +115,13 @@ pub enum PlistEvent {
     StringValue(String),
 }
 
-pub type Result<T> = ::std::result::Result<T, Error>;
+type Result<T> = ::std::result::Result<T, Error>;
 
 #[derive(Debug)]
 pub enum Error {
     InvalidData,
     UnexpectedEof,
-    Io(IoError),
+    Io(io::Error),
     Serde(String),
 }
 
@@ -153,8 +152,8 @@ impl fmt::Display for Error {
     }
 }
 
-impl From<IoError> for Error {
-    fn from(err: IoError) -> Error {
+impl From<io::Error> for Error {
+    fn from(err: io::Error) -> Error {
         Error::Io(err)
     }
 }

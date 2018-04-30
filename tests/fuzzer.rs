@@ -1,7 +1,7 @@
 extern crate plist;
 
+use plist::{Error, Plist};
 use std::io::Cursor;
-use plist::{Plist, Result};
 
 #[test]
 fn too_large_allocation() {
@@ -59,7 +59,7 @@ fn issue_22_binary_with_byte_ref_size() {
     test_fuzzer_data_ok(data);
 }
 
-fn test_fuzzer_data(data: &[u8]) -> Result<Plist> {
+fn test_fuzzer_data(data: &[u8]) -> Result<Plist, Error> {
     let cursor = Cursor::new(data);
     Plist::read(cursor)
 }
