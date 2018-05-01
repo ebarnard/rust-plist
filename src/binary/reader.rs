@@ -158,8 +158,7 @@ impl<R: Read + Seek> EventReader<R> {
 
     fn read_data(&mut self, len: u64) -> Result<Vec<u8>> {
         let mut data = self.allocate_vec(len, size_of::<u8>())?;
-        // Safe as u8 is a Copy type and we have already know len has been allocated.
-        unsafe { data.set_len(len as usize) }
+        data.resize(len as usize, 0);
         self.reader.read_exact(&mut data)?;
         Ok(data)
     }
@@ -229,9 +228,9 @@ impl<R: Read + Seek> EventReader<R> {
             (0x3, 3) => {
                 // Date. Seconds since 1/1/2001 00:00:00.
                 let secs = self.reader.read_f64::<BigEndian>()?;
-                Some(PlistEvent::DateValue(
-                    Date::from_seconds_since_plist_epoch(secs)?,
-                ))
+                Some(PlistEvent::DateValue(Date::from_seconds_since_plist_epoch(
+                    secs,
+                )?))
             }
             (0x4, n) => {
                 // Data
