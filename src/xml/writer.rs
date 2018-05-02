@@ -1,7 +1,6 @@
 use base64;
 use std::borrow::Cow;
 use std::io::Write;
-use xml_rs::attribute::Attribute;
 use xml_rs::escape::escape_str_pcdata;
 use xml_rs::name::Name;
 use xml_rs::namespace::Namespace;
@@ -89,6 +88,10 @@ impl<W: Write> EventWriter<W> {
     fn maybe_end_plist(&mut self) -> Result<()> {
         // If there are no more open tags then write the </plist> element
         if self.stack.len() == 1 {
+            // We didn't tell the xml_writer about the <plist> tag so it thinks we're already at
+            // the root. As such, it's not going to prettify our output, so we need to include
+            // the newline ourselves.
+            self.xml_writer.write(WriteXmlEvent::Characters("\n"))?;
             self.end_element("plist")?;
             if let Some(Element::Root) = self.stack.pop() {
             } else {
@@ -129,17 +132,9 @@ impl<W: Write> PlistEventWriter for EventWriter<W> {
                 // Write prologue
                 let prologue = r#"<?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
 "#;
                 self.xml_writer.write(WriteXmlEvent::Characters(prologue))?;
-
-                let version_name = Name::local("version");
-                let version_attr = Attribute::new(version_name, "1.0");
-
-                self.xml_writer.write(WriteXmlEvent::StartElement {
-                    name: Name::local("plist"),
-                    attributes: Cow::Borrowed(&[version_attr]),
-                    namespace: Cow::Borrowed(&self.empty_namespace),
-                })?;
 
                 self.stack.push(Element::Root);
             }
@@ -239,23 +234,23 @@ mod tests {
         let comparison = "<?xml version=\"1.0\" encoding=\"UTF-8\"?>
 <!DOCTYPE plist PUBLIC \"-//Apple//DTD PLIST 1.0//EN\" \"http://www.apple.com/DTDs/PropertyList-1.0.dtd\">
 <plist version=\"1.0\">
-\t<dict>
-\t\t<key>Author</key>
-\t\t<string>William Shakespeare</string>
-\t\t<key>Lines</key>
-\t\t<array>
-\t\t\t<string>It is a tale told by an idiot,</string>
-\t\t\t<string>Full of sound and fury, signifying nothing.</string>
-\t\t</array>
-\t\t<key>Death</key>
-\t\t<integer>1564</integer>
-\t\t<key>Height</key>
-\t\t<real>1.6</real>
-\t\t<key>Data</key>
-\t\t<data>AAAAvgAAAAMAAAAeAAAA</data>
-\t\t<key>Birthdate</key>
-\t\t<date>1981-05-16T11:32:06Z</date>
-\t</dict>
+<dict>
+\t<key>Author</key>
+\t<string>William Shakespeare</string>
+\t<key>Lines</key>
+\t<array>
+\t\t<string>It is a tale told by an idiot,</string>
+\t\t<string>Full of sound and fury, signifying nothing.</string>
+\t</array>
+\t<key>Death</key>
+\t<integer>1564</integer>
+\t<key>Height</key>
+\t<real>1.6</real>
+\t<key>Data</key>
+\t<data>AAAAvgAAAAMAAAAeAAAA</data>
+\t<key>Birthdate</key>
+\t<date>1981-05-16T11:32:06Z</date>
+</dict>
 </plist>";
 
         let s = String::from_utf8(cursor.into_inner()).unwrap();
