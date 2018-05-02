@@ -2,10 +2,11 @@ use base64;
 use std::borrow::Cow;
 use std::io::Write;
 use xml_rs::attribute::Attribute;
+use xml_rs::escape::escape_str_pcdata;
 use xml_rs::name::Name;
 use xml_rs::namespace::Namespace;
-use xml_rs::writer::{EmitterConfig, Error as XmlWriterError, EventWriter as XmlEventWriter};
 use xml_rs::writer::events::XmlEvent as WriteXmlEvent;
+use xml_rs::writer::{EmitterConfig, Error as XmlWriterError, EventWriter as XmlEventWriter};
 
 use {Error, EventWriter as PlistEventWriter, PlistEvent, Result};
 
@@ -38,15 +39,16 @@ pub struct EventWriter<W: Write> {
 
 impl<W: Write> EventWriter<W> {
     pub fn new(writer: W) -> EventWriter<W> {
-        let config = EmitterConfig::new()
+        let mut config = EmitterConfig::new()
             .line_separator("\n")
-            .indent_string("    ")
+            .indent_string("\t")
             .perform_indent(true)
-            .write_document_declaration(true)
+            .write_document_declaration(false)
             .normalize_empty_elements(true)
             .cdata_to_characters(true)
             .keep_element_names_stack(false)
             .autopad_comments(true);
+        config.perform_escaping = false;
 
         EventWriter {
             xml_writer: XmlEventWriter::new_with_config(writer, config),
@@ -79,7 +81,8 @@ impl<W: Write> EventWriter<W> {
     }
 
     fn write_value(&mut self, value: &str) -> Result<()> {
-        self.xml_writer.write(WriteXmlEvent::Characters(value))?;
+        self.xml_writer
+            .write(WriteXmlEvent::Characters(&escape_str_pcdata(value)))?;
         Ok(())
     }
 
@@ -123,6 +126,12 @@ impl<W: Write> PlistEventWriter for EventWriter<W> {
                 .push(Element::Dictionary(DictionaryState::ExpectKey)),
             Some(other) => self.stack.push(other),
             None => {
+                // Write prologue
+                let prologue = r#"<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+"#;
+                self.xml_writer.write(WriteXmlEvent::Characters(prologue))?;
+
                 let version_name = Name::local("version");
                 let version_attr = Attribute::new(version_name, "1.0");
 
@@ -227,25 +236,26 @@ mod tests {
             }
         }
 
-        let comparison = "<?xml version=\"1.0\" encoding=\"utf-8\"?>
+        let comparison = "<?xml version=\"1.0\" encoding=\"UTF-8\"?>
+<!DOCTYPE plist PUBLIC \"-//Apple//DTD PLIST 1.0//EN\" \"http://www.apple.com/DTDs/PropertyList-1.0.dtd\">
 <plist version=\"1.0\">
-    <dict>
-        <key>Author</key>
-        <string>William Shakespeare</string>
-        <key>Lines</key>
-        <array>
-            <string>It is a tale told by an idiot,</string>
-            <string>Full of sound and fury, signifying nothing.</string>
-        </array>
-        <key>Death</key>
-        <integer>1564</integer>
-        <key>Height</key>
-        <real>1.6</real>
-        <key>Data</key>
-        <data>AAAAvgAAAAMAAAAeAAAA</data>
-        <key>Birthdate</key>
-        <date>1981-05-16T11:32:06Z</date>
-    </dict>
+\t<dict>
+\t\t<key>Author</key>
+\t\t<string>William Shakespeare</string>
+\t\t<key>Lines</key>
+\t\t<array>
+\t\t\t<string>It is a tale told by an idiot,</string>
+\t\t\t<string>Full of sound and fury, signifying nothing.</string>
+\t\t</array>
+\t\t<key>Death</key>
+\t\t<integer>1564</integer>
+\t\t<key>Height</key>
+\t\t<real>1.6</real>
+\t\t<key>Data</key>
+\t\t<data>AAAAvgAAAAMAAAAeAAAA</data>
+\t\t<key>Birthdate</key>
+\t\t<date>1981-05-16T11:32:06Z</date>
+\t</dict>
 </plist>";
 
         let s = String::from_utf8(cursor.into_inner()).unwrap();
