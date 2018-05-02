@@ -1,8 +1,8 @@
 use serde_base::ser;
 use std::fmt::Display;
 
-use {Date, Error, EventWriter, PlistEvent};
 use date::serde_impls::DATE_NEWTYPE_STRUCT_NAME;
+use {Date, Error, EventWriter, PlistEvent};
 
 impl ser::Error for Error {
     fn custom<T: Display>(msg: T) -> Self {

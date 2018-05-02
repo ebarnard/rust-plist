@@ -1,22 +1,22 @@
 use serde_base::de;
-use std::iter::Peekable;
 use std::fmt::Display;
+use std::iter::Peekable;
 
 use {Error, PlistEvent, u64_option_to_usize};
 
 macro_rules! expect {
     ($next:expr, $pat:pat) => {
         match $next {
-            Some(Ok(v@$pat)) => v,
+            Some(Ok(v @ $pat)) => v,
             None => return Err(Error::UnexpectedEof),
-            _ => return Err(event_mismatch_error())
+            _ => return Err(event_mismatch_error()),
         }
     };
     ($next:expr, $pat:pat => $save:expr) => {
         match $next {
             Some(Ok($pat)) => $save,
             None => return Err(Error::UnexpectedEof),
-            _ => return Err(event_mismatch_error())
+            _ => return Err(event_mismatch_error()),
         }
     };
 }
@@ -26,9 +26,9 @@ macro_rules! try_next {
         match $next {
             Some(Ok(v)) => v,
             Some(Err(_)) => return Err(event_mismatch_error()),
-            None => return Err(Error::UnexpectedEof)
+            None => return Err(Error::UnexpectedEof),
         }
-    }
+    };
 }
 
 fn event_mismatch_error() -> Error {

@@ -8,8 +8,8 @@ use serde_base::de::{Deserialize, DeserializeOwned};
 use serde_base::ser::Serialize;
 use std::io::{Read, Seek, Write};
 
-use Result;
 use EventReader;
+use Result;
 use xml;
 
 pub fn deserialize<R: Read + Seek, T: DeserializeOwned>(reader: R) -> Result<T> {
