@@ -1,7 +1,6 @@
 use base64;
 use std::borrow::Cow;
 use std::io::Write;
-use xml_rs::escape::escape_str_pcdata;
 use xml_rs::name::Name;
 use xml_rs::namespace::Namespace;
 use xml_rs::writer::events::XmlEvent as WriteXmlEvent;
@@ -38,7 +37,7 @@ pub struct EventWriter<W: Write> {
 
 impl<W: Write> EventWriter<W> {
     pub fn new(writer: W) -> EventWriter<W> {
-        let mut config = EmitterConfig::new()
+        let config = EmitterConfig::new()
             .line_separator("\n")
             .indent_string("\t")
             .perform_indent(true)
@@ -47,7 +46,6 @@ impl<W: Write> EventWriter<W> {
             .cdata_to_characters(true)
             .keep_element_names_stack(false)
             .autopad_comments(true);
-        config.perform_escaping = false;
 
         EventWriter {
             xml_writer: XmlEventWriter::new_with_config(writer, config),
@@ -80,19 +78,16 @@ impl<W: Write> EventWriter<W> {
     }
 
     fn write_value(&mut self, value: &str) -> Result<()> {
-        self.xml_writer
-            .write(WriteXmlEvent::Characters(&escape_str_pcdata(value)))?;
+        self.xml_writer.write(WriteXmlEvent::Characters(value))?;
         Ok(())
     }
 
     fn maybe_end_plist(&mut self) -> Result<()> {
         // If there are no more open tags then write the </plist> element
         if self.stack.len() == 1 {
-            // We didn't tell the xml_writer about the <plist> tag so it thinks we're already at
-            // the root. As such, it's not going to prettify our output, so we need to include
-            // the newline ourselves.
-            self.xml_writer.write(WriteXmlEvent::Characters("\n"))?;
-            self.end_element("plist")?;
+            // We didn't tell the xml_writer about the <plist> tag so we'll skip telling it
+            // about the </plist> tag as well.
+            self.xml_writer.inner_mut().write(b"\n</plist>")?;
             if let Some(Element::Root) = self.stack.pop() {
             } else {
                 return Err(Error::InvalidData);
@@ -134,7 +129,7 @@ impl<W: Write> PlistEventWriter for EventWriter<W> {
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 "#;
-                self.xml_writer.write(WriteXmlEvent::Characters(prologue))?;
+                self.xml_writer.inner_mut().write(prologue.as_bytes())?;
 
                 self.stack.push(Element::Root);
             }
