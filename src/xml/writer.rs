@@ -213,6 +213,8 @@ mod tests {
             DataValue(vec![0, 0, 0, 190, 0, 0, 0, 3, 0, 0, 0, 30, 0, 0, 0]),
             StringValue("Birthdate".to_owned()),
             DateValue(parse_rfc3339_weak("1981-05-16 11:32:06").unwrap().into()),
+            StringValue("Comment".to_owned()),
+            StringValue("2 < 3".to_owned()), // make sure characters are escaped
             EndDictionary,
         ];
 
@@ -245,6 +247,8 @@ mod tests {
 \t<data>AAAAvgAAAAMAAAAeAAAA</data>
 \t<key>Birthdate</key>
 \t<date>1981-05-16T11:32:06Z</date>
+\t<key>Comment</key>
+\t<string>2 &lt; 3</string>
 </dict>
 </plist>";
 
