@@ -4,7 +4,7 @@ use std::str::FromStr;
 use xml_rs::reader::{EventReader, ParserConfig, XmlEvent};
 
 use events::Event;
-use {Date, Error, Result};
+use {Date, Error};
 
 pub struct XmlReader<R: Read> {
     xml_reader: EventReader<R>,
@@ -30,9 +30,9 @@ impl<R: Read> XmlReader<R> {
         }
     }
 
-    fn read_content<F>(&mut self, f: F) -> Result<Event>
+    fn read_content<F>(&mut self, f: F) -> Result<Event, Error>
     where
-        F: FnOnce(String) -> Result<Event>,
+        F: FnOnce(String) -> Result<Event, Error>,
     {
         match self.xml_reader.next() {
             Ok(XmlEvent::Characters(s)) => f(s),
@@ -52,7 +52,7 @@ impl<R: Read> XmlReader<R> {
         }
     }
 
-    fn read_next(&mut self) -> Option<Result<Event>> {
+    fn read_next(&mut self) -> Option<Result<Event, Error>> {
         loop {
             match self.next_event() {
                 Ok(XmlEvent::StartElement { name, .. }) => {
@@ -126,9 +126,9 @@ impl<R: Read> XmlReader<R> {
 }
 
 impl<R: Read> Iterator for XmlReader<R> {
-    type Item = Result<Event>;
+    type Item = Result<Event, Error>;
 
-    fn next(&mut self) -> Option<Result<Event>> {
+    fn next(&mut self) -> Option<Result<Event, Error>> {
         if self.finished {
             None
         } else {

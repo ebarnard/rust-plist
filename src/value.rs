@@ -2,7 +2,7 @@ use std::collections::BTreeMap;
 use std::io::{Read, Seek};
 
 use events::{Event, Reader};
-use {builder, Date, Result};
+use {builder, Date, Error};
 
 #[derive(Clone, Debug, PartialEq)]
 pub enum Value {
@@ -17,14 +17,14 @@ pub enum Value {
 }
 
 impl Value {
-    pub fn read<R: Read + Seek>(reader: R) -> Result<Value> {
+    pub fn read<R: Read + Seek>(reader: R) -> Result<Value, Error> {
         let reader = Reader::new(reader);
         Value::from_events(reader)
     }
 
-    pub fn from_events<T>(events: T) -> Result<Value>
+    pub fn from_events<T>(events: T) -> Result<Value, Error>
     where
-        T: IntoIterator<Item = Result<Event>>,
+        T: IntoIterator<Item = Result<Event, Error>>,
     {
         let iter = events.into_iter();
         let builder = builder::Builder::new(iter);

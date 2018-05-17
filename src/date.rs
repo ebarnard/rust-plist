@@ -3,7 +3,7 @@ use std::fmt;
 use std::result::Result as StdResult;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
-use {Error, Result};
+use Error;
 
 /// A UTC timestamp. Used for serialization to and from the plist date type.
 #[derive(Clone, PartialEq)]
@@ -12,7 +12,7 @@ pub struct Date {
 }
 
 impl Date {
-    pub(crate) fn from_rfc3339(date: &str) -> Result<Self> {
+    pub(crate) fn from_rfc3339(date: &str) -> Result<Self, Error> {
         Ok(Date {
             inner: humantime::parse_rfc3339(date).map_err(|_| Error::InvalidData)?,
         })
@@ -22,7 +22,7 @@ impl Date {
         format!("{}", humantime::format_rfc3339(self.inner))
     }
 
-    pub(crate) fn from_seconds_since_plist_epoch(timestamp: f64) -> Result<Date> {
+    pub(crate) fn from_seconds_since_plist_epoch(timestamp: f64) -> Result<Date, Error> {
         // `timestamp` is the number of seconds since the plist epoch of 1/1/2001 00:00:00.
         // `PLIST_EPOCH_UNIX_TIMESTAMP` is the unix timestamp of the plist epoch.
         const PLIST_EPOCH_UNIX_TIMESTAMP: u64 = 978307200;

@@ -6,7 +6,7 @@ use xml_rs::namespace::Namespace;
 use xml_rs::writer::{EmitterConfig, Error as XmlWriterError, EventWriter, XmlEvent};
 
 use events::{Event, Writer};
-use {Error, Result};
+use Error;
 
 impl From<XmlWriterError> for Error {
     fn from(err: XmlWriterError) -> Error {
@@ -54,14 +54,14 @@ impl<W: Write> XmlWriter<W> {
         }
     }
 
-    fn write_element_and_value(&mut self, name: &str, value: &str) -> Result<()> {
+    fn write_element_and_value(&mut self, name: &str, value: &str) -> Result<(), Error> {
         self.start_element(name)?;
         self.write_value(value)?;
         self.end_element(name)?;
         Ok(())
     }
 
-    fn start_element(&mut self, name: &str) -> Result<()> {
+    fn start_element(&mut self, name: &str) -> Result<(), Error> {
         self.xml_writer.write(XmlEvent::StartElement {
             name: Name::local(name),
             attributes: Cow::Borrowed(&[]),
@@ -70,19 +70,19 @@ impl<W: Write> XmlWriter<W> {
         Ok(())
     }
 
-    fn end_element(&mut self, name: &str) -> Result<()> {
+    fn end_element(&mut self, name: &str) -> Result<(), Error> {
         self.xml_writer.write(XmlEvent::EndElement {
             name: Some(Name::local(name)),
         })?;
         Ok(())
     }
 
-    fn write_value(&mut self, value: &str) -> Result<()> {
+    fn write_value(&mut self, value: &str) -> Result<(), Error> {
         self.xml_writer.write(XmlEvent::Characters(value))?;
         Ok(())
     }
 
-    fn maybe_end_plist(&mut self) -> Result<()> {
+    fn maybe_end_plist(&mut self) -> Result<(), Error> {
         // If there are no more open tags then write the </plist> element
         if self.stack.len() == 1 {
             // We didn't tell the xml_writer about the <plist> tag so we'll skip telling it
@@ -96,13 +96,13 @@ impl<W: Write> XmlWriter<W> {
         Ok(())
     }
 
-    pub fn write(&mut self, event: &Event) -> Result<()> {
+    pub fn write(&mut self, event: &Event) -> Result<(), Error> {
         <Self as Writer>::write(self, event)
     }
 }
 
 impl<W: Write> Writer for XmlWriter<W> {
-    fn write(&mut self, event: &Event) -> Result<()> {
+    fn write(&mut self, event: &Event) -> Result<(), Error> {
         match self.stack.pop() {
             Some(Element::Dictionary(DictionaryState::ExpectKey)) => {
                 match *event {

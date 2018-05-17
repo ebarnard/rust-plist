@@ -4,7 +4,7 @@ use std::mem::size_of;
 use std::string::{FromUtf16Error, FromUtf8Error};
 
 use events::Event;
-use {u64_to_usize, Date, Error, Result};
+use {u64_to_usize, Date, Error};
 
 impl From<FromUtf8Error> for Error {
     fn from(_: FromUtf8Error) -> Error {
@@ -69,7 +69,7 @@ impl<R: Read + Seek> BinaryReader<R> {
         byte_len <= self.max_allocation_bytes as u64
     }
 
-    fn allocate_vec<T>(&self, len: u64, size: usize) -> Result<Vec<T>> {
+    fn allocate_vec<T>(&self, len: u64, size: usize) -> Result<Vec<T>, Error> {
         if self.can_allocate(len, size) {
             Ok(Vec::with_capacity(len as usize))
         } else {
@@ -77,7 +77,7 @@ impl<R: Read + Seek> BinaryReader<R> {
         }
     }
 
-    fn read_trailer(&mut self) -> Result<()> {
+    fn read_trailer(&mut self) -> Result<(), Error> {
         self.reader.seek(SeekFrom::Start(0))?;
         let mut magic = [0; 8];
         self.reader.read_exact(&mut magic)?;
@@ -123,7 +123,7 @@ impl<R: Read + Seek> BinaryReader<R> {
         Ok(())
     }
 
-    fn read_ints(&mut self, len: u64, size: u8) -> Result<Vec<u64>> {
+    fn read_ints(&mut self, len: u64, size: u8) -> Result<Vec<u64>, Error> {
         let mut ints = self.allocate_vec(len, size as usize)?;
         for _ in 0..len {
             match size {
@@ -137,12 +137,12 @@ impl<R: Read + Seek> BinaryReader<R> {
         Ok(ints)
     }
 
-    fn read_refs(&mut self, len: u64) -> Result<Vec<u64>> {
+    fn read_refs(&mut self, len: u64) -> Result<Vec<u64>, Error> {
         let ref_size = self.ref_size;
         self.read_ints(len, ref_size)
     }
 
-    fn read_object_len(&mut self, len: u8) -> Result<u64> {
+    fn read_object_len(&mut self, len: u8) -> Result<u64, Error> {
         if (len & 0x0f) == 0x0f {
             let len_power_of_two = self.reader.read_u8()? & 0x03;
             Ok(match len_power_of_two {
@@ -157,14 +157,14 @@ impl<R: Read + Seek> BinaryReader<R> {
         }
     }
 
-    fn read_data(&mut self, len: u64) -> Result<Vec<u8>> {
+    fn read_data(&mut self, len: u64) -> Result<Vec<u8>, Error> {
         let mut data = self.allocate_vec(len, size_of::<u8>())?;
         data.resize(len as usize, 0);
         self.reader.read_exact(&mut data)?;
         Ok(data)
     }
 
-    fn seek_to_object(&mut self, object_ref: u64) -> Result<u64> {
+    fn seek_to_object(&mut self, object_ref: u64) -> Result<u64, Error> {
         let object_ref = u64_to_usize(object_ref)?;
         let offset = *self
             .object_offsets
@@ -173,7 +173,7 @@ impl<R: Read + Seek> BinaryReader<R> {
         Ok(self.reader.seek(SeekFrom::Start(offset))?)
     }
 
-    fn read_next(&mut self) -> Result<Option<Event>> {
+    fn read_next(&mut self) -> Result<Option<Event>, Error> {
         if self.ref_size == 0 {
             // Initialise here rather than in new
             self.read_trailer()?;
@@ -306,9 +306,9 @@ impl<R: Read + Seek> BinaryReader<R> {
 }
 
 impl<R: Read + Seek> Iterator for BinaryReader<R> {
-    type Item = Result<Event>;
+    type Item = Result<Event, Error>;
 
-    fn next(&mut self) -> Option<Result<Event>> {
+    fn next(&mut self) -> Option<Result<Event, Error>> {
         if self.finished {
             None
         } else {

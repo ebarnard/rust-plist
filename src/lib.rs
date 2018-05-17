@@ -88,8 +88,6 @@ pub use self::ser::{serialize_to_xml, Serializer};
 use std::fmt;
 use std::io;
 
-type Result<T> = ::std::result::Result<T, Error>;
-
 #[derive(Debug)]
 pub enum Error {
     InvalidData,
@@ -131,7 +129,7 @@ impl From<io::Error> for Error {
     }
 }
 
-fn u64_to_usize(len_u64: u64) -> Result<usize> {
+fn u64_to_usize(len_u64: u64) -> Result<usize, Error> {
     let len = len_u64 as usize;
     if len as u64 != len_u64 {
         return Err(Error::InvalidData); // Too long
@@ -139,7 +137,7 @@ fn u64_to_usize(len_u64: u64) -> Result<usize> {
     Ok(len)
 }
 
-fn u64_option_to_usize(len: Option<u64>) -> Result<Option<usize>> {
+fn u64_option_to_usize(len: Option<u64>) -> Result<Option<usize>, Error> {
     match len {
         Some(len) => Ok(Some(u64_to_usize(len)?)),
         None => Ok(None),

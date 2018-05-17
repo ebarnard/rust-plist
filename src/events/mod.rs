@@ -8,7 +8,7 @@ mod xml_writer;
 pub use self::xml_writer::XmlWriter;
 
 use std::io::{Read, Seek, SeekFrom};
-use {Date, Result};
+use {Date, Error};
 
 /// An encoding of a plist as a flat structure.
 ///
@@ -55,7 +55,7 @@ impl<R: Read + Seek> Reader<R> {
         Reader(ReaderInner::Uninitialized(Some(reader)))
     }
 
-    fn is_binary(reader: &mut R) -> Result<bool> {
+    fn is_binary(reader: &mut R) -> Result<bool, Error> {
         reader.seek(SeekFrom::Start(0))?;
         let mut magic = [0; 8];
         reader.read_exact(&mut magic)?;
@@ -66,9 +66,9 @@ impl<R: Read + Seek> Reader<R> {
 }
 
 impl<R: Read + Seek> Iterator for Reader<R> {
-    type Item = Result<Event>;
+    type Item = Result<Event, Error>;
 
-    fn next(&mut self) -> Option<Result<Event>> {
+    fn next(&mut self) -> Option<Result<Event, Error>> {
         let mut reader = match self.0 {
             ReaderInner::Xml(ref mut parser) => return parser.next(),
             ReaderInner::Binary(ref mut parser) => return parser.next(),
@@ -91,5 +91,5 @@ impl<R: Read + Seek> Iterator for Reader<R> {
 }
 
 pub trait Writer {
-    fn write(&mut self, event: &Event) -> Result<()>;
+    fn write(&mut self, event: &Event) -> Result<(), Error>;
 }
