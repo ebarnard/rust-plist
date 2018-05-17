@@ -20,14 +20,14 @@
 //! ## Examples
 //!
 //! ```rust
-//! use plist::Plist;
+//! use plist::Value;
 //! use std::fs::File;
 //!
 //! let file = File::open("tests/data/xml.plist").unwrap();
-//! let plist = Plist::read(file).unwrap();
+//! let plist = Value::read(file).unwrap();
 //!
 //! match plist {
-//!     Plist::Array(_array) => (),
+//!     Value::Array(_array) => (),
 //!     _ => ()
 //! }
 //! ```
@@ -40,7 +40,7 @@
 //!
 //! # #[cfg(feature = "serde")]
 //! # fn main() {
-//! use plist::serde::deserialize;
+//! use plist::deserialize;
 //! use std::fs::File;
 //!
 //! #[derive(Deserialize)]
@@ -63,57 +63,30 @@ extern crate byteorder;
 extern crate humantime;
 extern crate xml as xml_rs;
 
-pub mod binary;
-pub mod xml;
+pub mod events;
 
 mod builder;
 mod date;
-mod plist;
+mod value;
 
 pub use date::Date;
-pub use plist::Plist;
+pub use value::Value;
 
 // Optional serde module
 #[cfg(feature = "serde")]
 #[macro_use]
-extern crate serde as serde_base;
+extern crate serde;
 #[cfg(feature = "serde")]
-pub mod serde;
+mod de;
+#[cfg(feature = "serde")]
+mod ser;
+#[cfg(feature = "serde")]
+pub use self::de::{deserialize, Deserializer};
+#[cfg(feature = "serde")]
+pub use self::ser::{serialize_to_xml, Serializer};
 
 use std::fmt;
-use std::io::{self, Read, Seek, SeekFrom};
-
-/// An encoding of a plist as a flat structure.
-///
-/// Output by the event readers.
-///
-/// Dictionary keys and values are represented as pairs of values e.g.:
-///
-/// ```ignore rust
-/// StartDictionary
-/// StringValue("Height") // Key
-/// RealValue(181.2)      // Value
-/// StringValue("Age")    // Key
-/// IntegerValue(28)      // Value
-/// EndDictionary
-/// ```
-#[derive(Clone, Debug, PartialEq)]
-pub enum PlistEvent {
-    // While the length of an array or dict cannot be feasably greater than max(usize) this better
-    // conveys the concept of an effectively unbounded event stream.
-    StartArray(Option<u64>),
-    EndArray,
-
-    StartDictionary(Option<u64>),
-    EndDictionary,
-
-    BooleanValue(bool),
-    DataValue(Vec<u8>),
-    DateValue(Date),
-    IntegerValue(i64),
-    RealValue(f64),
-    StringValue(String),
-}
+use std::io;
 
 type Result<T> = ::std::result::Result<T, Error>;
 
@@ -156,58 +129,6 @@ impl From<io::Error> for Error {
     fn from(err: io::Error) -> Error {
         Error::Io(err)
     }
-}
-
-pub struct EventReader<R: Read + Seek>(EventReaderInner<R>);
-
-enum EventReaderInner<R: Read + Seek> {
-    Uninitialized(Option<R>),
-    Xml(xml::EventReader<R>),
-    Binary(binary::EventReader<R>),
-}
-
-impl<R: Read + Seek> EventReader<R> {
-    pub fn new(reader: R) -> EventReader<R> {
-        EventReader(EventReaderInner::Uninitialized(Some(reader)))
-    }
-
-    fn is_binary(reader: &mut R) -> Result<bool> {
-        reader.seek(SeekFrom::Start(0))?;
-        let mut magic = [0; 8];
-        reader.read_exact(&mut magic)?;
-        reader.seek(SeekFrom::Start(0))?;
-
-        Ok(&magic == b"bplist00")
-    }
-}
-
-impl<R: Read + Seek> Iterator for EventReader<R> {
-    type Item = Result<PlistEvent>;
-
-    fn next(&mut self) -> Option<Result<PlistEvent>> {
-        let mut reader = match self.0 {
-            EventReaderInner::Xml(ref mut parser) => return parser.next(),
-            EventReaderInner::Binary(ref mut parser) => return parser.next(),
-            EventReaderInner::Uninitialized(ref mut reader) => reader.take().unwrap(),
-        };
-
-        let event_reader = match EventReader::is_binary(&mut reader) {
-            Ok(true) => EventReaderInner::Binary(binary::EventReader::new(reader)),
-            Ok(false) => EventReaderInner::Xml(xml::EventReader::new(reader)),
-            Err(err) => {
-                ::std::mem::replace(&mut self.0, EventReaderInner::Uninitialized(Some(reader)));
-                return Some(Err(err));
-            }
-        };
-
-        ::std::mem::replace(&mut self.0, event_reader);
-
-        self.next()
-    }
-}
-
-pub trait EventWriter {
-    fn write(&mut self, event: &PlistEvent) -> Result<()>;
 }
 
 fn u64_to_usize(len_u64: u64) -> Result<usize> {

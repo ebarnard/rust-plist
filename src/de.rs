@@ -1,8 +1,10 @@
-use serde_base::de;
+use serde::de;
 use std::fmt::Display;
+use std::io::{Read, Seek};
 use std::iter::Peekable;
 
-use {Error, PlistEvent, u64_option_to_usize};
+use events::{self, Event};
+use {u64_option_to_usize, Error};
 
 macro_rules! expect {
     ($next:expr, $pat:pat) => {
@@ -43,14 +45,14 @@ impl de::Error for Error {
 
 pub struct Deserializer<I>
 where
-    I: IntoIterator<Item = Result<PlistEvent, Error>>,
+    I: IntoIterator<Item = Result<Event, Error>>,
 {
     events: Peekable<<I as IntoIterator>::IntoIter>,
 }
 
 impl<I> Deserializer<I>
 where
-    I: IntoIterator<Item = Result<PlistEvent, Error>>,
+    I: IntoIterator<Item = Result<Event, Error>>,
 {
     pub fn new(iter: I) -> Deserializer<I> {
         Deserializer {
@@ -61,7 +63,7 @@ where
 
 impl<'de, 'a, I> de::Deserializer<'de> for &'a mut Deserializer<I>
 where
-    I: IntoIterator<Item = Result<PlistEvent, Error>>,
+    I: IntoIterator<Item = Result<Event, Error>>,
 {
     type Error = Error;
 
@@ -70,29 +72,29 @@ where
         V: de::Visitor<'de>,
     {
         match try_next!(self.events.next()) {
-            PlistEvent::StartArray(len) => {
+            Event::StartArray(len) => {
                 let len = u64_option_to_usize(len)?;
                 let ret = visitor.visit_seq(MapAndSeqAccess::new(self, false, len))?;
-                expect!(self.events.next(), PlistEvent::EndArray);
+                expect!(self.events.next(), Event::EndArray);
                 Ok(ret)
             }
-            PlistEvent::EndArray => Err(event_mismatch_error()),
+            Event::EndArray => Err(event_mismatch_error()),
 
-            PlistEvent::StartDictionary(len) => {
+            Event::StartDictionary(len) => {
                 let len = u64_option_to_usize(len)?;
                 let ret = visitor.visit_map(MapAndSeqAccess::new(self, false, len))?;
-                expect!(self.events.next(), PlistEvent::EndDictionary);
+                expect!(self.events.next(), Event::EndDictionary);
                 Ok(ret)
             }
-            PlistEvent::EndDictionary => Err(event_mismatch_error()),
+            Event::EndDictionary => Err(event_mismatch_error()),
 
-            PlistEvent::BooleanValue(v) => visitor.visit_bool(v),
-            PlistEvent::DataValue(v) => visitor.visit_byte_buf(v),
-            PlistEvent::DateValue(v) => visitor.visit_string(v.to_rfc3339()),
-            PlistEvent::IntegerValue(v) if v.is_positive() => visitor.visit_u64(v as u64),
-            PlistEvent::IntegerValue(v) => visitor.visit_i64(v as i64),
-            PlistEvent::RealValue(v) => visitor.visit_f64(v),
-            PlistEvent::StringValue(v) => visitor.visit_string(v),
+            Event::BooleanValue(v) => visitor.visit_bool(v),
+            Event::DataValue(v) => visitor.visit_byte_buf(v),
+            Event::DateValue(v) => visitor.visit_string(v.to_rfc3339()),
+            Event::IntegerValue(v) if v.is_positive() => visitor.visit_u64(v as u64),
+            Event::IntegerValue(v) => visitor.visit_i64(v as i64),
+            Event::RealValue(v) => visitor.visit_f64(v),
+            Event::StringValue(v) => visitor.visit_string(v),
         }
     }
 
@@ -106,7 +108,7 @@ where
     where
         V: de::Visitor<'de>,
     {
-        expect!(self.events.next(), PlistEvent::StringValue(_));
+        expect!(self.events.next(), Event::StringValue(_));
         visitor.visit_unit()
     }
 
@@ -114,18 +116,18 @@ where
     where
         V: de::Visitor<'de>,
     {
-        expect!(self.events.next(), PlistEvent::StartDictionary(_));
+        expect!(self.events.next(), Event::StartDictionary(_));
 
         let ret = match try_next!(self.events.next()) {
-            PlistEvent::StringValue(ref s) if &s[..] == "None" => {
-                expect!(self.events.next(), PlistEvent::StringValue(_));
+            Event::StringValue(ref s) if &s[..] == "None" => {
+                expect!(self.events.next(), Event::StringValue(_));
                 visitor.visit_none::<Self::Error>()?
             }
-            PlistEvent::StringValue(ref s) if &s[..] == "Some" => visitor.visit_some(&mut *self)?,
+            Event::StringValue(ref s) if &s[..] == "Some" => visitor.visit_some(&mut *self)?,
             _ => return Err(event_mismatch_error()),
         };
 
-        expect!(self.events.next(), PlistEvent::EndDictionary);
+        expect!(self.events.next(), Event::EndDictionary);
 
         Ok(ret)
     }
@@ -150,9 +152,9 @@ where
     where
         V: de::Visitor<'de>,
     {
-        expect!(self.events.next(), PlistEvent::StartDictionary(_));
+        expect!(self.events.next(), Event::StartDictionary(_));
         let ret = visitor.visit_map(MapAndSeqAccess::new(self, true, None))?;
-        expect!(self.events.next(), PlistEvent::EndDictionary);
+        expect!(self.events.next(), Event::EndDictionary);
         Ok(ret)
     }
 
@@ -165,16 +167,16 @@ where
     where
         V: de::Visitor<'de>,
     {
-        expect!(self.events.next(), PlistEvent::StartDictionary(_));
+        expect!(self.events.next(), Event::StartDictionary(_));
         let ret = visitor.visit_enum(&mut *self)?;
-        expect!(self.events.next(), PlistEvent::EndDictionary);
+        expect!(self.events.next(), Event::EndDictionary);
         Ok(ret)
     }
 }
 
 impl<'de, 'a, I> de::EnumAccess<'de> for &'a mut Deserializer<I>
 where
-    I: IntoIterator<Item = Result<PlistEvent, Error>>,
+    I: IntoIterator<Item = Result<Event, Error>>,
 {
     type Error = Error;
     type Variant = Self;
@@ -189,7 +191,7 @@ where
 
 impl<'de, 'a, I> de::VariantAccess<'de> for &'a mut Deserializer<I>
 where
-    I: IntoIterator<Item = Result<PlistEvent, Error>>,
+    I: IntoIterator<Item = Result<Event, Error>>,
 {
     type Error = Error;
 
@@ -226,14 +228,14 @@ where
 
 pub struct StructValueDeserializer<'a, I: 'a>
 where
-    I: IntoIterator<Item = Result<PlistEvent, Error>>,
+    I: IntoIterator<Item = Result<Event, Error>>,
 {
     de: &'a mut Deserializer<I>,
 }
 
 impl<'de, 'a, I> de::Deserializer<'de> for StructValueDeserializer<'a, I>
 where
-    I: IntoIterator<Item = Result<PlistEvent, Error>>,
+    I: IntoIterator<Item = Result<Event, Error>>,
 {
     type Error = Error;
 
@@ -303,7 +305,7 @@ where
 
 struct MapAndSeqAccess<'a, I>
 where
-    I: 'a + IntoIterator<Item = Result<PlistEvent, Error>>,
+    I: 'a + IntoIterator<Item = Result<Event, Error>>,
 {
     de: &'a mut Deserializer<I>,
     is_struct: bool,
@@ -312,7 +314,7 @@ where
 
 impl<'a, I> MapAndSeqAccess<'a, I>
 where
-    I: 'a + IntoIterator<Item = Result<PlistEvent, Error>>,
+    I: 'a + IntoIterator<Item = Result<Event, Error>>,
 {
     fn new(
         de: &'a mut Deserializer<I>,
@@ -329,7 +331,7 @@ where
 
 impl<'de, 'a, I> de::SeqAccess<'de> for MapAndSeqAccess<'a, I>
 where
-    I: 'a + IntoIterator<Item = Result<PlistEvent, Error>>,
+    I: 'a + IntoIterator<Item = Result<Event, Error>>,
 {
     type Error = Error;
 
@@ -337,7 +339,7 @@ where
     where
         T: de::DeserializeSeed<'de>,
     {
-        if let Some(&Ok(PlistEvent::EndArray)) = self.de.events.peek() {
+        if let Some(&Ok(Event::EndArray)) = self.de.events.peek() {
             return Ok(None);
         }
 
@@ -352,7 +354,7 @@ where
 
 impl<'de, 'a, I> de::MapAccess<'de> for MapAndSeqAccess<'a, I>
 where
-    I: 'a + IntoIterator<Item = Result<PlistEvent, Error>>,
+    I: 'a + IntoIterator<Item = Result<Event, Error>>,
 {
     type Error = Error;
 
@@ -360,7 +362,7 @@ where
     where
         K: de::DeserializeSeed<'de>,
     {
-        if let Some(&Ok(PlistEvent::EndDictionary)) = self.de.events.peek() {
+        if let Some(&Ok(Event::EndDictionary)) = self.de.events.peek() {
             return Ok(None);
         }
 
@@ -382,4 +384,10 @@ where
     fn size_hint(&self) -> Option<usize> {
         self.remaining
     }
+}
+
+pub fn deserialize<R: Read + Seek, T: de::DeserializeOwned>(reader: R) -> Result<T, Error> {
+    let reader = events::Reader::new(reader);
+    let mut de = Deserializer::new(reader);
+    de::Deserialize::deserialize(&mut de)
 }

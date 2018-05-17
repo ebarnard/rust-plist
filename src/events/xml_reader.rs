@@ -1,19 +1,20 @@
 use base64;
 use std::io::Read;
 use std::str::FromStr;
-use xml_rs::reader::{EventReader as XmlEventReader, ParserConfig, XmlEvent};
+use xml_rs::reader::{EventReader, ParserConfig, XmlEvent};
 
-use {Date, Error, PlistEvent, Result};
+use events::Event;
+use {Date, Error, Result};
 
-pub struct EventReader<R: Read> {
-    xml_reader: XmlEventReader<R>,
+pub struct XmlReader<R: Read> {
+    xml_reader: EventReader<R>,
     queued_event: Option<XmlEvent>,
     element_stack: Vec<String>,
     finished: bool,
 }
 
-impl<R: Read> EventReader<R> {
-    pub fn new(reader: R) -> EventReader<R> {
+impl<R: Read> XmlReader<R> {
+    pub fn new(reader: R) -> XmlReader<R> {
         let config = ParserConfig::new()
             .trim_whitespace(false)
             .whitespace_to_characters(true)
@@ -21,17 +22,17 @@ impl<R: Read> EventReader<R> {
             .ignore_comments(true)
             .coalesce_characters(true);
 
-        EventReader {
-            xml_reader: XmlEventReader::new_with_config(reader, config),
+        XmlReader {
+            xml_reader: EventReader::new_with_config(reader, config),
             queued_event: None,
             element_stack: Vec::new(),
             finished: false,
         }
     }
 
-    fn read_content<F>(&mut self, f: F) -> Result<PlistEvent>
+    fn read_content<F>(&mut self, f: F) -> Result<Event>
     where
-        F: FnOnce(String) -> Result<PlistEvent>,
+        F: FnOnce(String) -> Result<Event>,
     {
         match self.xml_reader.next() {
             Ok(XmlEvent::Characters(s)) => f(s),
@@ -51,7 +52,7 @@ impl<R: Read> EventReader<R> {
         }
     }
 
-    fn read_next(&mut self) -> Option<Result<PlistEvent>> {
+    fn read_next(&mut self) -> Option<Result<Event>> {
         loop {
             match self.next_event() {
                 Ok(XmlEvent::StartElement { name, .. }) => {
@@ -60,38 +61,38 @@ impl<R: Read> EventReader<R> {
 
                     match &name.local_name[..] {
                         "plist" => (),
-                        "array" => return Some(Ok(PlistEvent::StartArray(None))),
-                        "dict" => return Some(Ok(PlistEvent::StartDictionary(None))),
-                        "key" => return Some(self.read_content(|s| Ok(PlistEvent::StringValue(s)))),
-                        "true" => return Some(Ok(PlistEvent::BooleanValue(true))),
-                        "false" => return Some(Ok(PlistEvent::BooleanValue(false))),
+                        "array" => return Some(Ok(Event::StartArray(None))),
+                        "dict" => return Some(Ok(Event::StartDictionary(None))),
+                        "key" => return Some(self.read_content(|s| Ok(Event::StringValue(s)))),
+                        "true" => return Some(Ok(Event::BooleanValue(true))),
+                        "false" => return Some(Ok(Event::BooleanValue(false))),
                         "data" => {
                             return Some(self.read_content(|s| {
                                 let data = base64::decode_config(&s, base64::MIME)
                                     .map_err(|_| Error::InvalidData)?;
-                                Ok(PlistEvent::DataValue(data))
+                                Ok(Event::DataValue(data))
                             }))
                         }
                         "date" => {
-                            return Some(self.read_content(|s| {
-                                Ok(PlistEvent::DateValue(Date::from_rfc3339(&s)?))
-                            }))
+                            return Some(
+                                self.read_content(|s| {
+                                    Ok(Event::DateValue(Date::from_rfc3339(&s)?))
+                                }),
+                            )
                         }
                         "integer" => {
                             return Some(self.read_content(|s| match FromStr::from_str(&s) {
-                                Ok(i) => Ok(PlistEvent::IntegerValue(i)),
+                                Ok(i) => Ok(Event::IntegerValue(i)),
                                 Err(_) => Err(Error::InvalidData),
                             }))
                         }
                         "real" => {
                             return Some(self.read_content(|s| match FromStr::from_str(&s) {
-                                Ok(f) => Ok(PlistEvent::RealValue(f)),
+                                Ok(f) => Ok(Event::RealValue(f)),
                                 Err(_) => Err(Error::InvalidData),
                             }))
                         }
-                        "string" => {
-                            return Some(self.read_content(|s| Ok(PlistEvent::StringValue(s))))
-                        }
+                        "string" => return Some(self.read_content(|s| Ok(Event::StringValue(s)))),
                         _ => return Some(Err(Error::InvalidData)),
                     }
                 }
@@ -104,8 +105,8 @@ impl<R: Read> EventReader<R> {
                     }
 
                     match &name.local_name[..] {
-                        "array" => return Some(Ok(PlistEvent::EndArray)),
-                        "dict" => return Some(Ok(PlistEvent::EndDictionary)),
+                        "array" => return Some(Ok(Event::EndArray)),
+                        "dict" => return Some(Ok(Event::EndDictionary)),
                         "plist" => (),
                         _ => (),
                     }
@@ -124,10 +125,10 @@ impl<R: Read> EventReader<R> {
     }
 }
 
-impl<R: Read> Iterator for EventReader<R> {
-    type Item = Result<PlistEvent>;
+impl<R: Read> Iterator for XmlReader<R> {
+    type Item = Result<Event>;
 
-    fn next(&mut self) -> Option<Result<PlistEvent>> {
+    fn next(&mut self) -> Option<Result<Event>> {
         if self.finished {
             None
         } else {
@@ -153,15 +154,14 @@ mod tests {
     use std::path::Path;
 
     use super::*;
-    use PlistEvent;
+    use events::Event;
+    use events::Event::*;
 
     #[test]
     fn streaming_parser() {
-        use PlistEvent::*;
-
         let reader = File::open(&Path::new("./tests/data/xml.plist")).unwrap();
-        let streaming_parser = EventReader::new(reader);
-        let events: Vec<PlistEvent> = streaming_parser.map(|e| e.unwrap()).collect();
+        let streaming_parser = XmlReader::new(reader);
+        let events: Vec<Event> = streaming_parser.map(|e| e.unwrap()).collect();
 
         let comparison = &[
             StartDictionary(None),
@@ -191,7 +191,7 @@ mod tests {
     #[test]
     fn bad_data() {
         let reader = File::open(&Path::new("./tests/data/xml_error.plist")).unwrap();
-        let streaming_parser = EventReader::new(reader);
+        let streaming_parser = XmlReader::new(reader);
         let events: Vec<_> = streaming_parser.collect();
 
         assert!(events.last().unwrap().is_err());

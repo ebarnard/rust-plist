@@ -1,13 +1,14 @@
 use std::collections::BTreeMap;
 
-use {Error, Plist, PlistEvent, Result, u64_option_to_usize};
+use events::Event;
+use {u64_option_to_usize, Error, Result, Value};
 
 pub struct Builder<T> {
     stream: T,
-    token: Option<PlistEvent>,
+    token: Option<Event>,
 }
 
-impl<T: Iterator<Item = Result<PlistEvent>>> Builder<T> {
+impl<T: Iterator<Item = Result<Event>>> Builder<T> {
     pub fn new(stream: T) -> Builder<T> {
         Builder {
             stream: stream,
@@ -15,7 +16,7 @@ impl<T: Iterator<Item = Result<PlistEvent>>> Builder<T> {
         }
     }
 
-    pub fn build(mut self) -> Result<Plist> {
+    pub fn build(mut self) -> Result<Value> {
         self.bump()?;
 
         let plist = self.build_value()?;
@@ -37,27 +38,27 @@ impl<T: Iterator<Item = Result<PlistEvent>>> Builder<T> {
         Ok(())
     }
 
-    fn build_value(&mut self) -> Result<Plist> {
+    fn build_value(&mut self) -> Result<Value> {
         match self.token.take() {
-            Some(PlistEvent::StartArray(len)) => Ok(Plist::Array(self.build_array(len)?)),
-            Some(PlistEvent::StartDictionary(len)) => Ok(Plist::Dictionary(self.build_dict(len)?)),
+            Some(Event::StartArray(len)) => Ok(Value::Array(self.build_array(len)?)),
+            Some(Event::StartDictionary(len)) => Ok(Value::Dictionary(self.build_dict(len)?)),
 
-            Some(PlistEvent::BooleanValue(b)) => Ok(Plist::Boolean(b)),
-            Some(PlistEvent::DataValue(d)) => Ok(Plist::Data(d)),
-            Some(PlistEvent::DateValue(d)) => Ok(Plist::Date(d)),
-            Some(PlistEvent::IntegerValue(i)) => Ok(Plist::Integer(i)),
-            Some(PlistEvent::RealValue(f)) => Ok(Plist::Real(f)),
-            Some(PlistEvent::StringValue(s)) => Ok(Plist::String(s)),
+            Some(Event::BooleanValue(b)) => Ok(Value::Boolean(b)),
+            Some(Event::DataValue(d)) => Ok(Value::Data(d)),
+            Some(Event::DateValue(d)) => Ok(Value::Date(d)),
+            Some(Event::IntegerValue(i)) => Ok(Value::Integer(i)),
+            Some(Event::RealValue(f)) => Ok(Value::Real(f)),
+            Some(Event::StringValue(s)) => Ok(Value::String(s)),
 
-            Some(PlistEvent::EndArray) => Err(Error::InvalidData),
-            Some(PlistEvent::EndDictionary) => Err(Error::InvalidData),
+            Some(Event::EndArray) => Err(Error::InvalidData),
+            Some(Event::EndDictionary) => Err(Error::InvalidData),
 
             // The stream should not have ended here
             None => Err(Error::InvalidData),
         }
     }
 
-    fn build_array(&mut self, len: Option<u64>) -> Result<Vec<Plist>> {
+    fn build_array(&mut self, len: Option<u64>) -> Result<Vec<Value>> {
         let len = u64_option_to_usize(len)?;
         let mut values = match len {
             Some(len) => Vec::with_capacity(len),
@@ -66,7 +67,7 @@ impl<T: Iterator<Item = Result<PlistEvent>>> Builder<T> {
 
         loop {
             self.bump()?;
-            if let Some(PlistEvent::EndArray) = self.token {
+            if let Some(Event::EndArray) = self.token {
                 self.token.take();
                 return Ok(values);
             }
@@ -74,14 +75,14 @@ impl<T: Iterator<Item = Result<PlistEvent>>> Builder<T> {
         }
     }
 
-    fn build_dict(&mut self, _len: Option<u64>) -> Result<BTreeMap<String, Plist>> {
+    fn build_dict(&mut self, _len: Option<u64>) -> Result<BTreeMap<String, Value>> {
         let mut values = BTreeMap::new();
 
         loop {
             self.bump()?;
             match self.token.take() {
-                Some(PlistEvent::EndDictionary) => return Ok(values),
-                Some(PlistEvent::StringValue(s)) => {
+                Some(Event::EndDictionary) => return Ok(values),
+                Some(Event::StringValue(s)) => {
                     self.bump()?;
                     values.insert(s, self.build_value()?);
                 }
@@ -99,14 +100,12 @@ mod tests {
     use std::collections::BTreeMap;
 
     use super::*;
-    use Plist;
+    use events::Event::*;
+    use Value;
 
     #[test]
     fn builder() {
-        use PlistEvent::*;
-
         // Input
-
         let events = vec![
             StartDictionary(None),
             StringValue("Author".to_owned()),
@@ -127,22 +126,21 @@ mod tests {
         let plist = builder.build();
 
         // Expected output
-
         let mut lines = Vec::new();
-        lines.push(Plist::String("It is a tale told by an idiot,".to_owned()));
-        lines.push(Plist::String(
+        lines.push(Value::String("It is a tale told by an idiot,".to_owned()));
+        lines.push(Value::String(
             "Full of sound and fury, signifying nothing.".to_owned(),
         ));
 
         let mut dict = BTreeMap::new();
         dict.insert(
             "Author".to_owned(),
-            Plist::String("William Shakespeare".to_owned()),
+            Value::String("William Shakespeare".to_owned()),
         );
-        dict.insert("Lines".to_owned(), Plist::Array(lines));
-        dict.insert("Birthdate".to_owned(), Plist::Integer(1564));
-        dict.insert("Height".to_owned(), Plist::Real(1.60));
+        dict.insert("Lines".to_owned(), Value::Array(lines));
+        dict.insert("Birthdate".to_owned(), Value::Integer(1564));
+        dict.insert("Height".to_owned(), Value::Real(1.60));
 
-        assert_eq!(plist.unwrap(), Plist::Dictionary(dict));
+        assert_eq!(plist.unwrap(), Value::Dictionary(dict));
     }
 }

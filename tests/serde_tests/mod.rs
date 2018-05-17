@@ -1,13 +1,14 @@
-use plist::PlistEvent::*;
-use plist::serde::{Deserializer, Serializer};
-use plist::{Date, Error, EventWriter, PlistEvent};
+use plist::events::Event;
+use plist::events::Event::*;
+use plist::events::Writer;
+use plist::{Date, Deserializer, Error, Serializer};
 use serde::de::DeserializeOwned;
 use serde::ser::Serialize;
 use std::fmt::Debug;
 use std::time::SystemTime;
 
 struct VecWriter {
-    events: Vec<PlistEvent>,
+    events: Vec<Event>,
 }
 
 impl VecWriter {
@@ -15,13 +16,13 @@ impl VecWriter {
         VecWriter { events: Vec::new() }
     }
 
-    pub fn into_inner(self) -> Vec<PlistEvent> {
+    pub fn into_inner(self) -> Vec<Event> {
         self.events
     }
 }
 
-impl EventWriter for VecWriter {
-    fn write(&mut self, event: &PlistEvent) -> Result<(), Error> {
+impl Writer for VecWriter {
+    fn write(&mut self, event: &Event) -> Result<(), Error> {
         self.events.push(event.clone());
         Ok(())
     }
@@ -31,12 +32,12 @@ fn new_serializer() -> Serializer<VecWriter> {
     Serializer::new(VecWriter::new())
 }
 
-fn new_deserializer(events: Vec<PlistEvent>) -> Deserializer<Vec<Result<PlistEvent, Error>>> {
+fn new_deserializer(events: Vec<Event>) -> Deserializer<Vec<Result<Event, Error>>> {
     let result_events = events.into_iter().map(Ok).collect();
     Deserializer::new(result_events)
 }
 
-fn assert_roundtrip<T>(obj: T, comparison: Option<&[PlistEvent]>)
+fn assert_roundtrip<T>(obj: T, comparison: Option<&[Event]>)
 where
     T: Debug + DeserializeOwned + PartialEq + Serialize,
 {
@@ -98,13 +99,11 @@ fn cow() {
 #[test]
 fn dog() {
     let dog = Animal::Dog(DogOuter {
-        inner: vec![
-            DogInner {
-                a: (),
-                b: 12,
-                c: vec!["a".to_string(), "b".to_string()],
-            },
-        ],
+        inner: vec![DogInner {
+            a: (),
+            b: 12,
+            c: vec!["a".to_string(), "b".to_string()],
+        }],
     });
 
     let comparison = &[

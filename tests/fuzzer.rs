@@ -1,6 +1,6 @@
 extern crate plist;
 
-use plist::{Error, Plist};
+use plist::{Error, Value};
 use std::io::Cursor;
 
 #[test]
@@ -59,9 +59,9 @@ fn issue_22_binary_with_byte_ref_size() {
     test_fuzzer_data_ok(data);
 }
 
-fn test_fuzzer_data(data: &[u8]) -> Result<Plist, Error> {
+fn test_fuzzer_data(data: &[u8]) -> Result<Value, Error> {
     let cursor = Cursor::new(data);
-    Plist::read(cursor)
+    Value::read(cursor)
 }
 
 fn test_fuzzer_data_ok(data: &[u8]) {

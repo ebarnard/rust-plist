@@ -70,8 +70,8 @@ impl Into<SystemTime> for Date {
 
 #[cfg(feature = "serde")]
 pub mod serde_impls {
-    use serde_base::de::{Deserialize, Deserializer, Error, Unexpected, Visitor};
-    use serde_base::ser::{Serialize, Serializer};
+    use serde::de::{Deserialize, Deserializer, Error, Unexpected, Visitor};
+    use serde::ser::{Serialize, Serializer};
     use std::fmt;
 
     use Date;

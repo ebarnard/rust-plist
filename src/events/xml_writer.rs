@@ -3,10 +3,10 @@ use std::borrow::Cow;
 use std::io::Write;
 use xml_rs::name::Name;
 use xml_rs::namespace::Namespace;
-use xml_rs::writer::events::XmlEvent as WriteXmlEvent;
-use xml_rs::writer::{EmitterConfig, Error as XmlWriterError, EventWriter as XmlEventWriter};
+use xml_rs::writer::{EmitterConfig, Error as XmlWriterError, EventWriter, XmlEvent};
 
-use {Error, EventWriter as PlistEventWriter, PlistEvent, Result};
+use events::{Event, Writer};
+use {Error, Result};
 
 impl From<XmlWriterError> for Error {
     fn from(err: XmlWriterError) -> Error {
@@ -28,15 +28,15 @@ enum DictionaryState {
     ExpectValue,
 }
 
-pub struct EventWriter<W: Write> {
-    xml_writer: XmlEventWriter<W>,
+pub struct XmlWriter<W: Write> {
+    xml_writer: EventWriter<W>,
     stack: Vec<Element>,
     // Not very nice
     empty_namespace: Namespace,
 }
 
-impl<W: Write> EventWriter<W> {
-    pub fn new(writer: W) -> EventWriter<W> {
+impl<W: Write> XmlWriter<W> {
+    pub fn new(writer: W) -> XmlWriter<W> {
         let config = EmitterConfig::new()
             .line_separator("\n")
             .indent_string("\t")
@@ -47,8 +47,8 @@ impl<W: Write> EventWriter<W> {
             .keep_element_names_stack(false)
             .autopad_comments(true);
 
-        EventWriter {
-            xml_writer: XmlEventWriter::new_with_config(writer, config),
+        XmlWriter {
+            xml_writer: EventWriter::new_with_config(writer, config),
             stack: Vec::new(),
             empty_namespace: Namespace::empty(),
         }
@@ -62,7 +62,7 @@ impl<W: Write> EventWriter<W> {
     }
 
     fn start_element(&mut self, name: &str) -> Result<()> {
-        self.xml_writer.write(WriteXmlEvent::StartElement {
+        self.xml_writer.write(XmlEvent::StartElement {
             name: Name::local(name),
             attributes: Cow::Borrowed(&[]),
             namespace: Cow::Borrowed(&self.empty_namespace),
@@ -71,14 +71,14 @@ impl<W: Write> EventWriter<W> {
     }
 
     fn end_element(&mut self, name: &str) -> Result<()> {
-        self.xml_writer.write(WriteXmlEvent::EndElement {
+        self.xml_writer.write(XmlEvent::EndElement {
             name: Some(Name::local(name)),
         })?;
         Ok(())
     }
 
     fn write_value(&mut self, value: &str) -> Result<()> {
-        self.xml_writer.write(WriteXmlEvent::Characters(value))?;
+        self.xml_writer.write(XmlEvent::Characters(value))?;
         Ok(())
     }
 
@@ -96,22 +96,22 @@ impl<W: Write> EventWriter<W> {
         Ok(())
     }
 
-    pub fn write(&mut self, event: &PlistEvent) -> Result<()> {
-        <Self as PlistEventWriter>::write(self, event)
+    pub fn write(&mut self, event: &Event) -> Result<()> {
+        <Self as Writer>::write(self, event)
     }
 }
 
-impl<W: Write> PlistEventWriter for EventWriter<W> {
-    fn write(&mut self, event: &PlistEvent) -> Result<()> {
+impl<W: Write> Writer for XmlWriter<W> {
+    fn write(&mut self, event: &Event) -> Result<()> {
         match self.stack.pop() {
             Some(Element::Dictionary(DictionaryState::ExpectKey)) => {
                 match *event {
-                    PlistEvent::StringValue(ref value) => {
+                    Event::StringValue(ref value) => {
                         self.write_element_and_value("key", &*value)?;
                         self.stack
                             .push(Element::Dictionary(DictionaryState::ExpectValue));
                     }
-                    PlistEvent::EndDictionary => {
+                    Event::EndDictionary => {
                         self.end_element("dict")?;
                         // We might be closing the last tag here as well
                         self.maybe_end_plist()?;
@@ -120,7 +120,8 @@ impl<W: Write> PlistEventWriter for EventWriter<W> {
                 };
                 return Ok(());
             }
-            Some(Element::Dictionary(DictionaryState::ExpectValue)) => self.stack
+            Some(Element::Dictionary(DictionaryState::ExpectValue)) => self
+                .stack
                 .push(Element::Dictionary(DictionaryState::ExpectKey)),
             Some(other) => self.stack.push(other),
             None => {
@@ -136,11 +137,11 @@ impl<W: Write> PlistEventWriter for EventWriter<W> {
         }
 
         match *event {
-            PlistEvent::StartArray(_) => {
+            Event::StartArray(_) => {
                 self.start_element("array")?;
                 self.stack.push(Element::Array);
             }
-            PlistEvent::EndArray => {
+            Event::EndArray => {
                 self.end_element("array")?;
                 if let Some(Element::Array) = self.stack.pop() {
                 } else {
@@ -148,35 +149,35 @@ impl<W: Write> PlistEventWriter for EventWriter<W> {
                 }
             }
 
-            PlistEvent::StartDictionary(_) => {
+            Event::StartDictionary(_) => {
                 self.start_element("dict")?;
                 self.stack
                     .push(Element::Dictionary(DictionaryState::ExpectKey));
             }
-            PlistEvent::EndDictionary => return Err(Error::InvalidData),
+            Event::EndDictionary => return Err(Error::InvalidData),
 
-            PlistEvent::BooleanValue(true) => {
+            Event::BooleanValue(true) => {
                 self.start_element("true")?;
                 self.end_element("true")?;
             }
-            PlistEvent::BooleanValue(false) => {
+            Event::BooleanValue(false) => {
                 self.start_element("false")?;
                 self.end_element("false")?;
             }
-            PlistEvent::DataValue(ref value) => {
+            Event::DataValue(ref value) => {
                 let base64_data = base64::encode_config(&value, base64::MIME);
                 self.write_element_and_value("data", &base64_data)?;
             }
-            PlistEvent::DateValue(ref value) => {
+            Event::DateValue(ref value) => {
                 self.write_element_and_value("date", &value.to_rfc3339())?
             }
-            PlistEvent::IntegerValue(ref value) => {
+            Event::IntegerValue(ref value) => {
                 self.write_element_and_value("integer", &value.to_string())?
             }
-            PlistEvent::RealValue(ref value) => {
+            Event::RealValue(ref value) => {
                 self.write_element_and_value("real", &value.to_string())?
             }
-            PlistEvent::StringValue(ref value) => self.write_element_and_value("string", &*value)?,
+            Event::StringValue(ref value) => self.write_element_and_value("string", &*value)?,
         };
 
         self.maybe_end_plist()?;
@@ -191,11 +192,10 @@ mod tests {
     use std::io::Cursor;
 
     use super::*;
+    use events::Event::*;
 
     #[test]
     fn streaming_parser() {
-        use PlistEvent::*;
-
         let plist = &[
             StartDictionary(None),
             StringValue("Author".to_owned()),
@@ -221,7 +221,7 @@ mod tests {
         let mut cursor = Cursor::new(Vec::new());
 
         {
-            let mut plist_w = EventWriter::new(&mut cursor);
+            let mut plist_w = XmlWriter::new(&mut cursor);
 
             for item in plist {
                 plist_w.write(item).unwrap();
