@@ -6,6 +6,5 @@ rust:
 - stable
 - 1.18.0
 script:
-- |
-  cargo test
-  cargo test --no-default-features
+  - cargo test
+  - cargo test --no-default-features
