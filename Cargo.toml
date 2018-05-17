@@ -7,6 +7,7 @@ license = "MIT"
 repository = "https://github.com/ebarnard/rust-plist/"
 documentation = "https://docs.rs/plist/0.3.1/plist/"
 keywords = ["plist", "parser"]
+categories = ["config", "encoding", "parser-implementations"]
 
 [features]
 default = ["serde"]
