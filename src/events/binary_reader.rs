@@ -54,7 +54,7 @@ impl<R: Read + Seek> BinaryReader<R> {
         BinaryReader {
             stack: Vec::new(),
             object_offsets: Vec::new(),
-            reader: reader,
+            reader,
             ref_size: 0,
             finished: false,
             max_allocation_bytes: 0,
@@ -127,10 +127,10 @@ impl<R: Read + Seek> BinaryReader<R> {
         let mut ints = self.allocate_vec(len, size as usize)?;
         for _ in 0..len {
             match size {
-                1 => ints.push(self.reader.read_u8()? as u64),
-                2 => ints.push(self.reader.read_u16::<BigEndian>()? as u64),
-                4 => ints.push(self.reader.read_u32::<BigEndian>()? as u64),
-                8 => ints.push(self.reader.read_u64::<BigEndian>()? as u64),
+                1 => ints.push(self.reader.read_u8()?.into()),
+                2 => ints.push(self.reader.read_u16::<BigEndian>()?.into()),
+                4 => ints.push(self.reader.read_u32::<BigEndian>()?.into()),
+                8 => ints.push(self.reader.read_u64::<BigEndian>()?),
                 _ => return Err(Error::InvalidData),
             }
         }
@@ -146,14 +146,14 @@ impl<R: Read + Seek> BinaryReader<R> {
         if (len & 0x0f) == 0x0f {
             let len_power_of_two = self.reader.read_u8()? & 0x03;
             Ok(match len_power_of_two {
-                0 => self.reader.read_u8()? as u64,
-                1 => self.reader.read_u16::<BigEndian>()? as u64,
-                2 => self.reader.read_u32::<BigEndian>()? as u64,
+                0 => self.reader.read_u8()?.into(),
+                1 => self.reader.read_u16::<BigEndian>()?.into(),
+                2 => self.reader.read_u32::<BigEndian>()?.into(),
                 3 => self.reader.read_u64::<BigEndian>()?,
                 _ => return Err(Error::InvalidData),
             })
         } else {
-            Ok(len as u64)
+            Ok(len.into())
         }
     }
 
@@ -166,8 +166,7 @@ impl<R: Read + Seek> BinaryReader<R> {
 
     fn seek_to_object(&mut self, object_ref: u64) -> Result<u64, Error> {
         let object_ref = u64_to_usize(object_ref)?;
-        let offset = *self
-            .object_offsets
+        let offset = *self.object_offsets
             .get(object_ref)
             .ok_or(Error::InvalidData)?;
         Ok(self.reader.seek(SeekFrom::Start(offset))?)
@@ -214,17 +213,19 @@ impl<R: Read + Seek> BinaryReader<R> {
             (0x0, 0x08) => Some(Event::BooleanValue(false)),
             (0x0, 0x09) => Some(Event::BooleanValue(true)),
             (0x0, 0x0f) => return Err(Error::InvalidData), // fill
-            (0x1, 0) => Some(Event::IntegerValue(self.reader.read_u8()? as i64)),
+            (0x1, 0) => Some(Event::IntegerValue(self.reader.read_u8()?.into())),
             (0x1, 1) => Some(Event::IntegerValue(
-                self.reader.read_u16::<BigEndian>()? as i64
+                self.reader.read_u16::<BigEndian>()?.into(),
             )),
             (0x1, 2) => Some(Event::IntegerValue(
-                self.reader.read_u32::<BigEndian>()? as i64
+                self.reader.read_u32::<BigEndian>()?.into(),
             )),
             (0x1, 3) => Some(Event::IntegerValue(self.reader.read_i64::<BigEndian>()?)),
             (0x1, 4) => return Err(Error::InvalidData), // 128 bit int
             (0x1, _) => return Err(Error::InvalidData), // variable length int
-            (0x2, 2) => Some(Event::RealValue(self.reader.read_f32::<BigEndian>()? as f64)),
+            (0x2, 2) => Some(Event::RealValue(
+                self.reader.read_f32::<BigEndian>()?.into(),
+            )),
             (0x2, 3) => Some(Event::RealValue(self.reader.read_f64::<BigEndian>()?)),
             (0x2, _) => return Err(Error::InvalidData), // odd length float
             (0x3, 3) => {
@@ -267,7 +268,7 @@ impl<R: Read + Seek> BinaryReader<R> {
 
                 self.stack.push(StackItem {
                     ty: StackType::Array,
-                    object_refs: object_refs,
+                    object_refs,
                 });
 
                 Some(Event::StartArray(Some(len)))
@@ -288,7 +289,7 @@ impl<R: Read + Seek> BinaryReader<R> {
 
                 self.stack.push(StackItem {
                     ty: StackType::Dict,
-                    object_refs: object_refs,
+                    object_refs,
                 });
 
                 Some(Event::StartDictionary(Some(len as u64)))

@@ -120,8 +120,7 @@ impl<W: Write> Writer for XmlWriter<W> {
                 };
                 return Ok(());
             }
-            Some(Element::Dictionary(DictionaryState::ExpectValue)) => self
-                .stack
+            Some(Element::Dictionary(DictionaryState::ExpectValue)) => self.stack
                 .push(Element::Dictionary(DictionaryState::ExpectKey)),
             Some(other) => self.stack.push(other),
             None => {

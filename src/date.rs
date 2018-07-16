@@ -25,7 +25,7 @@ impl Date {
     pub(crate) fn from_seconds_since_plist_epoch(timestamp: f64) -> Result<Date, Error> {
         // `timestamp` is the number of seconds since the plist epoch of 1/1/2001 00:00:00.
         // `PLIST_EPOCH_UNIX_TIMESTAMP` is the unix timestamp of the plist epoch.
-        const PLIST_EPOCH_UNIX_TIMESTAMP: u64 = 978307200;
+        const PLIST_EPOCH_UNIX_TIMESTAMP: u64 = 978_307_200;
         let plist_epoch = UNIX_EPOCH + Duration::from_secs(PLIST_EPOCH_UNIX_TIMESTAMP);
 
         if !timestamp.is_finite() {
@@ -58,13 +58,13 @@ impl fmt::Debug for Date {
 
 impl From<SystemTime> for Date {
     fn from(date: SystemTime) -> Self {
-        Date { inner: date.into() }
+        Date { inner: date }
     }
 }
 
 impl Into<SystemTime> for Date {
     fn into(self) -> SystemTime {
-        self.inner.into()
+        self.inner
     }
 }
 
@@ -76,7 +76,7 @@ pub mod serde_impls {
 
     use Date;
 
-    pub const DATE_NEWTYPE_STRUCT_NAME: &'static str = "PLIST-DATE";
+    pub const DATE_NEWTYPE_STRUCT_NAME: &str = "PLIST-DATE";
 
     impl Serialize for Date {
         fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>

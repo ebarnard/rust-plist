@@ -222,7 +222,7 @@ impl From<f64> for Value {
 
 impl From<f32> for Value {
     fn from(from: f32) -> Value {
-        Value::Real(from as f64)
+        Value::Real(from.into())
     }
 }
 
@@ -234,37 +234,37 @@ impl From<i64> for Value {
 
 impl From<i32> for Value {
     fn from(from: i32) -> Value {
-        Value::Integer(from as i64)
+        Value::Integer(from.into())
     }
 }
 
 impl From<i16> for Value {
     fn from(from: i16) -> Value {
-        Value::Integer(from as i64)
+        Value::Integer(from.into())
     }
 }
 
 impl From<i8> for Value {
     fn from(from: i8) -> Value {
-        Value::Integer(from as i64)
+        Value::Integer(from.into())
     }
 }
 
 impl From<u32> for Value {
     fn from(from: u32) -> Value {
-        Value::Integer(from as i64)
+        Value::Integer(from.into())
     }
 }
 
 impl From<u16> for Value {
     fn from(from: u16) -> Value {
-        Value::Integer(from as i64)
+        Value::Integer(from.into())
     }
 }
 
 impl From<u8> for Value {
     fn from(from: u8) -> Value {
-        Value::Integer(from as i64)
+        Value::Integer(from.into())
     }
 }
 
@@ -276,7 +276,7 @@ impl<'a> From<&'a f64> for Value {
 
 impl<'a> From<&'a f32> for Value {
     fn from(from: &'a f32) -> Value {
-        Value::Real(*from as f64)
+        Value::Real((*from).into())
     }
 }
 
@@ -288,37 +288,37 @@ impl<'a> From<&'a i64> for Value {
 
 impl<'a> From<&'a i32> for Value {
     fn from(from: &'a i32) -> Value {
-        Value::Integer(*from as i64)
+        Value::Integer((*from).into())
     }
 }
 
 impl<'a> From<&'a i16> for Value {
     fn from(from: &'a i16) -> Value {
-        Value::Integer(*from as i64)
+        Value::Integer((*from).into())
     }
 }
 
 impl<'a> From<&'a i8> for Value {
     fn from(from: &'a i8) -> Value {
-        Value::Integer(*from as i64)
+        Value::Integer((*from).into())
     }
 }
 
 impl<'a> From<&'a u32> for Value {
     fn from(from: &'a u32) -> Value {
-        Value::Integer(*from as i64)
+        Value::Integer((*from).into())
     }
 }
 
 impl<'a> From<&'a u16> for Value {
     fn from(from: &'a u16) -> Value {
-        Value::Integer(*from as i64)
+        Value::Integer((*from).into())
     }
 }
 
 impl<'a> From<&'a u8> for Value {
     fn from(from: &'a u8) -> Value {
-        Value::Integer(*from as i64)
+        Value::Integer((*from).into())
     }
 }
 

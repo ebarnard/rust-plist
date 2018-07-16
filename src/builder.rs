@@ -11,7 +11,7 @@ pub struct Builder<T> {
 impl<T: Iterator<Item = Result<Event, Error>>> Builder<T> {
     pub fn new(stream: T) -> Builder<T> {
         Builder {
-            stream: stream,
+            stream,
             token: None,
         }
     }

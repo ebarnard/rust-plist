@@ -322,8 +322,8 @@ where
         len: Option<usize>,
     ) -> MapAndSeqAccess<'a, I> {
         MapAndSeqAccess {
-            de: de,
-            is_struct: is_struct,
+            de,
+            is_struct,
             remaining: len,
         }
     }
