@@ -87,7 +87,7 @@ impl<W: Write> XmlWriter<W> {
         if self.stack.len() == 1 {
             // We didn't tell the xml_writer about the <plist> tag so we'll skip telling it
             // about the </plist> tag as well.
-            self.xml_writer.inner_mut().write(b"\n</plist>")?;
+            self.xml_writer.inner_mut().write_all(b"\n</plist>")?;
             if let Some(Element::Root) = self.stack.pop() {
             } else {
                 return Err(Error::InvalidData);
@@ -130,7 +130,7 @@ impl<W: Write> Writer for XmlWriter<W> {
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 "#;
-                self.xml_writer.inner_mut().write(prologue.as_bytes())?;
+                self.xml_writer.inner_mut().write_all(prologue.as_bytes())?;
 
                 self.stack.push(Element::Root);
             }
