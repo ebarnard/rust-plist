@@ -65,7 +65,6 @@ extern crate xml as xml_rs;
 
 pub mod events;
 
-mod builder;
 mod date;
 mod value;
 
