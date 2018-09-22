@@ -386,7 +386,8 @@ where
     }
 }
 
-pub fn deserialize<R: Read + Seek, T: de::DeserializeOwned>(reader: R) -> Result<T, Error> {
+/// Deserializes an instance of type `T` from a seekable byte stream.
+pub fn from_reader<R: Read + Seek, T: de::DeserializeOwned>(reader: R) -> Result<T, Error> {
     let reader = events::Reader::new(reader);
     let mut de = Deserializer::new(reader);
     de::Deserialize::deserialize(&mut de)

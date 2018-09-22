@@ -20,6 +20,8 @@
 //! ## Examples
 //!
 //! ```rust
+//! extern crate plist;
+//!
 //! use plist::Value;
 //! use std::fs::File;
 //!
@@ -33,14 +35,13 @@
 //! ```
 //!
 //! ```rust
+//! extern crate plist;
 //! # #[cfg(feature = "serde")]
 //! #[macro_use]
 //! extern crate serde_derive;
-//! # extern crate plist;
 //!
 //! # #[cfg(feature = "serde")]
 //! # fn main() {
-//! use plist::deserialize;
 //! use std::fs::File;
 //!
 //! #[derive(Deserialize)]
@@ -51,7 +52,7 @@
 //! }
 //!
 //! let file = File::open("tests/data/xml.plist").unwrap();
-//! let info: Info = deserialize(file).unwrap();
+//! let info: Info = plist::from_reader(file).unwrap();
 //! # }
 //! #
 //! # #[cfg(not(feature = "serde"))]
@@ -80,9 +81,9 @@ mod de;
 #[cfg(feature = "serde")]
 mod ser;
 #[cfg(feature = "serde")]
-pub use self::de::{deserialize, Deserializer};
+pub use self::de::{from_reader, Deserializer};
 #[cfg(feature = "serde")]
-pub use self::ser::{serialize_to_xml, Serializer};
+pub use self::ser::{to_writer_xml, Serializer};
 
 use std::fmt;
 use std::io;

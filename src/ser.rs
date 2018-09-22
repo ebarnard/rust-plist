@@ -705,7 +705,8 @@ impl<'a, W: Writer> ser::SerializeStructVariant for Compound<'a, W> {
     }
 }
 
-pub fn serialize_to_xml<W: Write, T: ser::Serialize>(writer: W, value: &T) -> Result<(), Error> {
+/// Serializes the given data structure as an XML encoded plist file.
+pub fn to_writer_xml<W: Write, T: ser::Serialize>(writer: W, value: &T) -> Result<(), Error> {
     let writer = events::XmlWriter::new(writer);
     let mut ser = Serializer::new(writer);
     value.serialize(&mut ser)
