@@ -141,9 +141,9 @@ impl Value {
     /// If the `Value` is a Date, returns the associated `Date`.
     ///
     /// Returns `None` otherwise.
-    pub fn as_date(&self) -> Option<&Date> {
+    pub fn as_date(&self) -> Option<Date> {
         match *self {
-            Value::Date(ref date) => Some(date),
+            Value::Date(date) => Some(date),
             _ => None,
         }
     }
@@ -224,7 +224,7 @@ impl From<Date> for Value {
 
 impl<'a> From<&'a Date> for Value {
     fn from(from: &'a Date) -> Value {
-        Value::Date(from.clone())
+        Value::Date(*from)
     }
 }
 
@@ -471,7 +471,7 @@ mod tests {
         );
 
         let date: Date = SystemTime::now().into();
-        assert_eq!(Value::Date(date.clone()).as_date(), Some(&date));
+        assert_eq!(Value::Date(date.clone()).as_date(), Some(date));
 
         assert_eq!(Value::Real(0.0).as_real(), Some(0.0));
         assert_eq!(Value::Integer(1).as_integer(), Some(1));

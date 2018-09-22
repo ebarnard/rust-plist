@@ -6,7 +6,7 @@ use std::time::{Duration, SystemTime, UNIX_EPOCH};
 use Error;
 
 /// A UTC timestamp. Used for serialization to and from the plist date type.
-#[derive(Clone, PartialEq)]
+#[derive(Clone, Copy, Hash, PartialEq)]
 pub struct Date {
     inner: SystemTime,
 }
