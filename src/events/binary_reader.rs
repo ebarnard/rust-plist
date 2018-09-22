@@ -166,7 +166,8 @@ impl<R: Read + Seek> BinaryReader<R> {
 
     fn seek_to_object(&mut self, object_ref: u64) -> Result<u64, Error> {
         let object_ref = u64_to_usize(object_ref)?;
-        let offset = *self.object_offsets
+        let offset = *self
+            .object_offsets
             .get(object_ref)
             .ok_or(Error::InvalidData)?;
         Ok(self.reader.seek(SeekFrom::Start(offset))?)

@@ -74,9 +74,11 @@ impl<R: Read> XmlReader<R> {
                             }))
                         }
                         "date" => {
-                            return Some(self.read_content(|s| {
-                                Ok(Event::DateValue(Date::from_rfc3339(&s)?))
-                            }))
+                            return Some(
+                                self.read_content(|s| {
+                                    Ok(Event::DateValue(Date::from_rfc3339(&s)?))
+                                }),
+                            )
                         }
                         "integer" => {
                             return Some(self.read_content(|s| match FromStr::from_str(&s) {
