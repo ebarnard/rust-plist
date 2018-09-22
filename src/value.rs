@@ -4,6 +4,7 @@ use std::io::{Read, Seek};
 use events::{Event, Reader};
 use {u64_option_to_usize, Date, Error};
 
+/// Represents any plist value.
 #[derive(Clone, Debug, PartialEq)]
 pub enum Value {
     Array(Vec<Value>),
@@ -17,11 +18,13 @@ pub enum Value {
 }
 
 impl Value {
-    pub fn read<R: Read + Seek>(reader: R) -> Result<Value, Error> {
+    /// Reads a `Value` from a seekable byte stream.
+    pub fn from_reader<R: Read + Seek>(reader: R) -> Result<Value, Error> {
         let reader = Reader::new(reader);
         Value::from_events(reader)
     }
 
+    /// Creates a `Value` from an event source.
     pub fn from_events<T>(events: T) -> Result<Value, Error>
     where
         T: IntoIterator<Item = Result<Event, Error>>,
@@ -29,6 +32,7 @@ impl Value {
         Builder::new(events.into_iter()).build()
     }
 
+    /// Converts a `Value` into an `Event` stream.
     pub fn into_events(self) -> Vec<Event> {
         let mut events = Vec::new();
         self.into_events_inner(&mut events);

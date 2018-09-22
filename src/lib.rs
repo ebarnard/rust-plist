@@ -24,7 +24,7 @@
 //! use std::fs::File;
 //!
 //! let file = File::open("tests/data/xml.plist").unwrap();
-//! let plist = Value::read(file).unwrap();
+//! let plist = Value::from_reader(file).unwrap();
 //!
 //! match plist {
 //!     Value::Array(_array) => (),

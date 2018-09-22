@@ -61,7 +61,7 @@ fn issue_22_binary_with_byte_ref_size() {
 
 fn test_fuzzer_data(data: &[u8]) -> Result<Value, Error> {
     let cursor = Cursor::new(data);
-    Value::read(cursor)
+    Value::from_reader(cursor)
 }
 
 fn test_fuzzer_data_ok(data: &[u8]) {
