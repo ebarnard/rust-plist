@@ -61,8 +61,9 @@ impl Value {
         }
     }
 
-    /// If the `Value` is an Array, returns the associated Vec.
-    /// Returns None otherwise.
+    /// If the `Value` is an Array, returns the associated `Vec`.
+    ///
+    /// Returns `None` otherwise.
     pub fn as_array(&self) -> Option<&Vec<Value>> {
         match *self {
             Value::Array(ref array) => Some(array),
@@ -70,8 +71,9 @@ impl Value {
         }
     }
 
-    /// If the `Value` is an Array, returns the associated mutable Vec.
-    /// Returns None otherwise.
+    /// If the `Value` is an Array, returns the associated mutable `Vec`.
+    ///
+    /// Returns `None` otherwise.
     pub fn as_array_mut(&mut self) -> Option<&mut Vec<Value>> {
         match *self {
             Value::Array(ref mut array) => Some(array),
@@ -79,8 +81,9 @@ impl Value {
         }
     }
 
-    /// If the `Value` is a Dictionary, returns the associated BTreeMap.
-    /// Returns None otherwise.
+    /// If the `Value` is a Dictionary, returns the associated `BTreeMap`.
+    ///
+    /// Returns `None` otherwise.
     pub fn as_dictionary(&self) -> Option<&BTreeMap<String, Value>> {
         match *self {
             Value::Dictionary(ref map) => Some(map),
@@ -88,8 +91,9 @@ impl Value {
         }
     }
 
-    /// If the `Value` is a Dictionary, returns the associated mutable BTreeMap.
-    /// Returns None otherwise.
+    /// If the `Value` is a Dictionary, returns the associated mutable `BTreeMap`.
+    ///
+    /// Returns `None` otherwise.
     pub fn as_dictionary_mut(&mut self) -> Option<&mut BTreeMap<String, Value>> {
         match *self {
             Value::Dictionary(ref mut map) => Some(map),
@@ -97,8 +101,9 @@ impl Value {
         }
     }
 
-    /// If the `Value` is a Boolean, returns the associated bool.
-    /// Returns None otherwise.
+    /// If the `Value` is a Boolean, returns the associated `bool`.
+    ///
+    /// Returns `None` otherwise.
     pub fn as_boolean(&self) -> Option<bool> {
         match *self {
             Value::Boolean(v) => Some(v),
@@ -106,8 +111,9 @@ impl Value {
         }
     }
 
-    /// If the `Value` is a Data, returns the underlying Vec.
-    /// Returns None otherwise.
+    /// If the `Value` is a Data, returns the underlying `Vec`.
+    ///
+    /// Returns `None` otherwise.
     ///
     /// This method consumes the `Value`. If this is not desired, please use
     /// `as_data` method.
@@ -118,8 +124,9 @@ impl Value {
         }
     }
 
-    /// If the `Value` is a Data, returns the associated Vec.
-    /// Returns None otherwise.
+    /// If the `Value` is a Data, returns the associated `Vec`.
+    ///
+    /// Returns `None` otherwise.
     pub fn as_data(&self) -> Option<&[u8]> {
         match *self {
             Value::Data(ref data) => Some(data),
@@ -127,8 +134,9 @@ impl Value {
         }
     }
 
-    /// If the `Value` is a Date, returns the associated DateTime.
-    /// Returns None otherwise.
+    /// If the `Value` is a Date, returns the associated `Date`.
+    ///
+    /// Returns `None` otherwise.
     pub fn as_date(&self) -> Option<&Date> {
         match *self {
             Value::Date(ref date) => Some(date),
@@ -136,8 +144,9 @@ impl Value {
         }
     }
 
-    /// If the `Value` is a Real, returns the associated f64.
-    /// Returns None otherwise.
+    /// If the `Value` is a Real, returns the associated `f64`.
+    ///
+    /// Returns `None` otherwise.
     pub fn as_real(&self) -> Option<f64> {
         match *self {
             Value::Real(v) => Some(v),
@@ -145,8 +154,9 @@ impl Value {
         }
     }
 
-    /// If the `Value` is an Integer, returns the associated i64.
-    /// Returns None otherwise.
+    /// If the `Value` is an Integer, returns the associated `i64`.
+    ///
+    /// Returns `None` otherwise.
     pub fn as_integer(&self) -> Option<i64> {
         match *self {
             Value::Integer(v) => Some(v),
@@ -154,8 +164,9 @@ impl Value {
         }
     }
 
-    /// If the `Value` is a String, returns the underlying String.
-    /// Returns None otherwise.
+    /// If the `Value` is a String, returns the underlying `String`.
+    ///
+    /// Returns `None` otherwise.
     ///
     /// This method consumes the `Value`. If this is not desired, please use
     /// `as_string` method.
@@ -166,8 +177,9 @@ impl Value {
         }
     }
 
-    /// If the `Value` is a String, returns the associated str.
-    /// Returns None otherwise.
+    /// If the `Value` is a String, returns the associated `str`.
+    ///
+    /// Returns `None` otherwise.
     pub fn as_string(&self) -> Option<&str> {
         match *self {
             Value::String(ref v) => Some(v),
