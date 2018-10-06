@@ -1,7 +1,10 @@
 use std::collections::BTreeMap;
-use std::io::{Read, Seek};
+use std::fs::File;
+use std::io::Write;
+use std::io::{BufReader, Read, Seek};
+use std::path::Path;
 
-use events::{Event, Reader};
+use events::{Event, Reader, Writer, XmlReader, XmlWriter};
 use {u64_to_usize, Date, Error};
 
 /// Represents any plist value.
@@ -18,10 +21,36 @@ pub enum Value {
 }
 
 impl Value {
-    /// Reads a `Value` from a seekable byte stream.
+    /// Reads a `Value` from a plist file of any encoding.
+    pub fn from_file<P: AsRef<Path>>(path: P) -> Result<Value, Error> {
+        let file = File::open(path)?;
+        Value::from_reader(BufReader::new(file))
+    }
+
+    /// Reads a `Value` from a seekable byte stream containing a plist file of any encoding.
     pub fn from_reader<R: Read + Seek>(reader: R) -> Result<Value, Error> {
         let reader = Reader::new(reader);
         Value::from_events(reader)
+    }
+
+    /// Reads a `Value` from a seekable byte stream containing an XML encoded plist file.
+    pub fn from_reader_xml<R: Read>(reader: R) -> Result<Value, Error> {
+        let reader = XmlReader::new(reader);
+        Value::from_events(reader)
+    }
+
+    /// Serializes the given data structure as an XML encoded plist file.
+    pub fn to_writer_xml<W: Write>(&self, writer: W) -> Result<(), Error> {
+        let mut writer = XmlWriter::new(writer);
+        self.to_writer_xml_inner(&mut writer)
+    }
+
+    fn to_writer_xml_inner(&self, writer: &mut Writer) -> Result<(), Error> {
+        let events = self.clone().into_events();
+        for event in events {
+            writer.write(&event)?;
+        }
+        Ok(())
     }
 
     /// Creates a `Value` from an event source.

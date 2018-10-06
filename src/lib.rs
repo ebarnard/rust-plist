@@ -23,8 +23,7 @@
 //! use plist::Value;
 //! use std::fs::File;
 //!
-//! let file = File::open("tests/data/xml.plist").unwrap();
-//! let value = Value::from_reader(file).unwrap();
+//! let value = Value::from_file("tests/data/xml.plist").unwrap();
 //!
 //! match value {
 //!     Value::Array(_array) => (),
@@ -40,8 +39,6 @@
 //!
 //! # #[cfg(feature = "serde")]
 //! # fn main() {
-//! use std::fs::File;
-//!
 //! #[derive(Deserialize)]
 //! #[serde(rename_all = "PascalCase")]
 //! struct Info {
@@ -49,8 +46,7 @@
 //!     height: f32,
 //! }
 //!
-//! let file = File::open("tests/data/xml.plist").unwrap();
-//! let info: Info = plist::from_reader(file).unwrap();
+//! let info: Info = plist::from_file("tests/data/xml.plist").unwrap();
 //! # }
 //! #
 //! # #[cfg(not(feature = "serde"))]
@@ -79,7 +75,7 @@ mod de;
 #[cfg(feature = "serde")]
 mod ser;
 #[cfg(feature = "serde")]
-pub use self::de::{from_reader, Deserializer};
+pub use self::de::{from_file, from_reader, from_reader_xml, Deserializer};
 #[cfg(feature = "serde")]
 pub use self::ser::{to_writer_xml, Serializer};
 
