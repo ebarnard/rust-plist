@@ -475,7 +475,7 @@ impl<'a, W: Writer> ser::Serializer for DateSerializer<'a, W> {
     }
 
     fn serialize_str(self, v: &str) -> Result<(), Self::Error> {
-        let date = Date::from_rfc3339(v).map_err(|_| self.expecting_date_error())?;
+        let date = Date::from_rfc3339(v).map_err(|()| self.expecting_date_error())?;
         self.ser.emit(Event::DateValue(date))
     }
 

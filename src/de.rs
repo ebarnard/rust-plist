@@ -4,7 +4,7 @@ use std::io::{Read, Seek};
 use std::iter::Peekable;
 
 use events::{self, Event};
-use {u64_option_to_usize, Error};
+use {u64_to_usize, Error};
 
 macro_rules! expect {
     ($next:expr, $pat:pat) => {
@@ -73,7 +73,7 @@ where
     {
         match try_next!(self.events.next()) {
             Event::StartArray(len) => {
-                let len = u64_option_to_usize(len)?;
+                let len = len.and_then(u64_to_usize);
                 let ret = visitor.visit_seq(MapAndSeqAccess::new(self, false, len))?;
                 expect!(self.events.next(), Event::EndArray);
                 Ok(ret)
@@ -81,7 +81,7 @@ where
             Event::EndArray => Err(event_mismatch_error()),
 
             Event::StartDictionary(len) => {
-                let len = u64_option_to_usize(len)?;
+                let len = len.and_then(u64_to_usize);
                 let ret = visitor.visit_map(MapAndSeqAccess::new(self, false, len))?;
                 expect!(self.events.next(), Event::EndDictionary);
                 Ok(ret)

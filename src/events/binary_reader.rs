@@ -165,7 +165,7 @@ impl<R: Read + Seek> BinaryReader<R> {
     }
 
     fn seek_to_object(&mut self, object_ref: u64) -> Result<u64, Error> {
-        let object_ref = u64_to_usize(object_ref)?;
+        let object_ref = u64_to_usize(object_ref).ok_or(Error::InvalidData)?;
         let offset = *self
             .object_offsets
             .get(object_ref)
@@ -232,9 +232,9 @@ impl<R: Read + Seek> BinaryReader<R> {
             (0x3, 3) => {
                 // Date. Seconds since 1/1/2001 00:00:00.
                 let secs = self.reader.read_f64::<BigEndian>()?;
-                Some(Event::DateValue(Date::from_seconds_since_plist_epoch(
-                    secs,
-                )?))
+                Some(Event::DateValue(
+                    Date::from_seconds_since_plist_epoch(secs).map_err(|()| Error::InvalidData)?,
+                ))
             }
             (0x4, n) => {
                 // Data

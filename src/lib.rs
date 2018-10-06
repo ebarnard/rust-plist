@@ -129,17 +129,10 @@ impl From<io::Error> for Error {
     }
 }
 
-fn u64_to_usize(len_u64: u64) -> Result<usize, Error> {
+fn u64_to_usize(len_u64: u64) -> Option<usize> {
     let len = len_u64 as usize;
     if len as u64 != len_u64 {
-        return Err(Error::InvalidData); // Too long
+        return None; // Too long
     }
-    Ok(len)
-}
-
-fn u64_option_to_usize(len: Option<u64>) -> Result<Option<usize>, Error> {
-    match len {
-        Some(len) => Ok(Some(u64_to_usize(len)?)),
-        None => Ok(None),
-    }
+    Some(len)
 }

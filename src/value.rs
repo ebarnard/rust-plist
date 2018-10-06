@@ -2,7 +2,7 @@ use std::collections::BTreeMap;
 use std::io::{Read, Seek};
 
 use events::{Event, Reader};
-use {u64_option_to_usize, Date, Error};
+use {u64_to_usize, Date, Error};
 
 /// Represents any plist value.
 #[derive(Clone, Debug, PartialEq)]
@@ -403,8 +403,7 @@ impl<T: Iterator<Item = Result<Event, Error>>> Builder<T> {
     }
 
     fn build_array(&mut self, len: Option<u64>) -> Result<Vec<Value>, Error> {
-        let len = u64_option_to_usize(len)?;
-        let mut values = match len {
+        let mut values = match len.and_then(u64_to_usize) {
             Some(len) => Vec::with_capacity(len),
             None => Vec::new(),
         };

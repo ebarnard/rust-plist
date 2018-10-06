@@ -3,8 +3,6 @@ use std::fmt;
 use std::result::Result as StdResult;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
-use Error;
-
 /// A UTC timestamp. Used for serialization to and from the plist date type.
 #[derive(Clone, Copy, Hash, PartialEq)]
 pub struct Date {
@@ -12,9 +10,9 @@ pub struct Date {
 }
 
 impl Date {
-    pub(crate) fn from_rfc3339(date: &str) -> Result<Self, Error> {
+    pub(crate) fn from_rfc3339(date: &str) -> Result<Self, ()> {
         Ok(Date {
-            inner: humantime::parse_rfc3339(date).map_err(|_| Error::InvalidData)?,
+            inner: humantime::parse_rfc3339(date).map_err(|_| ())?,
         })
     }
 
@@ -22,14 +20,14 @@ impl Date {
         format!("{}", humantime::format_rfc3339(self.inner))
     }
 
-    pub(crate) fn from_seconds_since_plist_epoch(timestamp: f64) -> Result<Date, Error> {
+    pub(crate) fn from_seconds_since_plist_epoch(timestamp: f64) -> Result<Date, ()> {
         // `timestamp` is the number of seconds since the plist epoch of 1/1/2001 00:00:00.
         // `PLIST_EPOCH_UNIX_TIMESTAMP` is the unix timestamp of the plist epoch.
         const PLIST_EPOCH_UNIX_TIMESTAMP: u64 = 978_307_200;
         let plist_epoch = UNIX_EPOCH + Duration::from_secs(PLIST_EPOCH_UNIX_TIMESTAMP);
 
         if !timestamp.is_finite() {
-            return Err(Error::InvalidData);
+            return Err(());
         }
 
         let is_negative = timestamp < 0.0;
@@ -118,7 +116,7 @@ pub mod serde_impls {
         where
             E: Error,
         {
-            Date::from_rfc3339(v).map_err(|_| E::invalid_value(Unexpected::Str(v), &self))
+            Date::from_rfc3339(v).map_err(|()| E::invalid_value(Unexpected::Str(v), &self))
         }
     }
 
