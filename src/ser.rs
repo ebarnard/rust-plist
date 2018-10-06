@@ -12,6 +12,7 @@ impl ser::Error for Error {
     }
 }
 
+/// A structure that serializes Rust values plist event streams.
 pub struct Serializer<W: Writer> {
     writer: W,
 }

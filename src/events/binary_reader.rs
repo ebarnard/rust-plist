@@ -29,8 +29,8 @@ enum StackType {
     Root,
 }
 
-/// https://opensource.apple.com/source/CF/CF-550/CFBinaryPList.c
-/// https://hg.python.org/cpython/file/3.4/Lib/plistlib.py
+// https://opensource.apple.com/source/CF/CF-550/CFBinaryPList.c
+// https://hg.python.org/cpython/file/3.4/Lib/plistlib.py
 pub struct BinaryReader<R> {
     stack: Vec<StackItem>,
     object_offsets: Vec<u64>,

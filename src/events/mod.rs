@@ -1,3 +1,5 @@
+//! An abstraction of a plist file as a set of events. Used to support multiple encodings.
+
 mod binary_reader;
 pub use self::binary_reader::BinaryReader;
 
@@ -90,6 +92,7 @@ impl<R: Read + Seek> Iterator for Reader<R> {
     }
 }
 
+/// Supports writing event streams in different plist encodings.
 pub trait Writer {
     fn write(&mut self, event: &Event) -> Result<(), Error>;
 }

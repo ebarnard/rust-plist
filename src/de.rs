@@ -43,6 +43,7 @@ impl de::Error for Error {
     }
 }
 
+/// A structure that deserializes plist event streams into Rust values.
 pub struct Deserializer<I>
 where
     I: IntoIterator<Item = Result<Event, Error>>,
