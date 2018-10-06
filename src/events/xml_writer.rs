@@ -8,6 +8,11 @@ use xml_rs::writer::{EmitterConfig, Error as XmlWriterError, EventWriter, XmlEve
 use events::{Event, Writer};
 use Error;
 
+static XML_PROLOGUE: &str = r#"<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+"#;
+
 impl From<XmlWriterError> for Error {
     fn from(err: XmlWriterError) -> Error {
         match err {
@@ -17,20 +22,17 @@ impl From<XmlWriterError> for Error {
     }
 }
 
+#[derive(PartialEq)]
 enum Element {
-    Dictionary(DictionaryState),
+    Dictionary,
     Array,
-    Root,
-}
-
-enum DictionaryState {
-    ExpectKey,
-    ExpectValue,
 }
 
 pub struct XmlWriter<W: Write> {
     xml_writer: EventWriter<W>,
     stack: Vec<Element>,
+    expecting_key: bool,
+    written_prologue: bool,
     // Not very nice
     empty_namespace: Namespace,
 }
@@ -50,6 +52,8 @@ impl<W: Write> XmlWriter<W> {
         XmlWriter {
             xml_writer: EventWriter::new_with_config(writer, config),
             stack: Vec::new(),
+            expecting_key: false,
+            written_prologue: false,
             empty_namespace: Namespace::empty(),
         }
     }
@@ -82,20 +86,6 @@ impl<W: Write> XmlWriter<W> {
         Ok(())
     }
 
-    fn maybe_end_plist(&mut self) -> Result<(), Error> {
-        // If there are no more open tags then write the </plist> element
-        if self.stack.len() == 1 {
-            // We didn't tell the xml_writer about the <plist> tag so we'll skip telling it
-            // about the </plist> tag as well.
-            self.xml_writer.inner_mut().write_all(b"\n</plist>")?;
-            if let Some(Element::Root) = self.stack.pop() {
-            } else {
-                return Err(Error::InvalidData);
-            }
-        }
-        Ok(())
-    }
-
     pub fn write(&mut self, event: &Event) -> Result<(), Error> {
         <Self as Writer>::write(self, event)
     }
@@ -103,84 +93,79 @@ impl<W: Write> XmlWriter<W> {
 
 impl<W: Write> Writer for XmlWriter<W> {
     fn write(&mut self, event: &Event) -> Result<(), Error> {
-        match self.stack.pop() {
-            Some(Element::Dictionary(DictionaryState::ExpectKey)) => {
-                match *event {
-                    Event::StringValue(ref value) => {
-                        self.write_element_and_value("key", &*value)?;
-                        self.stack
-                            .push(Element::Dictionary(DictionaryState::ExpectValue));
-                    }
-                    Event::EndDictionary => {
-                        self.end_element("dict")?;
-                        // We might be closing the last tag here as well
-                        self.maybe_end_plist()?;
-                    }
-                    _ => return Err(Error::InvalidData),
-                };
-                return Ok(());
-            }
-            Some(Element::Dictionary(DictionaryState::ExpectValue)) => self
-                .stack
-                .push(Element::Dictionary(DictionaryState::ExpectKey)),
-            Some(other) => self.stack.push(other),
-            None => {
-                // Write prologue
-                let prologue = r#"<?xml version="1.0" encoding="UTF-8"?>
-<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-<plist version="1.0">
-"#;
-                self.xml_writer.inner_mut().write_all(prologue.as_bytes())?;
+        if !self.written_prologue {
+            self.xml_writer
+                .inner_mut()
+                .write_all(XML_PROLOGUE.as_bytes())?;
 
-                self.stack.push(Element::Root);
-            }
+            self.written_prologue = true;
         }
 
-        match *event {
-            Event::StartArray(_) => {
-                self.start_element("array")?;
-                self.stack.push(Element::Array);
-            }
-            Event::EndArray => {
-                self.end_element("array")?;
-                if let Some(Element::Array) = self.stack.pop() {
-                } else {
-                    return Err(Error::InvalidData);
+        if self.expecting_key {
+            match *event {
+                Event::EndDictionary => match self.stack.pop() {
+                    Some(Element::Dictionary) => {
+                        self.end_element("dict")?;
+                        self.expecting_key = self.stack.last() == Some(&Element::Dictionary);
+                    }
+                    _ => return Err(Error::InvalidData),
+                },
+                Event::StringValue(ref value) => {
+                    self.write_element_and_value("key", &*value)?;
+                    self.expecting_key = false;
                 }
+                _ => return Err(Error::InvalidData),
             }
+        } else {
+            match *event {
+                Event::StartArray(_) => {
+                    self.start_element("array")?;
+                    self.stack.push(Element::Array);
+                }
+                Event::EndArray => match self.stack.pop() {
+                    Some(Element::Array) => self.end_element("array")?,
+                    _ => return Err(Error::InvalidData),
+                },
 
-            Event::StartDictionary(_) => {
-                self.start_element("dict")?;
-                self.stack
-                    .push(Element::Dictionary(DictionaryState::ExpectKey));
-            }
-            Event::EndDictionary => return Err(Error::InvalidData),
+                Event::StartDictionary(_) => {
+                    self.start_element("dict")?;
+                    self.stack.push(Element::Dictionary);
+                }
+                Event::EndDictionary => return Err(Error::InvalidData),
 
-            Event::BooleanValue(true) => {
-                self.start_element("true")?;
-                self.end_element("true")?;
-            }
-            Event::BooleanValue(false) => {
-                self.start_element("false")?;
-                self.end_element("false")?;
-            }
-            Event::DataValue(ref value) => {
-                let base64_data = base64::encode_config(&value, base64::MIME);
-                self.write_element_and_value("data", &base64_data)?;
-            }
-            Event::DateValue(ref value) => {
-                self.write_element_and_value("date", &value.to_rfc3339())?
-            }
-            Event::IntegerValue(ref value) => {
-                self.write_element_and_value("integer", &value.to_string())?
-            }
-            Event::RealValue(ref value) => {
-                self.write_element_and_value("real", &value.to_string())?
-            }
-            Event::StringValue(ref value) => self.write_element_and_value("string", &*value)?,
-        };
+                Event::BooleanValue(true) => {
+                    self.start_element("true")?;
+                    self.end_element("true")?;
+                }
+                Event::BooleanValue(false) => {
+                    self.start_element("false")?;
+                    self.end_element("false")?;
+                }
+                Event::DataValue(ref value) => {
+                    let base64_data = base64::encode_config(&value, base64::MIME);
+                    self.write_element_and_value("data", &base64_data)?;
+                }
+                Event::DateValue(ref value) => {
+                    self.write_element_and_value("date", &value.to_rfc3339())?
+                }
+                Event::IntegerValue(ref value) => {
+                    self.write_element_and_value("integer", &value.to_string())?
+                }
+                Event::RealValue(ref value) => {
+                    self.write_element_and_value("real", &value.to_string())?
+                }
+                Event::StringValue(ref value) => self.write_element_and_value("string", &*value)?,
+            };
 
-        self.maybe_end_plist()?;
+            self.expecting_key = self.stack.last() == Some(&Element::Dictionary);
+        }
+
+        // If there are no more open tags then write the </plist> element
+        if self.stack.len() == 0 {
+            // We didn't tell the xml_writer about the <plist> tag so we'll skip telling it
+            // about the </plist> tag as well.
+            self.xml_writer.inner_mut().write_all(b"\n</plist>")?;
+        }
 
         Ok(())
     }
