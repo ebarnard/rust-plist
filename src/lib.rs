@@ -20,15 +20,13 @@
 //! ## Examples
 //!
 //! ```rust
-//! extern crate plist;
-//!
 //! use plist::Value;
 //! use std::fs::File;
 //!
 //! let file = File::open("tests/data/xml.plist").unwrap();
-//! let plist = Value::from_reader(file).unwrap();
+//! let value = Value::from_reader(file).unwrap();
 //!
-//! match plist {
+//! match value {
 //!     Value::Array(_array) => (),
 //!     _ => ()
 //! }
