@@ -19,14 +19,14 @@ impl From<FromUtf16Error> for Error {
 }
 
 struct StackItem {
-    object_refs: Vec<u64>,
+    object_ref: u64,
+    child_object_refs: Vec<u64>,
     ty: StackType,
 }
 
 enum StackType {
     Array,
     Dict,
-    Root,
 }
 
 // https://opensource.apple.com/source/CF/CF-550/CFBinaryPList.c
@@ -34,19 +34,13 @@ enum StackType {
 pub struct BinaryReader<R> {
     stack: Vec<StackItem>,
     object_offsets: Vec<u64>,
+    object_on_stack: Vec<bool>,
     reader: R,
     ref_size: u8,
-    finished: bool,
-    // The largest single allocation allowed for this Plist.
-    // Equal to the number of bytes in the Plist minus the magic and trailer.
+    root_object: u64,
+    // The largest single allocation allowed for this plist.
+    // Equal to the number of bytes in the plist minus the magic number and trailer.
     max_allocation_bytes: usize,
-    // The maximum number of nested arrays and dicts allowed in the plist.
-    max_stack_depth: usize,
-    // The maximum number of objects that can be created. Default 10 * object_offsets.len().
-    // Binary plists can contain circular references.
-    max_objects: usize,
-    // The number of objects created so far.
-    current_objects: usize,
 }
 
 impl<R: Read + Seek> BinaryReader<R> {
@@ -54,13 +48,11 @@ impl<R: Read + Seek> BinaryReader<R> {
         BinaryReader {
             stack: Vec::new(),
             object_offsets: Vec::new(),
+            object_on_stack: Vec::new(),
             reader,
             ref_size: 0,
-            finished: false,
+            root_object: 0,
             max_allocation_bytes: 0,
-            max_stack_depth: 200,
-            max_objects: 0,
-            current_objects: 0,
         }
     }
 
@@ -101,7 +93,7 @@ impl<R: Read + Seek> BinaryReader<R> {
         }
 
         let num_objects = self.reader.read_u64::<BigEndian>()?;
-        let top_object = self.reader.read_u64::<BigEndian>()?;
+        self.root_object = self.reader.read_u64::<BigEndian>()?;
         let offset_table_offset = self.reader.read_u64::<BigEndian>()?;
 
         // File size minus trailer and header
@@ -111,14 +103,7 @@ impl<R: Read + Seek> BinaryReader<R> {
         // Read offset table
         self.reader.seek(SeekFrom::Start(offset_table_offset))?;
         self.object_offsets = self.read_ints(num_objects, offset_size)?;
-
-        self.max_objects = self.object_offsets.len() * 10;
-
-        // Seek to top object
-        self.stack.push(StackItem {
-            object_refs: vec![top_object],
-            ty: StackType::Root,
-        });
+        self.object_on_stack = vec![false; self.object_offsets.len()];
 
         Ok(())
     }
@@ -173,37 +158,50 @@ impl<R: Read + Seek> BinaryReader<R> {
         Ok(self.reader.seek(SeekFrom::Start(offset))?)
     }
 
+    fn push_stack_item_and_check_for_recursion(&mut self, item: StackItem) -> Result<(), Error> {
+        let object_ref = u64_to_usize(item.object_ref).expect("internal consistency error");
+        let is_on_stack = &mut self.object_on_stack[object_ref];
+        if *is_on_stack {
+            return Err(Error::InvalidData);
+        }
+        *is_on_stack = true;
+        self.stack.push(item);
+        Ok(())
+    }
+
+    fn pop_stack_item(&mut self) -> StackItem {
+        let item = self.stack.pop().expect("internal consistency error");
+        let object_ref = u64_to_usize(item.object_ref).expect("internal consistency error");
+        self.object_on_stack[object_ref] = false;
+        item
+    }
+
     fn read_next(&mut self) -> Result<Option<Event>, Error> {
-        if self.ref_size == 0 {
+        let object_ref = if self.ref_size == 0 {
             // Initialise here rather than in new
             self.read_trailer()?;
-        }
+            self.root_object
+        } else {
+            let maybe_object_ref = if let Some(stack_item) = self.stack.last_mut() {
+                stack_item.child_object_refs.pop()
+            } else {
+                // Finished reading the plist
+                return Ok(None);
+            };
 
-        let object_ref = match self.stack.last_mut() {
-            Some(stack_item) => stack_item.object_refs.pop(),
-            // Reached the end of the plist
-            None => return Ok(None),
-        };
-
-        match object_ref {
-            Some(object_ref) => {
-                if self.current_objects > self.max_objects {
-                    return Err(Error::InvalidData);
-                }
-                self.current_objects += 1;
-                self.seek_to_object(object_ref)?;
-            }
-            None => {
-                // We're at the end of an array or dict. Pop the top stack item and return
-                let item = self.stack.pop().unwrap();
-                match item.ty {
+            if let Some(object_ref) = maybe_object_ref {
+                object_ref
+            } else {
+                // We're at the end of an array or dict. Pop the top stack item and return.
+                let stack_item = self.pop_stack_item();
+                match stack_item.ty {
                     StackType::Array => return Ok(Some(Event::EndArray)),
                     StackType::Dict => return Ok(Some(Event::EndDictionary)),
-                    // We're at the end of the plist
-                    StackType::Root => return Ok(None),
                 }
             }
-        }
+        };
+
+        self.seek_to_object(object_ref)?;
 
         let token = self.reader.read_u8()?;
         let ty = (token & 0xf0) >> 4;
@@ -263,14 +261,15 @@ impl<R: Read + Seek> BinaryReader<R> {
             (0xa, n) => {
                 // Array
                 let len = self.read_object_len(n)?;
-                let mut object_refs = self.read_refs(len)?;
+                let mut child_object_refs = self.read_refs(len)?;
                 // Reverse so we can pop off the end of the stack in order
-                object_refs.reverse();
+                child_object_refs.reverse();
 
-                self.stack.push(StackItem {
+                self.push_stack_item_and_check_for_recursion(StackItem {
+                    object_ref,
                     ty: StackType::Array,
-                    object_refs,
-                });
+                    child_object_refs,
+                })?;
 
                 Some(Event::StartArray(Some(len)))
             }
@@ -280,28 +279,24 @@ impl<R: Read + Seek> BinaryReader<R> {
                 let key_refs = self.read_refs(len)?;
                 let value_refs = self.read_refs(len)?;
 
-                let mut object_refs = self.allocate_vec(len * 2, self.ref_size as usize)?;
+                let mut child_object_refs = self.allocate_vec(len * 2, self.ref_size as usize)?;
                 let len = key_refs.len();
                 for i in 1..len + 1 {
                     // Reverse so we can pop off the end of the stack in order
-                    object_refs.push(value_refs[len - i]);
-                    object_refs.push(key_refs[len - i]);
+                    child_object_refs.push(value_refs[len - i]);
+                    child_object_refs.push(key_refs[len - i]);
                 }
 
-                self.stack.push(StackItem {
+                self.push_stack_item_and_check_for_recursion(StackItem {
+                    object_ref,
                     ty: StackType::Dict,
-                    object_refs,
-                });
+                    child_object_refs,
+                })?;
 
                 Some(Event::StartDictionary(Some(len as u64)))
             }
             (_, _) => return Err(Error::InvalidData),
         };
-
-        // Prevent stack overflows when recursively parsing plist.
-        if self.stack.len() > self.max_stack_depth {
-            return Err(Error::InvalidData);
-        }
 
         Ok(result)
     }
@@ -311,20 +306,14 @@ impl<R: Read + Seek> Iterator for BinaryReader<R> {
     type Item = Result<Event, Error>;
 
     fn next(&mut self) -> Option<Result<Event, Error>> {
-        if self.finished {
-            None
-        } else {
-            match self.read_next() {
-                Ok(Some(event)) => Some(Ok(event)),
-                Err(err) => {
-                    self.finished = true;
-                    Some(Err(err))
-                }
-                Ok(None) => {
-                    self.finished = true;
-                    None
-                }
+        match self.read_next() {
+            Ok(Some(event)) => Some(Ok(event)),
+            Err(err) => {
+                // Mark the plist as finished
+                self.stack.clear();
+                Some(Err(err))
             }
+            Ok(None) => None,
         }
     }
 }
