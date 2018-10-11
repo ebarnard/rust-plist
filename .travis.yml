@@ -1,10 +1,14 @@
+os:
+  - windows
+  - linux
+  - mac
 sudo: false
 language: rust
 rust:
-- nightly
-- beta
-- stable
-- 1.18.0
+  - nightly
+  - beta
+  - stable
+  - 1.18.0
 script:
   - cargo test
   - cargo test --no-default-features
