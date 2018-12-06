@@ -89,6 +89,10 @@ impl<W: Write> XmlWriter<W> {
     pub fn write(&mut self, event: &Event) -> Result<(), Error> {
         <Self as Writer>::write(self, event)
     }
+    
+    pub fn into_inner(self) -> W {
+        self.xml_writer.into_inner()
+    }
 }
 
 impl<W: Write> Writer for XmlWriter<W> {
