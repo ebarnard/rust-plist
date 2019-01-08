@@ -5,7 +5,7 @@ use xml_rs::name::Name;
 use xml_rs::namespace::Namespace;
 use xml_rs::writer::{EmitterConfig, Error as XmlWriterError, EventWriter, XmlEvent};
 
-use events::{Event, Writer};
+use stream::{Event, Writer};
 use Error;
 
 static XML_PROLOGUE: &str = r#"<?xml version="1.0" encoding="UTF-8"?>
@@ -181,7 +181,7 @@ mod tests {
     use std::io::Cursor;
 
     use super::*;
-    use events::Event::*;
+    use stream::Event::*;
 
     #[test]
     fn streaming_parser() {

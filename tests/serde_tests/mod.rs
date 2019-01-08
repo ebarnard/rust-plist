@@ -1,6 +1,6 @@
-use plist::events::Event;
-use plist::events::Event::*;
-use plist::events::Writer;
+use plist::stream::Event;
+use plist::stream::Event::*;
+use plist::stream::Writer;
 use plist::{Date, Deserializer, Error, Serializer};
 use serde::de::DeserializeOwned;
 use serde::ser::Serialize;

@@ -4,7 +4,7 @@ use std::io::Write;
 use std::io::{BufReader, Read, Seek};
 use std::path::Path;
 
-use events::{Event, Reader, Writer, XmlReader, XmlWriter};
+use stream::{Event, Reader, Writer, XmlReader, XmlWriter};
 use {u64_to_usize, Date, Error};
 
 /// Represents any plist value.
@@ -473,7 +473,7 @@ mod tests {
     use std::time::SystemTime;
 
     use super::*;
-    use events::Event::*;
+    use stream::Event::*;
     use {Date, Value};
 
     #[test]

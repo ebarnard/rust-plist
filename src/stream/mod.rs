@@ -1,4 +1,4 @@
-//! An abstraction of a plist file as a set of events. Used to support multiple encodings.
+//! An abstraction of a plist file as a stream of events. Used to support multiple encodings.
 
 mod binary_reader;
 pub use self::binary_reader::BinaryReader;

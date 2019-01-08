@@ -3,7 +3,7 @@ use std::io::Read;
 use std::str::FromStr;
 use xml_rs::reader::{EventReader, ParserConfig, XmlEvent};
 
-use events::Event;
+use stream::Event;
 use {Date, Error};
 
 pub struct XmlReader<R: Read> {
@@ -154,8 +154,8 @@ mod tests {
     use std::path::Path;
 
     use super::*;
-    use events::Event;
-    use events::Event::*;
+    use stream::Event;
+    use stream::Event::*;
 
     #[test]
     fn streaming_parser() {

@@ -58,7 +58,7 @@ extern crate byteorder;
 extern crate humantime;
 extern crate xml as xml_rs;
 
-pub mod events;
+pub mod stream;
 
 mod date;
 mod value;

@@ -3,7 +3,7 @@ use std::io::{Read, Seek, SeekFrom};
 use std::mem::size_of;
 use std::string::{FromUtf16Error, FromUtf8Error};
 
-use events::Event;
+use stream::Event;
 use {u64_to_usize, Date, Error};
 
 impl From<FromUtf8Error> for Error {
@@ -325,8 +325,8 @@ mod tests {
     use std::path::Path;
 
     use super::*;
-    use events::Event;
-    use events::Event::*;
+    use stream::Event;
+    use stream::Event::*;
 
     #[test]
     fn streaming_parser() {

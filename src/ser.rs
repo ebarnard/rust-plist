@@ -3,7 +3,7 @@ use std::fmt::Display;
 use std::io::Write;
 
 use date::serde_impls::DATE_NEWTYPE_STRUCT_NAME;
-use events::{self, Event, Writer};
+use stream::{self, Event, Writer};
 use {Date, Error};
 
 impl ser::Error for Error {
@@ -708,7 +708,7 @@ impl<'a, W: Writer> ser::SerializeStructVariant for Compound<'a, W> {
 
 /// Serializes the given data structure as an XML encoded plist file.
 pub fn to_writer_xml<W: Write, T: ser::Serialize>(writer: W, value: &T) -> Result<(), Error> {
-    let writer = events::XmlWriter::new(writer);
+    let writer = stream::XmlWriter::new(writer);
     let mut ser = Serializer::new(writer);
     value.serialize(&mut ser)
 }
