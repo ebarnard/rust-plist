@@ -21,7 +21,6 @@
 //!
 //! ```rust
 //! use plist::Value;
-//! use std::fs::File;
 //!
 //! let value = Value::from_file("tests/data/xml.plist").unwrap();
 //!
