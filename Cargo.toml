@@ -13,7 +13,7 @@ categories = ["config", "encoding", "parser-implementations"]
 default = ["serde"]
 
 [dependencies]
-base64 = "0.9.0"
+base64 = "0.10"
 byteorder = "1.1.0"
 humantime = "1.1.1"
 xml-rs = "0.8.0"
