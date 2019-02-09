@@ -1,11 +1,9 @@
 use humantime;
 use std::fmt;
-use std::hash::{Hash, Hasher};
-use std::result::Result as StdResult;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 /// A UTC timestamp. Used for serialization to and from the plist date type.
-#[derive(Clone, Copy, PartialEq)]
+#[derive(Clone, Copy, Hash, PartialEq)]
 pub struct Date {
     inner: SystemTime,
 }
@@ -49,26 +47,9 @@ impl Date {
 }
 
 impl fmt::Debug for Date {
-    fn fmt(&self, f: &mut fmt::Formatter) -> StdResult<(), fmt::Error> {
+    fn fmt(&self, f: &mut fmt::Formatter) -> Result<(), fmt::Error> {
         let rfc3339 = humantime::format_rfc3339(self.inner);
         <humantime::Rfc3339Timestamp as fmt::Display>::fmt(&rfc3339, f)
-    }
-}
-
-// TODO: Remove manual impl once minimum Rust version reaches 1.24.0.
-impl Hash for Date {
-    fn hash<H: Hasher>(&self, state: &mut H) {
-        let elapsed = match self.inner.duration_since(UNIX_EPOCH) {
-            Ok(elapsed) => {
-                false.hash(state);
-                elapsed
-            }
-            Err(err) => {
-                true.hash(state);
-                err.duration()
-            }
-        };
-        elapsed.hash(state)
     }
 }
 
