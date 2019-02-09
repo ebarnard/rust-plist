@@ -55,6 +55,7 @@
 extern crate base64;
 extern crate byteorder;
 extern crate humantime;
+extern crate line_wrap;
 extern crate xml as xml_rs;
 
 pub mod stream;

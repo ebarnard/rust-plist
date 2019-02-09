@@ -67,30 +67,31 @@ impl<R: Read> XmlReader<R> {
                         "true" => return Some(Ok(Event::BooleanValue(true))),
                         "false" => return Some(Ok(Event::BooleanValue(false))),
                         "data" => {
-                            return Some(self.read_content(|s| {
-                                let data = base64::decode_config(&s, base64::MIME)
-                                    .map_err(|_| Error::InvalidData)?;
+                            return Some(self.read_content(|mut s| {
+                                // Strip whitespace and line endings from input string
+                                s.retain(|c| !c.is_ascii_whitespace());
+                                let data = base64::decode(&s).map_err(|_| Error::InvalidData)?;
                                 Ok(Event::DataValue(data))
-                            }))
+                            }));
                         }
                         "date" => {
                             return Some(self.read_content(|s| {
                                 Ok(Event::DateValue(
                                     Date::from_rfc3339(&s).map_err(|()| Error::InvalidData)?,
                                 ))
-                            }))
+                            }));
                         }
                         "integer" => {
                             return Some(self.read_content(|s| match FromStr::from_str(&s) {
                                 Ok(i) => Ok(Event::IntegerValue(i)),
                                 Err(_) => Err(Error::InvalidData),
-                            }))
+                            }));
                         }
                         "real" => {
                             return Some(self.read_content(|s| match FromStr::from_str(&s) {
                                 Ok(f) => Ok(Event::RealValue(f)),
                                 Err(_) => Err(Error::InvalidData),
-                            }))
+                            }));
                         }
                         "string" => return Some(self.read_content(|s| Ok(Event::StringValue(s)))),
                         _ => return Some(Err(Error::InvalidData)),
