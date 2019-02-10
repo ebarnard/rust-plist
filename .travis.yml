@@ -1,7 +1,7 @@
 os:
-  - windows
   - linux
   - mac
+  - windows
 sudo: false
 language: rust
 rust:
