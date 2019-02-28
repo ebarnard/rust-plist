@@ -3,6 +3,7 @@ use std::fmt::Display;
 use std::fs::File;
 use std::io::{BufReader, Read, Seek};
 use std::iter::Peekable;
+use std::mem;
 use std::path::Path;
 
 use stream::{self, Event};
@@ -45,12 +46,19 @@ impl de::Error for Error {
     }
 }
 
+enum OptionMode {
+    Root,
+    StructField,
+    Explicit,
+}
+
 /// A structure that deserializes plist event streams into Rust values.
 pub struct Deserializer<I>
 where
     I: IntoIterator<Item = Result<Event, Error>>,
 {
     events: Peekable<<I as IntoIterator>::IntoIter>,
+    option_mode: OptionMode,
 }
 
 impl<I> Deserializer<I>
@@ -60,7 +68,19 @@ where
     pub fn new(iter: I) -> Deserializer<I> {
         Deserializer {
             events: iter.into_iter().peekable(),
+            option_mode: OptionMode::Root,
         }
+    }
+
+    fn with_option_mode<'de, T, F: FnOnce(&mut Deserializer<I>) -> Result<T, Error>>(
+        &mut self,
+        option_mode: OptionMode,
+        f: F,
+    ) -> Result<T, Error> {
+        let prev_option_mode = mem::replace(&mut self.option_mode, option_mode);
+        let ret = f(&mut *self);
+        self.option_mode = prev_option_mode;
+        ret
     }
 }
 
@@ -70,7 +90,7 @@ where
 {
     type Error = Error;
 
-    fn deserialize_any<V>(self, visitor: V) -> Result<V::Value, Self::Error>
+    fn deserialize_any<V>(self, visitor: V) -> Result<V::Value, Error>
     where
         V: de::Visitor<'de>,
     {
@@ -116,7 +136,7 @@ where
         tuple_struct tuple ignored_any identifier
     }
 
-    fn deserialize_unit<V>(self, visitor: V) -> Result<V::Value, Self::Error>
+    fn deserialize_unit<V>(self, visitor: V) -> Result<V::Value, Error>
     where
         V: de::Visitor<'de>,
     {
@@ -124,31 +144,46 @@ where
         visitor.visit_unit()
     }
 
-    fn deserialize_option<V>(self, visitor: V) -> Result<V::Value, Self::Error>
+    fn deserialize_option<V>(self, visitor: V) -> Result<V::Value, Error>
     where
         V: de::Visitor<'de>,
     {
-        expect!(self.events.next(), Event::StartDictionary(_));
-
-        let ret = match try_next!(self.events.next()) {
-            Event::String(ref s) if &s[..] == "None" => {
-                expect!(self.events.next(), Event::String(_));
-                visitor.visit_none::<Self::Error>()?
+        match self.option_mode {
+            OptionMode::Root => {
+                if let None = self.events.peek() {
+                    visitor.visit_none::<Error>()
+                } else {
+                    self.with_option_mode(OptionMode::Explicit, |this| visitor.visit_some(this))
+                }
             }
-            Event::String(ref s) if &s[..] == "Some" => visitor.visit_some(&mut *self)?,
-            _ => return Err(event_mismatch_error()),
-        };
+            OptionMode::StructField => {
+                // None struct values are ignored so if we're here the value must be Some.
+                self.with_option_mode(OptionMode::Explicit, |this| Ok(visitor.visit_some(this)?))
+            }
+            OptionMode::Explicit => {
+                expect!(self.events.next(), Event::StartDictionary(_));
 
-        expect!(self.events.next(), Event::EndDictionary);
+                let ret = match try_next!(self.events.next()) {
+                    Event::String(ref s) if &s[..] == "None" => {
+                        expect!(self.events.next(), Event::String(_));
+                        visitor.visit_none::<Error>()?
+                    }
+                    Event::String(ref s) if &s[..] == "Some" => visitor.visit_some(&mut *self)?,
+                    _ => return Err(event_mismatch_error()),
+                };
 
-        Ok(ret)
+                expect!(self.events.next(), Event::EndDictionary);
+
+                Ok(ret)
+            }
+        }
     }
 
     fn deserialize_newtype_struct<V>(
         self,
         _name: &'static str,
         visitor: V,
-    ) -> Result<V::Value, Self::Error>
+    ) -> Result<V::Value, Error>
     where
         V: de::Visitor<'de>,
     {
@@ -160,7 +195,7 @@ where
         _name: &'static str,
         _fields: &'static [&'static str],
         visitor: V,
-    ) -> Result<V::Value, Self::Error>
+    ) -> Result<V::Value, Error>
     where
         V: de::Visitor<'de>,
     {
@@ -175,7 +210,7 @@ where
         _enum: &'static str,
         _variants: &'static [&'static str],
         visitor: V,
-    ) -> Result<V::Value, Self::Error>
+    ) -> Result<V::Value, Error>
     where
         V: de::Visitor<'de>,
     {
@@ -193,7 +228,7 @@ where
     type Error = Error;
     type Variant = Self;
 
-    fn variant_seed<V>(self, seed: V) -> Result<(V::Value, Self), Self::Error>
+    fn variant_seed<V>(self, seed: V) -> Result<(V::Value, Self), Error>
     where
         V: de::DeserializeSeed<'de>,
     {
@@ -207,111 +242,34 @@ where
 {
     type Error = Error;
 
-    fn unit_variant(self) -> Result<(), Self::Error> {
-        <() as de::Deserialize>::deserialize(self)
+    fn unit_variant(self) -> Result<(), Error> {
+        de::Deserialize::deserialize(self)
     }
 
-    fn newtype_variant_seed<T>(self, seed: T) -> Result<T::Value, Self::Error>
+    fn newtype_variant_seed<T>(self, seed: T) -> Result<T::Value, Error>
     where
         T: de::DeserializeSeed<'de>,
     {
         seed.deserialize(self)
     }
 
-    fn tuple_variant<V>(self, len: usize, visitor: V) -> Result<V::Value, Self::Error>
+    fn tuple_variant<V>(self, len: usize, visitor: V) -> Result<V::Value, Error>
     where
         V: de::Visitor<'de>,
     {
-        <Self as de::Deserializer>::deserialize_tuple(self, len, visitor)
+        de::Deserializer::deserialize_tuple(self, len, visitor)
     }
 
     fn struct_variant<V>(
         self,
         fields: &'static [&'static str],
         visitor: V,
-    ) -> Result<V::Value, Self::Error>
+    ) -> Result<V::Value, Error>
     where
         V: de::Visitor<'de>,
     {
         let name = "";
-        <Self as de::Deserializer>::deserialize_struct(self, name, fields, visitor)
-    }
-}
-
-pub struct StructValueDeserializer<'a, I: 'a>
-where
-    I: IntoIterator<Item = Result<Event, Error>>,
-{
-    de: &'a mut Deserializer<I>,
-}
-
-impl<'de, 'a, I> de::Deserializer<'de> for StructValueDeserializer<'a, I>
-where
-    I: IntoIterator<Item = Result<Event, Error>>,
-{
-    type Error = Error;
-
-    fn deserialize_any<V>(self, visitor: V) -> Result<V::Value, Self::Error>
-    where
-        V: de::Visitor<'de>,
-    {
-        self.de.deserialize_any(visitor)
-    }
-
-    forward_to_deserialize_any! {
-        bool u8 u16 u32 u64 i8 i16 i32 i64 f32 f64 char str string
-        seq bytes byte_buf map unit_struct
-        tuple_struct tuple ignored_any identifier
-    }
-
-    fn deserialize_unit<V>(self, visitor: V) -> Result<V::Value, Self::Error>
-    where
-        V: de::Visitor<'de>,
-    {
-        self.de.deserialize_unit(visitor)
-    }
-
-    fn deserialize_option<V>(self, visitor: V) -> Result<V::Value, Self::Error>
-    where
-        V: de::Visitor<'de>,
-    {
-        // None struct values are ignored so if we're here the value must be Some.
-        visitor.visit_some(self.de)
-    }
-
-    fn deserialize_newtype_struct<V>(
-        self,
-        name: &'static str,
-        visitor: V,
-    ) -> Result<V::Value, Self::Error>
-    where
-        V: de::Visitor<'de>,
-    {
-        self.de.deserialize_newtype_struct(name, visitor)
-    }
-
-    fn deserialize_struct<V>(
-        self,
-        name: &'static str,
-        fields: &'static [&'static str],
-        visitor: V,
-    ) -> Result<V::Value, Self::Error>
-    where
-        V: de::Visitor<'de>,
-    {
-        self.de.deserialize_struct(name, fields, visitor)
-    }
-
-    fn deserialize_enum<V>(
-        self,
-        enum_: &'static str,
-        variants: &'static [&'static str],
-        visitor: V,
-    ) -> Result<V::Value, Self::Error>
-    where
-        V: de::Visitor<'de>,
-    {
-        self.de.deserialize_enum(enum_, variants, visitor)
+        de::Deserializer::deserialize_struct(self, name, fields, visitor)
     }
 }
 
@@ -347,7 +305,7 @@ where
 {
     type Error = Error;
 
-    fn next_element_seed<T>(&mut self, seed: T) -> Result<Option<T::Value>, Self::Error>
+    fn next_element_seed<T>(&mut self, seed: T) -> Result<Option<T::Value>, Error>
     where
         T: de::DeserializeSeed<'de>,
     {
@@ -356,7 +314,9 @@ where
         }
 
         self.remaining = self.remaining.map(|r| r.saturating_sub(1));
-        seed.deserialize(&mut *self.de).map(Some)
+        self.de
+            .with_option_mode(OptionMode::Explicit, |this| seed.deserialize(this))
+            .map(Some)
     }
 
     fn size_hint(&self) -> Option<usize> {
@@ -370,7 +330,7 @@ where
 {
     type Error = Error;
 
-    fn next_key_seed<K>(&mut self, seed: K) -> Result<Option<K::Value>, Self::Error>
+    fn next_key_seed<K>(&mut self, seed: K) -> Result<Option<K::Value>, Error>
     where
         K: de::DeserializeSeed<'de>,
     {
@@ -379,18 +339,22 @@ where
         }
 
         self.remaining = self.remaining.map(|r| r.saturating_sub(1));
-        seed.deserialize(&mut *self.de).map(Some)
+        self.de
+            .with_option_mode(OptionMode::Explicit, |this| seed.deserialize(this))
+            .map(Some)
     }
 
-    fn next_value_seed<V>(&mut self, seed: V) -> Result<V::Value, Self::Error>
+    fn next_value_seed<V>(&mut self, seed: V) -> Result<V::Value, Error>
     where
         V: de::DeserializeSeed<'de>,
     {
-        if self.is_struct {
-            seed.deserialize(StructValueDeserializer { de: &mut *self.de })
+        let option_mode = if self.is_struct {
+            OptionMode::StructField
         } else {
-            seed.deserialize(&mut *self.de)
-        }
+            OptionMode::Explicit
+        };
+        self.de
+            .with_option_mode(option_mode, |this| Ok(seed.deserialize(this)?))
     }
 
     fn size_hint(&self) -> Option<usize> {

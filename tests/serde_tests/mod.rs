@@ -2,6 +2,7 @@ use plist::stream::{Event, VecWriter};
 use plist::{Date, Deserializer, Error, Serializer};
 use serde::de::DeserializeOwned;
 use serde::ser::Serialize;
+use std::collections::BTreeMap;
 use std::fmt::Debug;
 use std::time::SystemTime;
 
@@ -39,7 +40,7 @@ where
 enum Animal {
     Cow,
     Dog(DogOuter),
-    Frog(Result<String, bool>, Vec<f64>),
+    Frog(Result<String, bool>, Option<Vec<f64>>),
     Cat {
         age: usize,
         name: String,
@@ -112,7 +113,7 @@ fn dog() {
 fn frog() {
     let frog = Animal::Frog(
         Ok("hello".to_owned()),
-        vec![1.0, 2.0, 3.14159, 0.000000001, 1.27e31],
+        Some(vec![1.0, 2.0, 3.14159, 0.000000001, 1.27e31]),
     );
 
     let comparison = &[
@@ -123,6 +124,8 @@ fn frog() {
         Event::String("Ok".to_owned()),
         Event::String("hello".to_owned()),
         Event::EndDictionary,
+        Event::StartDictionary(Some(1)),
+        Event::String("Some".to_owned()),
         Event::StartArray(Some(5)),
         Event::Real(1.0),
         Event::Real(2.0),
@@ -130,6 +133,7 @@ fn frog() {
         Event::Real(0.000000001),
         Event::Real(1.27e31),
         Event::EndArray,
+        Event::EndDictionary,
         Event::EndArray,
         Event::EndDictionary,
     ];
@@ -138,7 +142,7 @@ fn frog() {
 }
 
 #[test]
-fn cat() {
+fn cat_with_firmware() {
     let cat = Animal::Cat {
         age: 12,
         name: "Paws".to_owned(),
@@ -172,6 +176,29 @@ fn cat() {
     assert_roundtrip(cat, Some(comparison));
 }
 
+#[test]
+fn cat_without_firmware() {
+    let cat = Animal::Cat {
+        age: 12,
+        name: "Paws".to_owned(),
+        firmware: None,
+    };
+
+    let comparison = &[
+        Event::StartDictionary(Some(1)),
+        Event::String("Cat".to_owned()),
+        Event::StartDictionary(None),
+        Event::String("age".to_owned()),
+        Event::Integer(12.into()),
+        Event::String("name".to_owned()),
+        Event::String("Paws".to_owned()),
+        Event::EndDictionary,
+        Event::EndDictionary,
+    ];
+
+    assert_roundtrip(cat, Some(comparison));
+}
+
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 struct NewtypeStruct(NewtypeInner);
 
@@ -196,7 +223,7 @@ fn newtype_struct() {
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 struct TypeWithOptions {
     a: Option<String>,
-    b: Option<u32>,
+    b: Option<Option<u32>>,
     c: Option<Box<TypeWithOptions>>,
 }
 
@@ -204,13 +231,13 @@ struct TypeWithOptions {
 fn type_with_options() {
     let inner = TypeWithOptions {
         a: None,
-        b: Some(12),
+        b: Some(Some(12)),
         c: None,
     };
 
     let obj = TypeWithOptions {
         a: Some("hello".to_owned()),
-        b: None,
+        b: Some(None),
         c: Some(Box::new(inner)),
     };
 
@@ -218,10 +245,18 @@ fn type_with_options() {
         Event::StartDictionary(None),
         Event::String("a".to_owned()),
         Event::String("hello".to_owned()),
+        Event::String("b".to_owned()),
+        Event::StartDictionary(Some(1)),
+        Event::String("None".to_owned()),
+        Event::String("".to_owned()),
+        Event::EndDictionary,
         Event::String("c".to_owned()),
         Event::StartDictionary(None),
         Event::String("b".to_owned()),
+        Event::StartDictionary(Some(1)),
+        Event::String("Some".to_owned()),
         Event::Integer(12.into()),
+        Event::EndDictionary,
         Event::EndDictionary,
         Event::EndDictionary,
     ];
@@ -251,6 +286,154 @@ fn type_with_date() {
         Event::String("b".to_owned()),
         Event::Date(date),
         Event::EndDictionary,
+    ];
+
+    assert_roundtrip(obj, Some(comparison));
+}
+
+#[test]
+fn option_some() {
+    let obj = Some(12);
+
+    let comparison = &[Event::Integer(12.into())];
+
+    assert_roundtrip(obj, Some(comparison));
+}
+
+#[test]
+fn option_none() {
+    let obj: Option<u32> = None;
+
+    let comparison = &[];
+
+    assert_roundtrip(obj, Some(comparison));
+}
+
+#[test]
+fn option_some_some() {
+    let obj = Some(Some(12));
+
+    let comparison = &[
+        Event::StartDictionary(Some(1)),
+        Event::String("Some".to_owned()),
+        Event::Integer(12.into()),
+        Event::EndDictionary,
+    ];
+
+    assert_roundtrip(obj, Some(comparison));
+}
+
+#[test]
+fn option_some_none() {
+    let obj: Option<Option<u32>> = Some(None);
+
+    let comparison = &[
+        Event::StartDictionary(Some(1)),
+        Event::String("None".to_owned()),
+        Event::String("".to_owned()),
+        Event::EndDictionary,
+    ];
+
+    assert_roundtrip(obj, Some(comparison));
+}
+
+#[test]
+fn option_dictionary_values() {
+    let mut obj = BTreeMap::new();
+    obj.insert("a".to_owned(), None);
+    obj.insert("b".to_owned(), Some(None));
+    obj.insert("c".to_owned(), Some(Some(144)));
+
+    let comparison = &[
+        Event::StartDictionary(Some(3)),
+        Event::String("a".to_owned()),
+        Event::StartDictionary(Some(1)),
+        Event::String("None".to_owned()),
+        Event::String("".to_owned()),
+        Event::EndDictionary,
+        Event::String("b".to_owned()),
+        Event::StartDictionary(Some(1)),
+        Event::String("Some".to_owned()),
+        Event::StartDictionary(Some(1)),
+        Event::String("None".to_owned()),
+        Event::String("".to_owned()),
+        Event::EndDictionary,
+        Event::EndDictionary,
+        Event::String("c".to_owned()),
+        Event::StartDictionary(Some(1)),
+        Event::String("Some".to_owned()),
+        Event::StartDictionary(Some(1)),
+        Event::String("Some".to_owned()),
+        Event::Integer(144.into()),
+        Event::EndDictionary,
+        Event::EndDictionary,
+        Event::EndDictionary,
+    ];
+
+    assert_roundtrip(obj, Some(comparison));
+}
+
+#[test]
+fn option_dictionary_keys() {
+    let mut obj = BTreeMap::new();
+    obj.insert(None, 1);
+    obj.insert(Some(None), 2);
+    obj.insert(Some(Some(144)), 3);
+
+    let comparison = &[
+        Event::StartDictionary(Some(3)),
+        Event::StartDictionary(Some(1)),
+        Event::String("None".to_owned()),
+        Event::String("".to_owned()),
+        Event::EndDictionary,
+        Event::Integer(1.into()),
+        Event::StartDictionary(Some(1)),
+        Event::String("Some".to_owned()),
+        Event::StartDictionary(Some(1)),
+        Event::String("None".to_owned()),
+        Event::String("".to_owned()),
+        Event::EndDictionary,
+        Event::EndDictionary,
+        Event::Integer(2.into()),
+        Event::StartDictionary(Some(1)),
+        Event::String("Some".to_owned()),
+        Event::StartDictionary(Some(1)),
+        Event::String("Some".to_owned()),
+        Event::Integer(144.into()),
+        Event::EndDictionary,
+        Event::EndDictionary,
+        Event::Integer(3.into()),
+        Event::EndDictionary,
+    ];
+
+    assert_roundtrip(obj, Some(comparison));
+}
+
+#[test]
+fn option_array() {
+    let obj = vec![None, Some(None), Some(Some(144))];
+
+    let comparison = &[
+        Event::StartArray(Some(3)),
+        Event::StartDictionary(Some(1)),
+        Event::String("None".to_owned()),
+        Event::String("".to_owned()),
+        Event::EndDictionary,
+        Event::StartDictionary(Some(1)),
+        Event::String("Some".to_owned()),
+        Event::StartDictionary(Some(1)),
+        Event::String("None".to_owned()),
+        Event::String("".to_owned()),
+        Event::EndDictionary,
+        Event::EndDictionary,
+        Event::StartDictionary(Some(1)),
+        Event::String("Some".to_owned()),
+        Event::StartDictionary(Some(1)),
+        Event::String("Some".to_owned()),
+        Event::Integer(144.into()),
+        Event::EndDictionary,
+        Event::EndDictionary,
+        Event::EndArray,
     ];
 
     assert_roundtrip(obj, Some(comparison));
