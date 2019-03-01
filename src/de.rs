@@ -98,6 +98,8 @@ where
             Event::IntegerValue(v) => visitor.visit_i64(v as i64),
             Event::RealValue(v) => visitor.visit_f64(v),
             Event::StringValue(v) => visitor.visit_string(v),
+
+            Event::__Nonexhaustive => unreachable!(),
         }
     }
 

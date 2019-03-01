@@ -160,6 +160,8 @@ impl<W: Write> Writer for XmlWriter<W> {
                     self.write_element_and_value("real", &value.to_string())?
                 }
                 Event::StringValue(ref value) => self.write_element_and_value("string", &*value)?,
+
+                Event::__Nonexhaustive => unreachable!(),
             };
 
             self.expecting_key = self.stack.last() == Some(&Element::Dictionary);

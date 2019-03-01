@@ -43,6 +43,9 @@ pub enum Event {
     IntegerValue(i64),
     RealValue(f64),
     StringValue(String),
+
+    #[doc(hidden)]
+    __Nonexhaustive,
 }
 
 /// An `Event` stream returned by `Value::into_events`.
@@ -82,6 +85,7 @@ impl IntoEvents {
             Value::Real(value) => events.push(Event::RealValue(value)),
             Value::Integer(value) => events.push(Event::IntegerValue(value)),
             Value::String(value) => events.push(Event::StringValue(value)),
+            Value::__Nonexhaustive => unreachable!(),
         }
     }
 }

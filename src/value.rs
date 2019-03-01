@@ -18,6 +18,8 @@ pub enum Value {
     Real(f64),
     Integer(i64),
     String(String),
+    #[doc(hidden)]
+    __Nonexhaustive,
 }
 
 impl Value {
@@ -397,6 +399,8 @@ impl<T: Iterator<Item = Result<Event, Error>>> Builder<T> {
 
             Some(Event::EndArray) => Err(Error::InvalidData),
             Some(Event::EndDictionary) => Err(Error::InvalidData),
+
+            Some(Event::__Nonexhaustive) => unreachable!(),
 
             // The stream should not have ended here
             None => Err(Error::InvalidData),
