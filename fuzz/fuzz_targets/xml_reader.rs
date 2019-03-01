@@ -4,7 +4,7 @@ extern crate plist;
 
 use std::io::Cursor;
 use plist::Value;
-use plist::events::XmlReader;
+use plist::stream::XmlReader;
 
 fuzz_target!(|data: &[u8]| {
     let cursor = Cursor::new(data);
