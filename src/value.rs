@@ -4,7 +4,7 @@ use std::io::Write;
 use std::io::{BufReader, Read, Seek};
 use std::path::Path;
 
-use stream::{Event, Reader, Writer, XmlReader, XmlWriter};
+use stream::{Event, IntoEvents, Reader, Writer, XmlReader, XmlWriter};
 use {u64_to_usize, Date, Error};
 
 /// Represents any plist value.
@@ -62,36 +62,8 @@ impl Value {
     }
 
     /// Converts a `Value` into an `Event` stream.
-    pub fn into_events(self) -> Vec<Event> {
-        let mut events = Vec::new();
-        self.into_events_inner(&mut events);
-        events
-    }
-
-    fn into_events_inner(self, events: &mut Vec<Event>) {
-        match self {
-            Value::Array(array) => {
-                events.push(Event::StartArray(Some(array.len() as u64)));
-                for value in array {
-                    value.into_events_inner(events);
-                }
-                events.push(Event::EndArray);
-            }
-            Value::Dictionary(dict) => {
-                events.push(Event::StartDictionary(Some(dict.len() as u64)));
-                for (key, value) in dict {
-                    events.push(Event::StringValue(key));
-                    value.into_events_inner(events);
-                }
-                events.push(Event::EndDictionary);
-            }
-            Value::Boolean(value) => events.push(Event::BooleanValue(value)),
-            Value::Data(value) => events.push(Event::DataValue(value)),
-            Value::Date(value) => events.push(Event::DateValue(value)),
-            Value::Real(value) => events.push(Event::RealValue(value)),
-            Value::Integer(value) => events.push(Event::IntegerValue(value)),
-            Value::String(value) => events.push(Event::StringValue(value)),
-        }
+    pub fn into_events(self) -> IntoEvents {
+        IntoEvents::new(self)
     }
 
     /// If the `Value` is an Array, returns the associated `Vec`.

@@ -10,7 +10,8 @@ mod xml_writer;
 pub use self::xml_writer::XmlWriter;
 
 use std::io::{Read, Seek, SeekFrom};
-use {Date, Error};
+use std::vec;
+use {Date, Error, Value};
 
 /// An encoding of a plist as a flat structure.
 ///
@@ -42,6 +43,55 @@ pub enum Event {
     IntegerValue(i64),
     RealValue(f64),
     StringValue(String),
+}
+
+/// An `Event` stream returned by `Value::into_events`.
+pub struct IntoEvents {
+    events: vec::IntoIter<Event>,
+}
+
+impl IntoEvents {
+    pub(crate) fn new(value: Value) -> IntoEvents {
+        let mut events = Vec::new();
+        IntoEvents::new_inner(value, &mut events);
+        IntoEvents {
+            events: events.into_iter(),
+        }
+    }
+
+    fn new_inner(value: Value, events: &mut Vec<Event>) {
+        match value {
+            Value::Array(array) => {
+                events.push(Event::StartArray(Some(array.len() as u64)));
+                for value in array {
+                    IntoEvents::new_inner(value, events);
+                }
+                events.push(Event::EndArray);
+            }
+            Value::Dictionary(dict) => {
+                events.push(Event::StartDictionary(Some(dict.len() as u64)));
+                for (key, value) in dict {
+                    events.push(Event::StringValue(key));
+                    IntoEvents::new_inner(value, events);
+                }
+                events.push(Event::EndDictionary);
+            }
+            Value::Boolean(value) => events.push(Event::BooleanValue(value)),
+            Value::Data(value) => events.push(Event::DataValue(value)),
+            Value::Date(value) => events.push(Event::DateValue(value)),
+            Value::Real(value) => events.push(Event::RealValue(value)),
+            Value::Integer(value) => events.push(Event::IntegerValue(value)),
+            Value::String(value) => events.push(Event::StringValue(value)),
+        }
+    }
+}
+
+impl Iterator for IntoEvents {
+    type Item = Event;
+
+    fn next(&mut self) -> Option<Event> {
+        self.events.next()
+    }
 }
 
 pub struct Reader<R: Read + Seek>(ReaderInner<R>);
