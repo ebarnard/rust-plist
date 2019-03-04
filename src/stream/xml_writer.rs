@@ -7,7 +7,7 @@ use xml_rs::namespace::Namespace;
 use xml_rs::writer::{EmitterConfig, Error as XmlWriterError, EventWriter, XmlEvent};
 
 use stream::{Event, Writer};
-use Error;
+use {Date, Error};
 
 static XML_PROLOGUE: &str = r#"<?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
@@ -94,10 +94,11 @@ impl<W: Write> XmlWriter<W> {
     pub fn into_inner(self) -> W {
         self.xml_writer.into_inner()
     }
-}
 
-impl<W: Write> Writer for XmlWriter<W> {
-    fn write(&mut self, event: &Event) -> Result<(), Error> {
+    fn write_event<F: FnOnce(&mut Self) -> Result<(), Error>>(
+        &mut self,
+        f: F,
+    ) -> Result<(), Error> {
         if !self.written_prologue {
             self.xml_writer
                 .inner_mut()
@@ -106,66 +107,7 @@ impl<W: Write> Writer for XmlWriter<W> {
             self.written_prologue = true;
         }
 
-        if self.expecting_key {
-            match *event {
-                Event::EndDictionary => match self.stack.pop() {
-                    Some(Element::Dictionary) => {
-                        self.end_element("dict")?;
-                        self.expecting_key = self.stack.last() == Some(&Element::Dictionary);
-                    }
-                    _ => return Err(Error::InvalidData),
-                },
-                Event::StringValue(ref value) => {
-                    self.write_element_and_value("key", &*value)?;
-                    self.expecting_key = false;
-                }
-                _ => return Err(Error::InvalidData),
-            }
-        } else {
-            match *event {
-                Event::StartArray(_) => {
-                    self.start_element("array")?;
-                    self.stack.push(Element::Array);
-                }
-                Event::EndArray => match self.stack.pop() {
-                    Some(Element::Array) => self.end_element("array")?,
-                    _ => return Err(Error::InvalidData),
-                },
-
-                Event::StartDictionary(_) => {
-                    self.start_element("dict")?;
-                    self.stack.push(Element::Dictionary);
-                }
-                Event::EndDictionary => return Err(Error::InvalidData),
-
-                Event::BooleanValue(true) => {
-                    self.start_element("true")?;
-                    self.end_element("true")?;
-                }
-                Event::BooleanValue(false) => {
-                    self.start_element("false")?;
-                    self.end_element("false")?;
-                }
-                Event::DataValue(ref value) => {
-                    let base64_data = base64_encode_plist(&value, self.stack.len());
-                    self.write_element_and_value("data", &base64_data)?;
-                }
-                Event::DateValue(ref value) => {
-                    self.write_element_and_value("date", &value.to_rfc3339())?
-                }
-                Event::IntegerValue(ref value) => {
-                    self.write_element_and_value("integer", &value.to_string())?
-                }
-                Event::RealValue(ref value) => {
-                    self.write_element_and_value("real", &value.to_string())?
-                }
-                Event::StringValue(ref value) => self.write_element_and_value("string", &*value)?,
-
-                Event::__Nonexhaustive => unreachable!(),
-            };
-
-            self.expecting_key = self.stack.last() == Some(&Element::Dictionary);
-        }
+        f(self)?;
 
         // If there are no more open tags then write the </plist> element
         if self.stack.len() == 0 {
@@ -175,6 +117,102 @@ impl<W: Write> Writer for XmlWriter<W> {
         }
 
         Ok(())
+    }
+
+    fn write_value_event<F: FnOnce(&mut Self) -> Result<(), Error>>(
+        &mut self,
+        f: F,
+    ) -> Result<(), Error> {
+        self.write_event(|this| {
+            if this.expecting_key {
+                return Err(Error::InvalidData);
+            }
+            f(this)?;
+            this.expecting_key = this.stack.last() == Some(&Element::Dictionary);
+            Ok(())
+        })
+    }
+}
+
+impl<W: Write> Writer for XmlWriter<W> {
+    fn write_start_array(&mut self, _len: Option<u64>) -> Result<(), Error> {
+        self.write_value_event(|this| {
+            this.start_element("array")?;
+            this.stack.push(Element::Array);
+            Ok(())
+        })
+    }
+
+    fn write_end_array(&mut self) -> Result<(), Error> {
+        self.write_value_event(|this| match this.stack.pop() {
+            Some(Element::Array) => this.end_element("array"),
+            _ => Err(Error::InvalidData),
+        })
+    }
+
+    fn write_start_dictionary(&mut self, _len: Option<u64>) -> Result<(), Error> {
+        self.write_value_event(|this| {
+            this.start_element("dict")?;
+            this.stack.push(Element::Dictionary);
+            Ok(())
+        })
+    }
+
+    fn write_end_dictionary(&mut self) -> Result<(), Error> {
+        self.write_event(|this| {
+            if this.expecting_key {
+                match this.stack.pop() {
+                    Some(Element::Dictionary) => {
+                        this.end_element("dict")?;
+                        this.expecting_key = this.stack.last() == Some(&Element::Dictionary);
+                        Ok(())
+                    }
+                    _ => Err(Error::InvalidData),
+                }
+            } else {
+                Err(Error::InvalidData)
+            }
+        })
+    }
+
+    fn write_boolean_value(&mut self, value: bool) -> Result<(), Error> {
+        self.write_value_event(|this| {
+            let value_str = if value { "true" } else { "false" };
+            this.start_element(value_str)?;
+            this.end_element(value_str)
+        })
+    }
+
+    fn write_data_value(&mut self, value: &[u8]) -> Result<(), Error> {
+        self.write_value_event(|this| {
+            let base64_data = base64_encode_plist(&value, this.stack.len());
+            this.write_element_and_value("data", &base64_data)
+        })
+    }
+
+    fn write_date_value(&mut self, value: Date) -> Result<(), Error> {
+        self.write_value_event(|this| this.write_element_and_value("date", &value.to_rfc3339()))
+    }
+
+    fn write_integer_value(&mut self, value: i64) -> Result<(), Error> {
+        self.write_value_event(|this| this.write_element_and_value("integer", &value.to_string()))
+    }
+
+    fn write_real_value(&mut self, value: f64) -> Result<(), Error> {
+        self.write_value_event(|this| this.write_element_and_value("real", &value.to_string()))
+    }
+
+    fn write_string_value(&mut self, value: &str) -> Result<(), Error> {
+        self.write_event(|this| {
+            if this.expecting_key {
+                this.write_element_and_value("key", &*value)?;
+                this.expecting_key = false;
+            } else {
+                this.write_element_and_value("string", &*value)?;
+                this.expecting_key = this.stack.last() == Some(&Element::Dictionary);
+            }
+            Ok(())
+        })
     }
 }
 

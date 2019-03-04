@@ -148,5 +148,32 @@ impl<R: Read + Seek> Iterator for Reader<R> {
 
 /// Supports writing event streams in different plist encodings.
 pub trait Writer {
-    fn write(&mut self, event: &Event) -> Result<(), Error>;
+    fn write(&mut self, event: &Event) -> Result<(), Error> {
+        match event {
+            Event::StartArray(len) => self.write_start_array(*len),
+            Event::EndArray => self.write_end_array(),
+            Event::StartDictionary(len) => self.write_start_dictionary(*len),
+            Event::EndDictionary => self.write_end_dictionary(),
+            Event::BooleanValue(value) => self.write_boolean_value(*value),
+            Event::DataValue(value) => self.write_data_value(value),
+            Event::DateValue(value) => self.write_date_value(*value),
+            Event::IntegerValue(value) => self.write_integer_value(*value),
+            Event::RealValue(value) => self.write_real_value(*value),
+            Event::StringValue(value) => self.write_string_value(value),
+            Event::__Nonexhaustive => unreachable!(),
+        }
+    }
+
+    fn write_start_array(&mut self, len: Option<u64>) -> Result<(), Error>;
+    fn write_end_array(&mut self) -> Result<(), Error>;
+
+    fn write_start_dictionary(&mut self, len: Option<u64>) -> Result<(), Error>;
+    fn write_end_dictionary(&mut self) -> Result<(), Error>;
+
+    fn write_boolean_value(&mut self, value: bool) -> Result<(), Error>;
+    fn write_data_value(&mut self, value: &[u8]) -> Result<(), Error>;
+    fn write_date_value(&mut self, value: Date) -> Result<(), Error>;
+    fn write_integer_value(&mut self, value: i64) -> Result<(), Error>;
+    fn write_real_value(&mut self, value: f64) -> Result<(), Error>;
+    fn write_string_value(&mut self, value: &str) -> Result<(), Error>;
 }
