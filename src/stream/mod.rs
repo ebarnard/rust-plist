@@ -147,7 +147,7 @@ impl<R: Read + Seek> Iterator for Reader<R> {
 }
 
 /// Supports writing event streams in different plist encodings.
-pub trait Writer {
+pub trait Writer: private::Sealed {
     fn write(&mut self, event: &Event) -> Result<(), Error> {
         match event {
             Event::StartArray(len) => self.write_start_array(*len),
@@ -176,4 +176,80 @@ pub trait Writer {
     fn write_integer_value(&mut self, value: i64) -> Result<(), Error>;
     fn write_real_value(&mut self, value: f64) -> Result<(), Error>;
     fn write_string_value(&mut self, value: &str) -> Result<(), Error>;
+}
+
+#[doc(hidden)]
+pub struct VecWriter {
+    events: Vec<Event>,
+}
+
+impl VecWriter {
+    pub fn new() -> VecWriter {
+        VecWriter { events: Vec::new() }
+    }
+
+    pub fn into_inner(self) -> Vec<Event> {
+        self.events
+    }
+}
+
+impl Writer for VecWriter {
+    fn write_start_array(&mut self, len: Option<u64>) -> Result<(), Error> {
+        self.events.push(Event::StartArray(len));
+        Ok(())
+    }
+
+    fn write_end_array(&mut self) -> Result<(), Error> {
+        self.events.push(Event::EndArray);
+        Ok(())
+    }
+
+    fn write_start_dictionary(&mut self, len: Option<u64>) -> Result<(), Error> {
+        self.events.push(Event::StartDictionary(len));
+        Ok(())
+    }
+
+    fn write_end_dictionary(&mut self) -> Result<(), Error> {
+        self.events.push(Event::EndDictionary);
+        Ok(())
+    }
+
+    fn write_boolean_value(&mut self, value: bool) -> Result<(), Error> {
+        self.events.push(Event::BooleanValue(value));
+        Ok(())
+    }
+
+    fn write_data_value(&mut self, value: &[u8]) -> Result<(), Error> {
+        self.events.push(Event::DataValue(value.to_owned()));
+        Ok(())
+    }
+
+    fn write_date_value(&mut self, value: Date) -> Result<(), Error> {
+        self.events.push(Event::DateValue(value));
+        Ok(())
+    }
+
+    fn write_integer_value(&mut self, value: i64) -> Result<(), Error> {
+        self.events.push(Event::IntegerValue(value));
+        Ok(())
+    }
+
+    fn write_real_value(&mut self, value: f64) -> Result<(), Error> {
+        self.events.push(Event::RealValue(value));
+        Ok(())
+    }
+
+    fn write_string_value(&mut self, value: &str) -> Result<(), Error> {
+        self.events.push(Event::StringValue(value.to_owned()));
+        Ok(())
+    }
+}
+
+mod private {
+    use std::io::Write;
+
+    pub trait Sealed {}
+
+    impl<W: Write> Sealed for super::XmlWriter<W> {}
+    impl Sealed for super::VecWriter {}
 }
