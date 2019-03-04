@@ -3,7 +3,7 @@ use std::fmt::Display;
 use std::io::Write;
 
 use date::serde_impls::DATE_NEWTYPE_STRUCT_NAME;
-use stream::{self, Event, Writer};
+use stream::{self, Writer};
 use {Date, Error};
 
 impl ser::Error for Error {
@@ -22,24 +22,19 @@ impl<W: Writer> Serializer<W> {
         Serializer { writer }
     }
 
-    fn emit(&mut self, event: Event) -> Result<(), Error> {
-        self.writer.write(&event)?;
-        Ok(())
-    }
-
     pub fn into_inner(self) -> W {
         self.writer
     }
 
     // Emit {key: value}
-    fn single_key_dict(&mut self, key: String) -> Result<(), Error> {
-        self.emit(Event::StartDictionary(Some(1)))?;
-        self.emit(Event::StringValue(key))?;
+    fn single_key_dict(&mut self, key: &str) -> Result<(), Error> {
+        self.writer.write_start_dictionary(Some(1))?;
+        self.writer.write_string_value(key)?;
         Ok(())
     }
 
     fn single_key_dict_end(&mut self) -> Result<(), Error> {
-        self.emit(Event::EndDictionary)?;
+        self.writer.write_end_dictionary()?;
         Ok(())
     }
 }
@@ -57,7 +52,7 @@ impl<'a, W: Writer> ser::Serializer for &'a mut Serializer<W> {
     type SerializeStructVariant = Compound<'a, W>;
 
     fn serialize_bool(self, v: bool) -> Result<(), Self::Error> {
-        self.emit(Event::BooleanValue(v))
+        self.writer.write_boolean_value(v)
     }
 
     fn serialize_i8(self, v: i8) -> Result<(), Self::Error> {
@@ -73,7 +68,7 @@ impl<'a, W: Writer> ser::Serializer for &'a mut Serializer<W> {
     }
 
     fn serialize_i64(self, v: i64) -> Result<(), Self::Error> {
-        self.emit(Event::IntegerValue(v))
+        self.writer.write_integer_value(v)
     }
 
     fn serialize_u8(self, v: u8) -> Result<(), Self::Error> {
@@ -89,7 +84,7 @@ impl<'a, W: Writer> ser::Serializer for &'a mut Serializer<W> {
     }
 
     fn serialize_u64(self, v: u64) -> Result<(), Self::Error> {
-        self.emit(Event::IntegerValue(v as i64))
+        self.writer.write_integer_value(v as i64)
     }
 
     fn serialize_f32(self, v: f32) -> Result<(), Self::Error> {
@@ -97,36 +92,38 @@ impl<'a, W: Writer> ser::Serializer for &'a mut Serializer<W> {
     }
 
     fn serialize_f64(self, v: f64) -> Result<(), Self::Error> {
-        self.emit(Event::RealValue(v))
+        self.writer.write_real_value(v)
     }
 
     fn serialize_char(self, v: char) -> Result<(), Self::Error> {
-        self.emit(Event::StringValue(v.to_string()))
+        let mut buf = [0; 4];
+        let v = v.encode_utf8(&mut buf);
+        self.writer.write_string_value(v)
     }
 
     fn serialize_str(self, v: &str) -> Result<(), Self::Error> {
-        self.emit(Event::StringValue(v.to_owned()))
+        self.writer.write_string_value(v)
     }
 
     fn serialize_bytes(self, v: &[u8]) -> Result<(), Self::Error> {
-        self.emit(Event::DataValue(v.to_owned()))
+        self.writer.write_data_value(v)
     }
 
     fn serialize_none(self) -> Result<(), Self::Error> {
-        self.single_key_dict("None".to_owned())?;
+        self.single_key_dict("None")?;
         self.serialize_unit()?;
         self.single_key_dict_end()
     }
 
     fn serialize_some<T: ?Sized + ser::Serialize>(self, value: &T) -> Result<(), Self::Error> {
-        self.single_key_dict("Some".to_owned())?;
+        self.single_key_dict("Some")?;
         value.serialize(&mut *self)?;
         self.single_key_dict_end()
     }
 
     fn serialize_unit(self) -> Result<(), Self::Error> {
         // Emit empty string
-        self.emit(Event::StringValue(String::new()))
+        self.writer.write_string_value("")
     }
 
     fn serialize_unit_struct(self, _name: &'static str) -> Result<(), Self::Error> {
@@ -139,7 +136,7 @@ impl<'a, W: Writer> ser::Serializer for &'a mut Serializer<W> {
         _variant_index: u32,
         variant: &'static str,
     ) -> Result<(), Self::Error> {
-        self.single_key_dict(variant.to_owned())?;
+        self.single_key_dict(variant)?;
         self.serialize_unit()?;
         self.single_key_dict_end()?;
         Ok(())
@@ -164,14 +161,14 @@ impl<'a, W: Writer> ser::Serializer for &'a mut Serializer<W> {
         variant: &'static str,
         value: &T,
     ) -> Result<(), Self::Error> {
-        self.single_key_dict(variant.to_owned())?;
+        self.single_key_dict(variant)?;
         value.serialize(&mut *self)?;
         self.single_key_dict_end()
     }
 
     fn serialize_seq(self, len: Option<usize>) -> Result<Self::SerializeSeq, Self::Error> {
         let len = len.map(|len| len as u64);
-        self.emit(Event::StartArray(len))?;
+        self.writer.write_start_array(len)?;
         Ok(Compound { ser: self })
     }
 
@@ -194,13 +191,13 @@ impl<'a, W: Writer> ser::Serializer for &'a mut Serializer<W> {
         variant: &'static str,
         len: usize,
     ) -> Result<Self::SerializeTupleVariant, Self::Error> {
-        self.single_key_dict(variant.to_owned())?;
+        self.single_key_dict(variant)?;
         self.serialize_tuple(len)
     }
 
     fn serialize_map(self, len: Option<usize>) -> Result<Self::SerializeMap, Self::Error> {
         let len = len.map(|len| len as u64);
-        self.emit(Event::StartDictionary(len))?;
+        self.writer.write_start_dictionary(len)?;
         Ok(Compound { ser: self })
     }
 
@@ -220,7 +217,7 @@ impl<'a, W: Writer> ser::Serializer for &'a mut Serializer<W> {
         variant: &'static str,
         len: usize,
     ) -> Result<Self::SerializeStructVariant, Self::Error> {
-        self.single_key_dict(variant.to_owned())?;
+        self.single_key_dict(variant)?;
         self.serialize_struct(name, len)
     }
 }
@@ -233,8 +230,7 @@ struct StructFieldSerializer<'a, W: 'a + Writer> {
 impl<'a, W: Writer> StructFieldSerializer<'a, W> {
     fn use_ser(self) -> Result<&'a mut Serializer<W>, Error> {
         // We are going to serialize something so write the struct field name.
-        self.ser
-            .emit(Event::StringValue(self.field_name.to_owned()))?;
+        self.ser.writer.write_string_value(self.field_name)?;
         Ok(self.ser)
     }
 }
@@ -477,7 +473,7 @@ impl<'a, W: Writer> ser::Serializer for DateSerializer<'a, W> {
 
     fn serialize_str(self, v: &str) -> Result<(), Self::Error> {
         let date = Date::from_rfc3339(v).map_err(|()| self.expecting_date_error())?;
-        self.ser.emit(Event::DateValue(date))
+        self.ser.writer.write_date_value(date)
     }
 
     fn serialize_bytes(self, _: &[u8]) -> Result<(), Self::Error> {
@@ -593,7 +589,7 @@ impl<'a, W: Writer> ser::SerializeSeq for Compound<'a, W> {
     }
 
     fn end(self) -> Result<Self::Ok, Self::Error> {
-        self.ser.emit(Event::EndArray)
+        self.ser.writer.write_end_array()
     }
 }
 
@@ -641,7 +637,7 @@ impl<'a, W: Writer> ser::SerializeTupleVariant for Compound<'a, W> {
     }
 
     fn end(self) -> Result<Self::Ok, Self::Error> {
-        self.ser.emit(Event::EndArray)?;
+        self.ser.writer.write_end_array()?;
         self.ser.single_key_dict_end()
     }
 }
@@ -662,7 +658,7 @@ impl<'a, W: Writer> ser::SerializeMap for Compound<'a, W> {
     }
 
     fn end(self) -> Result<Self::Ok, Self::Error> {
-        self.ser.emit(Event::EndDictionary)
+        self.ser.writer.write_end_dictionary()
     }
 }
 
@@ -701,7 +697,7 @@ impl<'a, W: Writer> ser::SerializeStructVariant for Compound<'a, W> {
     }
 
     fn end(self) -> Result<Self::Ok, Self::Error> {
-        self.ser.emit(Event::EndDictionary)?;
+        self.ser.writer.write_end_dictionary()?;
         self.ser.single_key_dict_end()
     }
 }
