@@ -154,12 +154,12 @@ pub trait Writer: private::Sealed {
             Event::EndArray => self.write_end_array(),
             Event::StartDictionary(len) => self.write_start_dictionary(*len),
             Event::EndDictionary => self.write_end_dictionary(),
-            Event::Boolean(value) => self.write_boolean_value(*value),
-            Event::Data(value) => self.write_data_value(value),
-            Event::Date(value) => self.write_date_value(*value),
-            Event::Integer(value) => self.write_integer_value(*value),
-            Event::Real(value) => self.write_real_value(*value),
-            Event::String(value) => self.write_string_value(value),
+            Event::Boolean(value) => self.write_boolean(*value),
+            Event::Data(value) => self.write_data(value),
+            Event::Date(value) => self.write_date(*value),
+            Event::Integer(value) => self.write_integer(*value),
+            Event::Real(value) => self.write_real(*value),
+            Event::String(value) => self.write_string(value),
             Event::__Nonexhaustive => unreachable!(),
         }
     }
@@ -170,12 +170,12 @@ pub trait Writer: private::Sealed {
     fn write_start_dictionary(&mut self, len: Option<u64>) -> Result<(), Error>;
     fn write_end_dictionary(&mut self) -> Result<(), Error>;
 
-    fn write_boolean_value(&mut self, value: bool) -> Result<(), Error>;
-    fn write_data_value(&mut self, value: &[u8]) -> Result<(), Error>;
-    fn write_date_value(&mut self, value: Date) -> Result<(), Error>;
-    fn write_integer_value(&mut self, value: Integer) -> Result<(), Error>;
-    fn write_real_value(&mut self, value: f64) -> Result<(), Error>;
-    fn write_string_value(&mut self, value: &str) -> Result<(), Error>;
+    fn write_boolean(&mut self, value: bool) -> Result<(), Error>;
+    fn write_data(&mut self, value: &[u8]) -> Result<(), Error>;
+    fn write_date(&mut self, value: Date) -> Result<(), Error>;
+    fn write_integer(&mut self, value: Integer) -> Result<(), Error>;
+    fn write_real(&mut self, value: f64) -> Result<(), Error>;
+    fn write_string(&mut self, value: &str) -> Result<(), Error>;
 }
 
 #[doc(hidden)]
@@ -214,32 +214,32 @@ impl Writer for VecWriter {
         Ok(())
     }
 
-    fn write_boolean_value(&mut self, value: bool) -> Result<(), Error> {
+    fn write_boolean(&mut self, value: bool) -> Result<(), Error> {
         self.events.push(Event::Boolean(value));
         Ok(())
     }
 
-    fn write_data_value(&mut self, value: &[u8]) -> Result<(), Error> {
+    fn write_data(&mut self, value: &[u8]) -> Result<(), Error> {
         self.events.push(Event::Data(value.to_owned()));
         Ok(())
     }
 
-    fn write_date_value(&mut self, value: Date) -> Result<(), Error> {
+    fn write_date(&mut self, value: Date) -> Result<(), Error> {
         self.events.push(Event::Date(value));
         Ok(())
     }
 
-    fn write_integer_value(&mut self, value: Integer) -> Result<(), Error> {
+    fn write_integer(&mut self, value: Integer) -> Result<(), Error> {
         self.events.push(Event::Integer(value));
         Ok(())
     }
 
-    fn write_real_value(&mut self, value: f64) -> Result<(), Error> {
+    fn write_real(&mut self, value: f64) -> Result<(), Error> {
         self.events.push(Event::Real(value));
         Ok(())
     }
 
-    fn write_string_value(&mut self, value: &str) -> Result<(), Error> {
+    fn write_string(&mut self, value: &str) -> Result<(), Error> {
         self.events.push(Event::String(value.to_owned()));
         Ok(())
     }

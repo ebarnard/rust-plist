@@ -175,7 +175,7 @@ impl<W: Write> Writer for XmlWriter<W> {
         })
     }
 
-    fn write_boolean_value(&mut self, value: bool) -> Result<(), Error> {
+    fn write_boolean(&mut self, value: bool) -> Result<(), Error> {
         self.write_value_event(|this| {
             let value_str = if value { "true" } else { "false" };
             this.start_element(value_str)?;
@@ -183,26 +183,26 @@ impl<W: Write> Writer for XmlWriter<W> {
         })
     }
 
-    fn write_data_value(&mut self, value: &[u8]) -> Result<(), Error> {
+    fn write_data(&mut self, value: &[u8]) -> Result<(), Error> {
         self.write_value_event(|this| {
             let base64_data = base64_encode_plist(&value, this.stack.len());
             this.write_element_and_value("data", &base64_data)
         })
     }
 
-    fn write_date_value(&mut self, value: Date) -> Result<(), Error> {
+    fn write_date(&mut self, value: Date) -> Result<(), Error> {
         self.write_value_event(|this| this.write_element_and_value("date", &value.to_rfc3339()))
     }
 
-    fn write_integer_value(&mut self, value: Integer) -> Result<(), Error> {
+    fn write_integer(&mut self, value: Integer) -> Result<(), Error> {
         self.write_value_event(|this| this.write_element_and_value("integer", &value.to_string()))
     }
 
-    fn write_real_value(&mut self, value: f64) -> Result<(), Error> {
+    fn write_real(&mut self, value: f64) -> Result<(), Error> {
         self.write_value_event(|this| this.write_element_and_value("real", &value.to_string()))
     }
 
-    fn write_string_value(&mut self, value: &str) -> Result<(), Error> {
+    fn write_string(&mut self, value: &str) -> Result<(), Error> {
         self.write_event(|this| {
             if this.expecting_key {
                 this.write_element_and_value("key", &*value)?;
