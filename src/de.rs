@@ -94,8 +94,15 @@ where
             Event::BooleanValue(v) => visitor.visit_bool(v),
             Event::DataValue(v) => visitor.visit_byte_buf(v),
             Event::DateValue(v) => visitor.visit_string(v.to_rfc3339()),
-            Event::IntegerValue(v) if v.is_positive() => visitor.visit_u64(v as u64),
-            Event::IntegerValue(v) => visitor.visit_i64(v as i64),
+            Event::IntegerValue(v) => {
+                if let Some(v) = v.as_unsigned() {
+                    visitor.visit_u64(v)
+                } else if let Some(v) = v.as_signed() {
+                    visitor.visit_i64(v)
+                } else {
+                    unreachable!()
+                }
+            }
             Event::RealValue(v) => visitor.visit_f64(v),
             Event::StringValue(v) => visitor.visit_string(v),
 

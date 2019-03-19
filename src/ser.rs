@@ -68,7 +68,7 @@ impl<'a, W: Writer> ser::Serializer for &'a mut Serializer<W> {
     }
 
     fn serialize_i64(self, v: i64) -> Result<(), Self::Error> {
-        self.writer.write_integer_value(v)
+        self.writer.write_integer_value(v.into())
     }
 
     fn serialize_u8(self, v: u8) -> Result<(), Self::Error> {
@@ -84,7 +84,7 @@ impl<'a, W: Writer> ser::Serializer for &'a mut Serializer<W> {
     }
 
     fn serialize_u64(self, v: u64) -> Result<(), Self::Error> {
-        self.writer.write_integer_value(v as i64)
+        self.writer.write_integer_value(v.into())
     }
 
     fn serialize_f32(self, v: f32) -> Result<(), Self::Error> {

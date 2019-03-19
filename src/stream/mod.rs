@@ -11,7 +11,7 @@ pub use self::xml_writer::XmlWriter;
 
 use std::io::{Read, Seek, SeekFrom};
 use std::vec;
-use {Date, Error, Value};
+use {Date, Error, Integer, Value};
 
 /// An encoding of a plist as a flat structure.
 ///
@@ -40,7 +40,7 @@ pub enum Event {
     BooleanValue(bool),
     DataValue(Vec<u8>),
     DateValue(Date),
-    IntegerValue(i64),
+    IntegerValue(Integer),
     RealValue(f64),
     StringValue(String),
 
@@ -173,7 +173,7 @@ pub trait Writer: private::Sealed {
     fn write_boolean_value(&mut self, value: bool) -> Result<(), Error>;
     fn write_data_value(&mut self, value: &[u8]) -> Result<(), Error>;
     fn write_date_value(&mut self, value: Date) -> Result<(), Error>;
-    fn write_integer_value(&mut self, value: i64) -> Result<(), Error>;
+    fn write_integer_value(&mut self, value: Integer) -> Result<(), Error>;
     fn write_real_value(&mut self, value: f64) -> Result<(), Error>;
     fn write_string_value(&mut self, value: &str) -> Result<(), Error>;
 }
@@ -229,7 +229,7 @@ impl Writer for VecWriter {
         Ok(())
     }
 
-    fn write_integer_value(&mut self, value: i64) -> Result<(), Error> {
+    fn write_integer_value(&mut self, value: Integer) -> Result<(), Error> {
         self.events.push(Event::IntegerValue(value));
         Ok(())
     }

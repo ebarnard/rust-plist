@@ -7,7 +7,7 @@ use xml_rs::namespace::Namespace;
 use xml_rs::writer::{EmitterConfig, Error as XmlWriterError, EventWriter, XmlEvent};
 
 use stream::{Event, Writer};
-use {Date, Error};
+use {Date, Error, Integer};
 
 static XML_PROLOGUE: &str = r#"<?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
@@ -194,7 +194,7 @@ impl<W: Write> Writer for XmlWriter<W> {
         self.write_value_event(|this| this.write_element_and_value("date", &value.to_rfc3339()))
     }
 
-    fn write_integer_value(&mut self, value: i64) -> Result<(), Error> {
+    fn write_integer_value(&mut self, value: Integer) -> Result<(), Error> {
         self.write_value_event(|this| this.write_element_and_value("integer", &value.to_string()))
     }
 
@@ -282,7 +282,7 @@ mod tests {
             DataValue((0..128).collect::<Vec<_>>()),
             EndArray,
             StringValue("Death".to_owned()),
-            IntegerValue(1564),
+            IntegerValue(1564.into()),
             StringValue("Height".to_owned()),
             RealValue(1.60),
             StringValue("Data".to_owned()),
@@ -291,6 +291,10 @@ mod tests {
             DateValue(parse_rfc3339_weak("1981-05-16 11:32:06").unwrap().into()),
             StringValue("Comment".to_owned()),
             StringValue("2 < 3".to_owned()), // make sure characters are escaped
+            StringValue("BiggestNumber".to_owned()),
+            IntegerValue(18446744073709551615u64.into()),
+            StringValue("SmallestNumber".to_owned()),
+            IntegerValue((-9223372036854775808i64).into()),
             EndDictionary,
         ];
 
@@ -332,6 +336,10 @@ mod tests {
 \t<date>1981-05-16T11:32:06Z</date>
 \t<key>Comment</key>
 \t<string>2 &lt; 3</string>
+\t<key>BiggestNumber</key>
+\t<integer>18446744073709551615</integer>
+\t<key>SmallestNumber</key>
+\t<integer>-9223372036854775808</integer>
 </dict>
 </plist>";
 

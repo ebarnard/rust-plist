@@ -219,8 +219,16 @@ impl<R: Read + Seek> BinaryReader<R> {
             (0x1, 2) => Some(Event::IntegerValue(
                 self.reader.read_u32::<BigEndian>()?.into(),
             )),
-            (0x1, 3) => Some(Event::IntegerValue(self.reader.read_i64::<BigEndian>()?)),
-            (0x1, 4) => return Err(Error::InvalidData), // 128 bit int
+            (0x1, 3) => Some(Event::IntegerValue(
+                self.reader.read_i64::<BigEndian>()?.into(),
+            )),
+            (0x1, 4) => {
+                let value = self.reader.read_i128::<BigEndian>()?;
+                if value < 0 || value > u64::max_value().into() {
+                    return Err(Error::InvalidData);
+                }
+                Some(Event::IntegerValue((value as u64).into()))
+            }
             (0x1, _) => return Err(Error::InvalidData), // variable length int
             (0x2, 2) => Some(Event::RealValue(
                 self.reader.read_f32::<BigEndian>()?.into(),
@@ -335,22 +343,28 @@ mod tests {
         let events: Vec<Event> = streaming_parser.map(|e| e.unwrap()).collect();
 
         let comparison = &[
-            StartDictionary(Some(6)),
-            StringValue("Lines".to_owned()),
-            StartArray(Some(2)),
-            StringValue("It is a tale told by an idiot,".to_owned()),
-            StringValue("Full of sound and fury, signifying nothing.".to_owned()),
-            EndArray,
-            StringValue("Death".to_owned()),
-            IntegerValue(1564),
-            StringValue("Height".to_owned()),
-            RealValue(1.60),
-            StringValue("Birthdate".to_owned()),
-            DateValue(parse_rfc3339_weak("1981-05-16 11:32:06").unwrap().into()),
-            StringValue("Author".to_owned()),
-            StringValue("William Shakespeare".to_owned()),
-            StringValue("Data".to_owned()),
+            StartDictionary(Some(9)),
+            StringValue("Author".into()),
+            StringValue("William Shakespeare".into()),
+            StringValue("Height".into()),
+            RealValue(1.6),
+            StringValue("Data".into()),
             DataValue(vec![0, 0, 0, 190, 0, 0, 0, 3, 0, 0, 0, 30, 0, 0, 0]),
+            StringValue("Birthdate".into()),
+            DateValue(parse_rfc3339_weak("1981-05-16 11:32:06").unwrap().into()),
+            StringValue("BiggestNumber".into()),
+            IntegerValue(18446744073709551615u64.into()),
+            StringValue("SmallestNumber".into()),
+            IntegerValue((-9223372036854775808i64).into()),
+            StringValue("Lines".into()),
+            StartArray(Some(2)),
+            StringValue("It is a tale told by an idiot,".into()),
+            StringValue("Full of sound and fury, signifying nothing.".into()),
+            EndArray,
+            StringValue("Death".into()),
+            IntegerValue(1564.into()),
+            StringValue("Blank".into()),
+            StringValue("".into()),
             EndDictionary,
         ];
 

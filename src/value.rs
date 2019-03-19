@@ -5,7 +5,7 @@ use std::io::{BufReader, Read, Seek};
 use std::path::Path;
 
 use stream::{Event, IntoEvents, Reader, Writer, XmlReader, XmlWriter};
-use {u64_to_usize, Date, Error};
+use {u64_to_usize, Date, Error, Integer};
 
 /// Represents any plist value.
 #[derive(Clone, Debug, PartialEq)]
@@ -16,7 +16,7 @@ pub enum Value {
     Data(Vec<u8>),
     Date(Date),
     Real(f64),
-    Integer(i64),
+    Integer(Integer),
     String(String),
     #[doc(hidden)]
     __Nonexhaustive,
@@ -161,12 +161,22 @@ impl Value {
         }
     }
 
-    /// If the `Value` is an Integer, returns the associated `i64`.
+    /// If the `Value` is a signed Integer, returns the associated `i64`.
     ///
     /// Returns `None` otherwise.
-    pub fn as_integer(&self) -> Option<i64> {
+    pub fn as_signed_integer(&self) -> Option<i64> {
         match *self {
-            Value::Integer(v) => Some(v),
+            Value::Integer(v) => v.as_signed(),
+            _ => None,
+        }
+    }
+
+    /// If the `Value` is an unsigned Integer, returns the associated `u64`.
+    ///
+    /// Returns `None` otherwise.
+    pub fn as_unsigned_integer(&self) -> Option<u64> {
+        match *self {
+            Value::Integer(v) => v.as_unsigned(),
             _ => None,
         }
     }
@@ -245,43 +255,49 @@ impl From<f32> for Value {
 
 impl From<i64> for Value {
     fn from(from: i64) -> Value {
-        Value::Integer(from)
+        Value::Integer(Integer::from(from))
     }
 }
 
 impl From<i32> for Value {
     fn from(from: i32) -> Value {
-        Value::Integer(from.into())
+        Value::Integer(Integer::from(from))
     }
 }
 
 impl From<i16> for Value {
     fn from(from: i16) -> Value {
-        Value::Integer(from.into())
+        Value::Integer(Integer::from(from))
     }
 }
 
 impl From<i8> for Value {
     fn from(from: i8) -> Value {
-        Value::Integer(from.into())
+        Value::Integer(Integer::from(from))
+    }
+}
+
+impl From<u64> for Value {
+    fn from(from: u64) -> Value {
+        Value::Integer(Integer::from(from))
     }
 }
 
 impl From<u32> for Value {
     fn from(from: u32) -> Value {
-        Value::Integer(from.into())
+        Value::Integer(Integer::from(from))
     }
 }
 
 impl From<u16> for Value {
     fn from(from: u16) -> Value {
-        Value::Integer(from.into())
+        Value::Integer(Integer::from(from))
     }
 }
 
 impl From<u8> for Value {
     fn from(from: u8) -> Value {
-        Value::Integer(from.into())
+        Value::Integer(Integer::from(from))
     }
 }
 
@@ -299,31 +315,37 @@ impl<'a> From<&'a f32> for Value {
 
 impl<'a> From<&'a i64> for Value {
     fn from(from: &'a i64) -> Value {
-        Value::Integer(*from)
+        Value::Integer(Integer::from(*from))
     }
 }
 
 impl<'a> From<&'a i32> for Value {
     fn from(from: &'a i32) -> Value {
-        Value::Integer((*from).into())
+        Value::Integer(Integer::from(*from))
     }
 }
 
 impl<'a> From<&'a i16> for Value {
     fn from(from: &'a i16) -> Value {
-        Value::Integer((*from).into())
+        Value::Integer(Integer::from(*from))
     }
 }
 
 impl<'a> From<&'a i8> for Value {
     fn from(from: &'a i8) -> Value {
-        Value::Integer((*from).into())
+        Value::Integer(Integer::from(*from))
+    }
+}
+
+impl<'a> From<&'a u64> for Value {
+    fn from(from: &'a u64) -> Value {
+        Value::Integer(Integer::from(*from))
     }
 }
 
 impl<'a> From<&'a u32> for Value {
     fn from(from: &'a u32) -> Value {
-        Value::Integer((*from).into())
+        Value::Integer(Integer::from(*from))
     }
 }
 
@@ -478,7 +500,13 @@ mod tests {
         assert_eq!(Value::Date(date.clone()).as_date(), Some(date));
 
         assert_eq!(Value::Real(0.0).as_real(), Some(0.0));
-        assert_eq!(Value::Integer(1).as_integer(), Some(1));
+        assert_eq!(Value::Integer(1.into()).as_signed_integer(), Some(1));
+        assert_eq!(Value::Integer(1.into()).as_unsigned_integer(), Some(1));
+        assert_eq!(Value::Integer((-1).into()).as_unsigned_integer(), None);
+        assert_eq!(
+            Value::Integer((i64::max_value() as u64 + 1).into()).as_signed_integer(),
+            None
+        );
         assert_eq!(Value::String("2".to_owned()).as_string(), Some("2"));
         assert_eq!(
             Value::String("t".to_owned()).into_string(),
@@ -499,7 +527,7 @@ mod tests {
             StringValue("Full of sound and fury, signifying nothing.".to_owned()),
             EndArray,
             StringValue("Birthdate".to_owned()),
-            IntegerValue(1564),
+            IntegerValue(1564.into()),
             StringValue("Height".to_owned()),
             RealValue(1.60),
             EndDictionary,
@@ -521,7 +549,7 @@ mod tests {
             Value::String("William Shakespeare".to_owned()),
         );
         dict.insert("Lines".to_owned(), Value::Array(lines));
-        dict.insert("Birthdate".to_owned(), Value::Integer(1564));
+        dict.insert("Birthdate".to_owned(), Value::Integer(1564.into()));
         dict.insert("Height".to_owned(), Value::Real(1.60));
 
         assert_eq!(plist.unwrap(), Value::Dictionary(dict));

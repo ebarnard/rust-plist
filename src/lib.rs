@@ -61,9 +61,11 @@ extern crate xml as xml_rs;
 pub mod stream;
 
 mod date;
+mod integer;
 mod value;
 
 pub use date::Date;
+pub use integer::Integer;
 pub use value::Value;
 
 // Optional serde module

@@ -174,7 +174,7 @@ mod tests {
             StringValue("Full of sound and fury, signifying nothing.".to_owned()),
             EndArray,
             StringValue("Death".to_owned()),
-            IntegerValue(1564),
+            IntegerValue(1564.into()),
             StringValue("Height".to_owned()),
             RealValue(1.60),
             StringValue("Data".to_owned()),
@@ -183,6 +183,10 @@ mod tests {
             DateValue(parse_rfc3339_weak("1981-05-16 11:32:06").unwrap().into()),
             StringValue("Blank".to_owned()),
             StringValue("".to_owned()),
+            StringValue("BiggestNumber".to_owned()),
+            IntegerValue(18446744073709551615u64.into()),
+            StringValue("SmallestNumber".to_owned()),
+            IntegerValue((-9223372036854775808i64).into()),
             EndDictionary,
         ];
 
