@@ -267,35 +267,35 @@ mod tests {
     use std::io::Cursor;
 
     use super::*;
-    use stream::Event::*;
+    use stream::Event;
 
     #[test]
     fn streaming_parser() {
         let plist = &[
-            StartDictionary(None),
-            StringValue("Author".to_owned()),
-            StringValue("William Shakespeare".to_owned()),
-            StringValue("Lines".to_owned()),
-            StartArray(None),
-            StringValue("It is a tale told by an idiot,".to_owned()),
-            StringValue("Full of sound and fury, signifying nothing.".to_owned()),
-            DataValue((0..128).collect::<Vec<_>>()),
-            EndArray,
-            StringValue("Death".to_owned()),
-            IntegerValue(1564.into()),
-            StringValue("Height".to_owned()),
-            RealValue(1.60),
-            StringValue("Data".to_owned()),
-            DataValue(vec![0, 0, 0, 190, 0, 0, 0, 3, 0, 0, 0, 30, 0, 0, 0]),
-            StringValue("Birthdate".to_owned()),
-            DateValue(parse_rfc3339_weak("1981-05-16 11:32:06").unwrap().into()),
-            StringValue("Comment".to_owned()),
-            StringValue("2 < 3".to_owned()), // make sure characters are escaped
-            StringValue("BiggestNumber".to_owned()),
-            IntegerValue(18446744073709551615u64.into()),
-            StringValue("SmallestNumber".to_owned()),
-            IntegerValue((-9223372036854775808i64).into()),
-            EndDictionary,
+            Event::StartDictionary(None),
+            Event::String("Author".to_owned()),
+            Event::String("William Shakespeare".to_owned()),
+            Event::String("Lines".to_owned()),
+            Event::StartArray(None),
+            Event::String("It is a tale told by an idiot,".to_owned()),
+            Event::String("Full of sound and fury, signifying nothing.".to_owned()),
+            Event::Data((0..128).collect::<Vec<_>>()),
+            Event::EndArray,
+            Event::String("Death".to_owned()),
+            Event::Integer(1564.into()),
+            Event::String("Height".to_owned()),
+            Event::Real(1.60),
+            Event::String("Data".to_owned()),
+            Event::Data(vec![0, 0, 0, 190, 0, 0, 0, 3, 0, 0, 0, 30, 0, 0, 0]),
+            Event::String("Birthdate".to_owned()),
+            Event::Date(parse_rfc3339_weak("1981-05-16 11:32:06").unwrap().into()),
+            Event::String("Comment".to_owned()),
+            Event::String("2 < 3".to_owned()), // make sure characters are escaped
+            Event::String("BiggestNumber".to_owned()),
+            Event::Integer(18446744073709551615u64.into()),
+            Event::String("SmallestNumber".to_owned()),
+            Event::Integer((-9223372036854775808i64).into()),
+            Event::EndDictionary,
         ];
 
         let mut cursor = Cursor::new(Vec::new());

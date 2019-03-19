@@ -21,10 +21,10 @@ use {Date, Error, Integer, Value};
 ///
 /// ```ignore rust
 /// StartDictionary
-/// StringValue("Height") // Key
-/// RealValue(181.2)      // Value
-/// StringValue("Age")    // Key
-/// IntegerValue(28)      // Value
+/// String("Height") // Key
+/// Real(181.2)      // Value
+/// String("Age")    // Key
+/// Integer(28)      // Value
 /// EndDictionary
 /// ```
 #[derive(Clone, Debug, PartialEq)]
@@ -37,12 +37,12 @@ pub enum Event {
     StartDictionary(Option<u64>),
     EndDictionary,
 
-    BooleanValue(bool),
-    DataValue(Vec<u8>),
-    DateValue(Date),
-    IntegerValue(Integer),
-    RealValue(f64),
-    StringValue(String),
+    Boolean(bool),
+    Data(Vec<u8>),
+    Date(Date),
+    Integer(Integer),
+    Real(f64),
+    String(String),
 
     #[doc(hidden)]
     __Nonexhaustive,
@@ -74,17 +74,17 @@ impl IntoEvents {
             Value::Dictionary(dict) => {
                 events.push(Event::StartDictionary(Some(dict.len() as u64)));
                 for (key, value) in dict {
-                    events.push(Event::StringValue(key));
+                    events.push(Event::String(key));
                     IntoEvents::new_inner(value, events);
                 }
                 events.push(Event::EndDictionary);
             }
-            Value::Boolean(value) => events.push(Event::BooleanValue(value)),
-            Value::Data(value) => events.push(Event::DataValue(value)),
-            Value::Date(value) => events.push(Event::DateValue(value)),
-            Value::Real(value) => events.push(Event::RealValue(value)),
-            Value::Integer(value) => events.push(Event::IntegerValue(value)),
-            Value::String(value) => events.push(Event::StringValue(value)),
+            Value::Boolean(value) => events.push(Event::Boolean(value)),
+            Value::Data(value) => events.push(Event::Data(value)),
+            Value::Date(value) => events.push(Event::Date(value)),
+            Value::Real(value) => events.push(Event::Real(value)),
+            Value::Integer(value) => events.push(Event::Integer(value)),
+            Value::String(value) => events.push(Event::String(value)),
             Value::__Nonexhaustive => unreachable!(),
         }
     }
@@ -154,12 +154,12 @@ pub trait Writer: private::Sealed {
             Event::EndArray => self.write_end_array(),
             Event::StartDictionary(len) => self.write_start_dictionary(*len),
             Event::EndDictionary => self.write_end_dictionary(),
-            Event::BooleanValue(value) => self.write_boolean_value(*value),
-            Event::DataValue(value) => self.write_data_value(value),
-            Event::DateValue(value) => self.write_date_value(*value),
-            Event::IntegerValue(value) => self.write_integer_value(*value),
-            Event::RealValue(value) => self.write_real_value(*value),
-            Event::StringValue(value) => self.write_string_value(value),
+            Event::Boolean(value) => self.write_boolean_value(*value),
+            Event::Data(value) => self.write_data_value(value),
+            Event::Date(value) => self.write_date_value(*value),
+            Event::Integer(value) => self.write_integer_value(*value),
+            Event::Real(value) => self.write_real_value(*value),
+            Event::String(value) => self.write_string_value(value),
             Event::__Nonexhaustive => unreachable!(),
         }
     }
@@ -215,32 +215,32 @@ impl Writer for VecWriter {
     }
 
     fn write_boolean_value(&mut self, value: bool) -> Result<(), Error> {
-        self.events.push(Event::BooleanValue(value));
+        self.events.push(Event::Boolean(value));
         Ok(())
     }
 
     fn write_data_value(&mut self, value: &[u8]) -> Result<(), Error> {
-        self.events.push(Event::DataValue(value.to_owned()));
+        self.events.push(Event::Data(value.to_owned()));
         Ok(())
     }
 
     fn write_date_value(&mut self, value: Date) -> Result<(), Error> {
-        self.events.push(Event::DateValue(value));
+        self.events.push(Event::Date(value));
         Ok(())
     }
 
     fn write_integer_value(&mut self, value: Integer) -> Result<(), Error> {
-        self.events.push(Event::IntegerValue(value));
+        self.events.push(Event::Integer(value));
         Ok(())
     }
 
     fn write_real_value(&mut self, value: f64) -> Result<(), Error> {
-        self.events.push(Event::RealValue(value));
+        self.events.push(Event::Real(value));
         Ok(())
     }
 
     fn write_string_value(&mut self, value: &str) -> Result<(), Error> {
-        self.events.push(Event::StringValue(value.to_owned()));
+        self.events.push(Event::String(value.to_owned()));
         Ok(())
     }
 }

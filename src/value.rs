@@ -412,12 +412,12 @@ impl<T: Iterator<Item = Result<Event, Error>>> Builder<T> {
             Some(Event::StartArray(len)) => Ok(Value::Array(self.build_array(len)?)),
             Some(Event::StartDictionary(len)) => Ok(Value::Dictionary(self.build_dict(len)?)),
 
-            Some(Event::BooleanValue(b)) => Ok(Value::Boolean(b)),
-            Some(Event::DataValue(d)) => Ok(Value::Data(d)),
-            Some(Event::DateValue(d)) => Ok(Value::Date(d)),
-            Some(Event::IntegerValue(i)) => Ok(Value::Integer(i)),
-            Some(Event::RealValue(f)) => Ok(Value::Real(f)),
-            Some(Event::StringValue(s)) => Ok(Value::String(s)),
+            Some(Event::Boolean(b)) => Ok(Value::Boolean(b)),
+            Some(Event::Data(d)) => Ok(Value::Data(d)),
+            Some(Event::Date(d)) => Ok(Value::Date(d)),
+            Some(Event::Integer(i)) => Ok(Value::Integer(i)),
+            Some(Event::Real(f)) => Ok(Value::Real(f)),
+            Some(Event::String(s)) => Ok(Value::String(s)),
 
             Some(Event::EndArray) => Err(Error::InvalidData),
             Some(Event::EndDictionary) => Err(Error::InvalidData),
@@ -452,7 +452,7 @@ impl<T: Iterator<Item = Result<Event, Error>>> Builder<T> {
             self.bump()?;
             match self.token.take() {
                 Some(Event::EndDictionary) => return Ok(values),
-                Some(Event::StringValue(s)) => {
+                Some(Event::String(s)) => {
                     self.bump()?;
                     values.insert(s, self.build_value()?);
                 }
@@ -519,17 +519,17 @@ mod tests {
         // Input
         let events = vec![
             StartDictionary(None),
-            StringValue("Author".to_owned()),
-            StringValue("William Shakespeare".to_owned()),
-            StringValue("Lines".to_owned()),
+            String("Author".to_owned()),
+            String("William Shakespeare".to_owned()),
+            String("Lines".to_owned()),
             StartArray(None),
-            StringValue("It is a tale told by an idiot,".to_owned()),
-            StringValue("Full of sound and fury, signifying nothing.".to_owned()),
+            String("It is a tale told by an idiot,".to_owned()),
+            String("Full of sound and fury, signifying nothing.".to_owned()),
             EndArray,
-            StringValue("Birthdate".to_owned()),
-            IntegerValue(1564.into()),
-            StringValue("Height".to_owned()),
-            RealValue(1.60),
+            String("Birthdate".to_owned()),
+            Integer(1564.into()),
+            String("Height".to_owned()),
+            Real(1.60),
             EndDictionary,
         ];
 

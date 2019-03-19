@@ -1,4 +1,3 @@
-use plist::stream::Event::*;
 use plist::stream::{Event, VecWriter};
 use plist::{Date, Deserializer, Error, Serializer};
 use serde::de::DeserializeOwned;
@@ -65,10 +64,10 @@ fn cow() {
     let cow = Animal::Cow;
 
     let comparison = &[
-        StartDictionary(Some(1)),
-        StringValue("Cow".to_owned()),
-        StringValue("".to_owned()),
-        EndDictionary,
+        Event::StartDictionary(Some(1)),
+        Event::String("Cow".to_owned()),
+        Event::String("".to_owned()),
+        Event::EndDictionary,
     ];
 
     assert_roundtrip(cow, Some(comparison));
@@ -85,25 +84,25 @@ fn dog() {
     });
 
     let comparison = &[
-        StartDictionary(Some(1)),
-        StringValue("Dog".to_owned()),
-        StartDictionary(None),
-        StringValue("inner".to_owned()),
-        StartArray(Some(1)),
-        StartDictionary(None),
-        StringValue("a".to_owned()),
-        StringValue("".to_owned()),
-        StringValue("b".to_owned()),
-        IntegerValue(12.into()),
-        StringValue("c".to_owned()),
-        StartArray(Some(2)),
-        StringValue("a".to_owned()),
-        StringValue("b".to_owned()),
-        EndArray,
-        EndDictionary,
-        EndArray,
-        EndDictionary,
-        EndDictionary,
+        Event::StartDictionary(Some(1)),
+        Event::String("Dog".to_owned()),
+        Event::StartDictionary(None),
+        Event::String("inner".to_owned()),
+        Event::StartArray(Some(1)),
+        Event::StartDictionary(None),
+        Event::String("a".to_owned()),
+        Event::String("".to_owned()),
+        Event::String("b".to_owned()),
+        Event::Integer(12.into()),
+        Event::String("c".to_owned()),
+        Event::StartArray(Some(2)),
+        Event::String("a".to_owned()),
+        Event::String("b".to_owned()),
+        Event::EndArray,
+        Event::EndDictionary,
+        Event::EndArray,
+        Event::EndDictionary,
+        Event::EndDictionary,
     ];
 
     assert_roundtrip(dog, Some(comparison));
@@ -117,22 +116,22 @@ fn frog() {
     );
 
     let comparison = &[
-        StartDictionary(Some(1)),
-        StringValue("Frog".to_owned()),
-        StartArray(Some(2)),
-        StartDictionary(Some(1)),
-        StringValue("Ok".to_owned()),
-        StringValue("hello".to_owned()),
-        EndDictionary,
-        StartArray(Some(5)),
-        RealValue(1.0),
-        RealValue(2.0),
-        RealValue(3.14159),
-        RealValue(0.000000001),
-        RealValue(1.27e31),
-        EndArray,
-        EndArray,
-        EndDictionary,
+        Event::StartDictionary(Some(1)),
+        Event::String("Frog".to_owned()),
+        Event::StartArray(Some(2)),
+        Event::StartDictionary(Some(1)),
+        Event::String("Ok".to_owned()),
+        Event::String("hello".to_owned()),
+        Event::EndDictionary,
+        Event::StartArray(Some(5)),
+        Event::Real(1.0),
+        Event::Real(2.0),
+        Event::Real(3.14159),
+        Event::Real(0.000000001),
+        Event::Real(1.27e31),
+        Event::EndArray,
+        Event::EndArray,
+        Event::EndDictionary,
     ];
 
     assert_roundtrip(frog, Some(comparison));
@@ -147,27 +146,27 @@ fn cat() {
     };
 
     let comparison = &[
-        StartDictionary(Some(1)),
-        StringValue("Cat".to_owned()),
-        StartDictionary(None),
-        StringValue("age".to_owned()),
-        IntegerValue(12.into()),
-        StringValue("name".to_owned()),
-        StringValue("Paws".to_owned()),
-        StringValue("firmware".to_owned()),
-        StartArray(Some(9)),
-        IntegerValue(0.into()),
-        IntegerValue(1.into()),
-        IntegerValue(2.into()),
-        IntegerValue(3.into()),
-        IntegerValue(4.into()),
-        IntegerValue(5.into()),
-        IntegerValue(6.into()),
-        IntegerValue(7.into()),
-        IntegerValue(8.into()),
-        EndArray,
-        EndDictionary,
-        EndDictionary,
+        Event::StartDictionary(Some(1)),
+        Event::String("Cat".to_owned()),
+        Event::StartDictionary(None),
+        Event::String("age".to_owned()),
+        Event::Integer(12.into()),
+        Event::String("name".to_owned()),
+        Event::String("Paws".to_owned()),
+        Event::String("firmware".to_owned()),
+        Event::StartArray(Some(9)),
+        Event::Integer(0.into()),
+        Event::Integer(1.into()),
+        Event::Integer(2.into()),
+        Event::Integer(3.into()),
+        Event::Integer(4.into()),
+        Event::Integer(5.into()),
+        Event::Integer(6.into()),
+        Event::Integer(7.into()),
+        Event::Integer(8.into()),
+        Event::EndArray,
+        Event::EndDictionary,
+        Event::EndDictionary,
     ];
 
     assert_roundtrip(cat, Some(comparison));
@@ -184,11 +183,11 @@ fn newtype_struct() {
     let newtype = NewtypeStruct(NewtypeInner(34, 32, 13));
 
     let comparison = &[
-        StartArray(Some(3)),
-        IntegerValue(34.into()),
-        IntegerValue(32.into()),
-        IntegerValue(13.into()),
-        EndArray,
+        Event::StartArray(Some(3)),
+        Event::Integer(34.into()),
+        Event::Integer(32.into()),
+        Event::Integer(13.into()),
+        Event::EndArray,
     ];
 
     assert_roundtrip(newtype, Some(comparison));
@@ -216,15 +215,15 @@ fn type_with_options() {
     };
 
     let comparison = &[
-        StartDictionary(None),
-        StringValue("a".to_owned()),
-        StringValue("hello".to_owned()),
-        StringValue("c".to_owned()),
-        StartDictionary(None),
-        StringValue("b".to_owned()),
-        IntegerValue(12.into()),
-        EndDictionary,
-        EndDictionary,
+        Event::StartDictionary(None),
+        Event::String("a".to_owned()),
+        Event::String("hello".to_owned()),
+        Event::String("c".to_owned()),
+        Event::StartDictionary(None),
+        Event::String("b".to_owned()),
+        Event::Integer(12.into()),
+        Event::EndDictionary,
+        Event::EndDictionary,
     ];
 
     assert_roundtrip(obj, Some(comparison));
@@ -246,12 +245,12 @@ fn type_with_date() {
     };
 
     let comparison = &[
-        StartDictionary(None),
-        StringValue("a".to_owned()),
-        IntegerValue(28.into()),
-        StringValue("b".to_owned()),
-        DateValue(date),
-        EndDictionary,
+        Event::StartDictionary(None),
+        Event::String("a".to_owned()),
+        Event::Integer(28.into()),
+        Event::String("b".to_owned()),
+        Event::Date(date),
+        Event::EndDictionary,
     ];
 
     assert_roundtrip(obj, Some(comparison));

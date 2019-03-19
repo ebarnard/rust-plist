@@ -209,50 +209,42 @@ impl<R: Read + Seek> BinaryReader<R> {
 
         let result = match (ty, size) {
             (0x0, 0x00) => return Err(Error::InvalidData), // null
-            (0x0, 0x08) => Some(Event::BooleanValue(false)),
-            (0x0, 0x09) => Some(Event::BooleanValue(true)),
+            (0x0, 0x08) => Some(Event::Boolean(false)),
+            (0x0, 0x09) => Some(Event::Boolean(true)),
             (0x0, 0x0f) => return Err(Error::InvalidData), // fill
-            (0x1, 0) => Some(Event::IntegerValue(self.reader.read_u8()?.into())),
-            (0x1, 1) => Some(Event::IntegerValue(
-                self.reader.read_u16::<BigEndian>()?.into(),
-            )),
-            (0x1, 2) => Some(Event::IntegerValue(
-                self.reader.read_u32::<BigEndian>()?.into(),
-            )),
-            (0x1, 3) => Some(Event::IntegerValue(
-                self.reader.read_i64::<BigEndian>()?.into(),
-            )),
+            (0x1, 0) => Some(Event::Integer(self.reader.read_u8()?.into())),
+            (0x1, 1) => Some(Event::Integer(self.reader.read_u16::<BigEndian>()?.into())),
+            (0x1, 2) => Some(Event::Integer(self.reader.read_u32::<BigEndian>()?.into())),
+            (0x1, 3) => Some(Event::Integer(self.reader.read_i64::<BigEndian>()?.into())),
             (0x1, 4) => {
                 let value = self.reader.read_i128::<BigEndian>()?;
                 if value < 0 || value > u64::max_value().into() {
                     return Err(Error::InvalidData);
                 }
-                Some(Event::IntegerValue((value as u64).into()))
+                Some(Event::Integer((value as u64).into()))
             }
             (0x1, _) => return Err(Error::InvalidData), // variable length int
-            (0x2, 2) => Some(Event::RealValue(
-                self.reader.read_f32::<BigEndian>()?.into(),
-            )),
-            (0x2, 3) => Some(Event::RealValue(self.reader.read_f64::<BigEndian>()?)),
+            (0x2, 2) => Some(Event::Real(self.reader.read_f32::<BigEndian>()?.into())),
+            (0x2, 3) => Some(Event::Real(self.reader.read_f64::<BigEndian>()?)),
             (0x2, _) => return Err(Error::InvalidData), // odd length float
             (0x3, 3) => {
                 // Date. Seconds since 1/1/2001 00:00:00.
                 let secs = self.reader.read_f64::<BigEndian>()?;
-                Some(Event::DateValue(
+                Some(Event::Date(
                     Date::from_seconds_since_plist_epoch(secs).map_err(|()| Error::InvalidData)?,
                 ))
             }
             (0x4, n) => {
                 // Data
                 let len = self.read_object_len(n)?;
-                Some(Event::DataValue(self.read_data(len)?))
+                Some(Event::Data(self.read_data(len)?))
             }
             (0x5, n) => {
                 // ASCII string
                 let len = self.read_object_len(n)?;
                 let raw = self.read_data(len)?;
                 let string = String::from_utf8(raw)?;
-                Some(Event::StringValue(string))
+                Some(Event::String(string))
             }
             (0x6, n) => {
                 // UTF-16 string
@@ -264,7 +256,7 @@ impl<R: Read + Seek> BinaryReader<R> {
                 }
 
                 let string = String::from_utf16(&raw_utf16)?;
-                Some(Event::StringValue(string))
+                Some(Event::String(string))
             }
             (0xa, n) => {
                 // Array
@@ -344,27 +336,27 @@ mod tests {
 
         let comparison = &[
             StartDictionary(Some(9)),
-            StringValue("Author".into()),
-            StringValue("William Shakespeare".into()),
-            StringValue("Height".into()),
-            RealValue(1.6),
-            StringValue("Data".into()),
-            DataValue(vec![0, 0, 0, 190, 0, 0, 0, 3, 0, 0, 0, 30, 0, 0, 0]),
-            StringValue("Birthdate".into()),
-            DateValue(parse_rfc3339_weak("1981-05-16 11:32:06").unwrap().into()),
-            StringValue("BiggestNumber".into()),
-            IntegerValue(18446744073709551615u64.into()),
-            StringValue("SmallestNumber".into()),
-            IntegerValue((-9223372036854775808i64).into()),
-            StringValue("Lines".into()),
+            String("Author".into()),
+            String("William Shakespeare".into()),
+            String("Height".into()),
+            Real(1.6),
+            String("Data".into()),
+            Data(vec![0, 0, 0, 190, 0, 0, 0, 3, 0, 0, 0, 30, 0, 0, 0]),
+            String("Birthdate".into()),
+            Date(parse_rfc3339_weak("1981-05-16 11:32:06").unwrap().into()),
+            String("BiggestNumber".into()),
+            Integer(18446744073709551615u64.into()),
+            String("SmallestNumber".into()),
+            Integer((-9223372036854775808i64).into()),
+            String("Lines".into()),
             StartArray(Some(2)),
-            StringValue("It is a tale told by an idiot,".into()),
-            StringValue("Full of sound and fury, signifying nothing.".into()),
+            String("It is a tale told by an idiot,".into()),
+            String("Full of sound and fury, signifying nothing.".into()),
             EndArray,
-            StringValue("Death".into()),
-            IntegerValue(1564.into()),
-            StringValue("Blank".into()),
-            StringValue("".into()),
+            String("Death".into()),
+            Integer(1564.into()),
+            String("Blank".into()),
+            String("".into()),
             EndDictionary,
         ];
 
@@ -377,9 +369,9 @@ mod tests {
         let streaming_parser = BinaryReader::new(reader);
         let mut events: Vec<Event> = streaming_parser.map(|e| e.unwrap()).collect();
 
-        assert_eq!(events[2], StringValue("\u{2605} or better".to_owned()));
+        assert_eq!(events[2], String("\u{2605} or better".to_owned()));
 
-        let poem = if let StringValue(ref mut poem) = events[4] {
+        let poem = if let String(ref mut poem) = events[4] {
             poem
         } else {
             panic!("not a string")

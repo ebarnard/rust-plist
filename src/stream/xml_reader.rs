@@ -63,37 +63,37 @@ impl<R: Read> XmlReader<R> {
                         "plist" => (),
                         "array" => return Some(Ok(Event::StartArray(None))),
                         "dict" => return Some(Ok(Event::StartDictionary(None))),
-                        "key" => return Some(self.read_content(|s| Ok(Event::StringValue(s)))),
-                        "true" => return Some(Ok(Event::BooleanValue(true))),
-                        "false" => return Some(Ok(Event::BooleanValue(false))),
+                        "key" => return Some(self.read_content(|s| Ok(Event::String(s)))),
+                        "true" => return Some(Ok(Event::Boolean(true))),
+                        "false" => return Some(Ok(Event::Boolean(false))),
                         "data" => {
                             return Some(self.read_content(|mut s| {
                                 // Strip whitespace and line endings from input string
                                 s.retain(|c| !c.is_ascii_whitespace());
                                 let data = base64::decode(&s).map_err(|_| Error::InvalidData)?;
-                                Ok(Event::DataValue(data))
+                                Ok(Event::Data(data))
                             }));
                         }
                         "date" => {
                             return Some(self.read_content(|s| {
-                                Ok(Event::DateValue(
+                                Ok(Event::Date(
                                     Date::from_rfc3339(&s).map_err(|()| Error::InvalidData)?,
                                 ))
                             }));
                         }
                         "integer" => {
                             return Some(self.read_content(|s| match FromStr::from_str(&s) {
-                                Ok(i) => Ok(Event::IntegerValue(i)),
+                                Ok(i) => Ok(Event::Integer(i)),
                                 Err(_) => Err(Error::InvalidData),
                             }));
                         }
                         "real" => {
                             return Some(self.read_content(|s| match FromStr::from_str(&s) {
-                                Ok(f) => Ok(Event::RealValue(f)),
+                                Ok(f) => Ok(Event::Real(f)),
                                 Err(_) => Err(Error::InvalidData),
                             }));
                         }
-                        "string" => return Some(self.read_content(|s| Ok(Event::StringValue(s)))),
+                        "string" => return Some(self.read_content(|s| Ok(Event::String(s)))),
                         _ => return Some(Err(Error::InvalidData)),
                     }
                 }
@@ -166,27 +166,27 @@ mod tests {
 
         let comparison = &[
             StartDictionary(None),
-            StringValue("Author".to_owned()),
-            StringValue("William Shakespeare".to_owned()),
-            StringValue("Lines".to_owned()),
+            String("Author".to_owned()),
+            String("William Shakespeare".to_owned()),
+            String("Lines".to_owned()),
             StartArray(None),
-            StringValue("It is a tale told by an idiot,".to_owned()),
-            StringValue("Full of sound and fury, signifying nothing.".to_owned()),
+            String("It is a tale told by an idiot,".to_owned()),
+            String("Full of sound and fury, signifying nothing.".to_owned()),
             EndArray,
-            StringValue("Death".to_owned()),
-            IntegerValue(1564.into()),
-            StringValue("Height".to_owned()),
-            RealValue(1.60),
-            StringValue("Data".to_owned()),
-            DataValue(vec![0, 0, 0, 190, 0, 0, 0, 3, 0, 0, 0, 30, 0, 0, 0]),
-            StringValue("Birthdate".to_owned()),
-            DateValue(parse_rfc3339_weak("1981-05-16 11:32:06").unwrap().into()),
-            StringValue("Blank".to_owned()),
-            StringValue("".to_owned()),
-            StringValue("BiggestNumber".to_owned()),
-            IntegerValue(18446744073709551615u64.into()),
-            StringValue("SmallestNumber".to_owned()),
-            IntegerValue((-9223372036854775808i64).into()),
+            String("Death".to_owned()),
+            Integer(1564.into()),
+            String("Height".to_owned()),
+            Real(1.60),
+            String("Data".to_owned()),
+            Data(vec![0, 0, 0, 190, 0, 0, 0, 3, 0, 0, 0, 30, 0, 0, 0]),
+            String("Birthdate".to_owned()),
+            Date(parse_rfc3339_weak("1981-05-16 11:32:06").unwrap().into()),
+            String("Blank".to_owned()),
+            String("".to_owned()),
+            String("BiggestNumber".to_owned()),
+            Integer(18446744073709551615u64.into()),
+            String("SmallestNumber".to_owned()),
+            Integer((-9223372036854775808i64).into()),
             EndDictionary,
         ];
 

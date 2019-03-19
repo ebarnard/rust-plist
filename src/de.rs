@@ -91,10 +91,10 @@ where
             }
             Event::EndDictionary => Err(event_mismatch_error()),
 
-            Event::BooleanValue(v) => visitor.visit_bool(v),
-            Event::DataValue(v) => visitor.visit_byte_buf(v),
-            Event::DateValue(v) => visitor.visit_string(v.to_rfc3339()),
-            Event::IntegerValue(v) => {
+            Event::Boolean(v) => visitor.visit_bool(v),
+            Event::Data(v) => visitor.visit_byte_buf(v),
+            Event::Date(v) => visitor.visit_string(v.to_rfc3339()),
+            Event::Integer(v) => {
                 if let Some(v) = v.as_unsigned() {
                     visitor.visit_u64(v)
                 } else if let Some(v) = v.as_signed() {
@@ -103,8 +103,8 @@ where
                     unreachable!()
                 }
             }
-            Event::RealValue(v) => visitor.visit_f64(v),
-            Event::StringValue(v) => visitor.visit_string(v),
+            Event::Real(v) => visitor.visit_f64(v),
+            Event::String(v) => visitor.visit_string(v),
 
             Event::__Nonexhaustive => unreachable!(),
         }
@@ -120,7 +120,7 @@ where
     where
         V: de::Visitor<'de>,
     {
-        expect!(self.events.next(), Event::StringValue(_));
+        expect!(self.events.next(), Event::String(_));
         visitor.visit_unit()
     }
 
@@ -131,11 +131,11 @@ where
         expect!(self.events.next(), Event::StartDictionary(_));
 
         let ret = match try_next!(self.events.next()) {
-            Event::StringValue(ref s) if &s[..] == "None" => {
-                expect!(self.events.next(), Event::StringValue(_));
+            Event::String(ref s) if &s[..] == "None" => {
+                expect!(self.events.next(), Event::String(_));
                 visitor.visit_none::<Self::Error>()?
             }
-            Event::StringValue(ref s) if &s[..] == "Some" => visitor.visit_some(&mut *self)?,
+            Event::String(ref s) if &s[..] == "Some" => visitor.visit_some(&mut *self)?,
             _ => return Err(event_mismatch_error()),
         };
 
