@@ -1,17 +1,16 @@
-use std::collections::BTreeMap;
 use std::fs::File;
 use std::io::Write;
 use std::io::{BufReader, Read, Seek};
 use std::path::Path;
 
 use stream::{Event, IntoEvents, Reader, Writer, XmlReader, XmlWriter};
-use {u64_to_usize, Date, Error, Integer};
+use {u64_to_usize, Date, Dictionary, Error, Integer};
 
 /// Represents any plist value.
 #[derive(Clone, Debug, PartialEq)]
 pub enum Value {
     Array(Vec<Value>),
-    Dictionary(BTreeMap<String, Value>),
+    Dictionary(Dictionary),
     Boolean(bool),
     Data(Vec<u8>),
     Date(Date),
@@ -91,9 +90,9 @@ impl Value {
     /// If the `Value` is a Dictionary, returns the associated `BTreeMap`.
     ///
     /// Returns `None` otherwise.
-    pub fn as_dictionary(&self) -> Option<&BTreeMap<String, Value>> {
+    pub fn as_dictionary(&self) -> Option<&Dictionary> {
         match *self {
-            Value::Dictionary(ref map) => Some(map),
+            Value::Dictionary(ref dict) => Some(dict),
             _ => None,
         }
     }
@@ -101,9 +100,9 @@ impl Value {
     /// If the `Value` is a Dictionary, returns the associated mutable `BTreeMap`.
     ///
     /// Returns `None` otherwise.
-    pub fn as_dictionary_mut(&mut self) -> Option<&mut BTreeMap<String, Value>> {
+    pub fn as_dictionary_mut(&mut self) -> Option<&mut Dictionary> {
         match *self {
-            Value::Dictionary(ref mut map) => Some(map),
+            Value::Dictionary(ref mut dict) => Some(dict),
             _ => None,
         }
     }
@@ -211,8 +210,8 @@ impl From<Vec<Value>> for Value {
     }
 }
 
-impl From<BTreeMap<String, Value>> for Value {
-    fn from(from: BTreeMap<String, Value>) -> Value {
+impl From<Dictionary> for Value {
+    fn from(from: Dictionary) -> Value {
         Value::Dictionary(from)
     }
 }
@@ -445,16 +444,16 @@ impl<T: Iterator<Item = Result<Event, Error>>> Builder<T> {
         }
     }
 
-    fn build_dict(&mut self, _len: Option<u64>) -> Result<BTreeMap<String, Value>, Error> {
-        let mut values = BTreeMap::new();
+    fn build_dict(&mut self, _len: Option<u64>) -> Result<Dictionary, Error> {
+        let mut dict = Dictionary::new();
 
         loop {
             self.bump()?;
             match self.token.take() {
-                Some(Event::EndDictionary) => return Ok(values),
+                Some(Event::EndDictionary) => return Ok(dict),
                 Some(Event::String(s)) => {
                     self.bump()?;
-                    values.insert(s, self.build_value()?);
+                    dict.insert(s, self.build_value()?);
                 }
                 _ => {
                     // Only string keys are supported in plists
@@ -467,12 +466,11 @@ impl<T: Iterator<Item = Result<Event, Error>>> Builder<T> {
 
 #[cfg(test)]
 mod tests {
-    use std::collections::BTreeMap;
     use std::time::SystemTime;
 
     use super::*;
     use stream::Event::*;
-    use {Date, Value};
+    use {Date, Dictionary, Value};
 
     #[test]
     fn value_accessors() {
@@ -481,7 +479,7 @@ mod tests {
         assert_eq!(array.as_array(), Some(&vec.clone()));
         assert_eq!(array.as_array_mut(), Some(&mut vec.clone()));
 
-        let mut map = BTreeMap::new();
+        let mut map = Dictionary::new();
         map.insert("key1".to_owned(), Value::String("value1".to_owned()));
         let mut dict = Value::Dictionary(map.clone());
         assert_eq!(dict.as_dictionary(), Some(&map.clone()));
@@ -543,7 +541,7 @@ mod tests {
             "Full of sound and fury, signifying nothing.".to_owned(),
         ));
 
-        let mut dict = BTreeMap::new();
+        let mut dict = Dictionary::new();
         dict.insert(
             "Author".to_owned(),
             Value::String("William Shakespeare".to_owned()),

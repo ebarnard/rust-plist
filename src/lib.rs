@@ -58,6 +58,7 @@ extern crate humantime;
 extern crate line_wrap;
 extern crate xml as xml_rs;
 
+pub mod dictionary;
 pub mod stream;
 
 mod date;
@@ -65,6 +66,7 @@ mod integer;
 mod value;
 
 pub use date::Date;
+pub use dictionary::Dictionary;
 pub use integer::Integer;
 pub use value::Value;
 

@@ -9,10 +9,9 @@ pub use self::xml_reader::XmlReader;
 mod xml_writer;
 pub use self::xml_writer::XmlWriter;
 
-use std::collections::btree_map;
 use std::io::{Read, Seek, SeekFrom};
 use std::vec;
-use {Date, Error, Integer, Value};
+use {dictionary, Date, Error, Integer, Value};
 
 /// An encoding of a plist as a flat structure.
 ///
@@ -57,7 +56,7 @@ pub struct IntoEvents {
 enum StackItem {
     Root(Value),
     Array(vec::IntoIter<Value>),
-    Dict(btree_map::IntoIter<String, Value>),
+    Dict(dictionary::IntoIter),
     DictValue(Value),
 }
 
