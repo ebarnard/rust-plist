@@ -9,6 +9,7 @@ pub use self::xml_reader::XmlReader;
 mod xml_writer;
 pub use self::xml_writer::XmlWriter;
 
+use std::collections::btree_map;
 use std::io::{Read, Seek, SeekFrom};
 use std::vec;
 use {Date, Error, Integer, Value};
@@ -50,42 +51,20 @@ pub enum Event {
 
 /// An `Event` stream returned by `Value::into_events`.
 pub struct IntoEvents {
-    events: vec::IntoIter<Event>,
+    stack: Vec<StackItem>,
+}
+
+enum StackItem {
+    Root(Value),
+    Array(vec::IntoIter<Value>),
+    Dict(btree_map::IntoIter<String, Value>),
+    DictValue(Value),
 }
 
 impl IntoEvents {
     pub(crate) fn new(value: Value) -> IntoEvents {
-        let mut events = Vec::new();
-        IntoEvents::new_inner(value, &mut events);
         IntoEvents {
-            events: events.into_iter(),
-        }
-    }
-
-    fn new_inner(value: Value, events: &mut Vec<Event>) {
-        match value {
-            Value::Array(array) => {
-                events.push(Event::StartArray(Some(array.len() as u64)));
-                for value in array {
-                    IntoEvents::new_inner(value, events);
-                }
-                events.push(Event::EndArray);
-            }
-            Value::Dictionary(dict) => {
-                events.push(Event::StartDictionary(Some(dict.len() as u64)));
-                for (key, value) in dict {
-                    events.push(Event::String(key));
-                    IntoEvents::new_inner(value, events);
-                }
-                events.push(Event::EndDictionary);
-            }
-            Value::Boolean(value) => events.push(Event::Boolean(value)),
-            Value::Data(value) => events.push(Event::Data(value)),
-            Value::Date(value) => events.push(Event::Date(value)),
-            Value::Real(value) => events.push(Event::Real(value)),
-            Value::Integer(value) => events.push(Event::Integer(value)),
-            Value::String(value) => events.push(Event::String(value)),
-            Value::__Nonexhaustive => unreachable!(),
+            stack: vec![StackItem::Root(value)],
         }
     }
 }
@@ -94,7 +73,55 @@ impl Iterator for IntoEvents {
     type Item = Event;
 
     fn next(&mut self) -> Option<Event> {
-        self.events.next()
+        fn handle_value(value: Value, stack: &mut Vec<StackItem>) -> Event {
+            match value {
+                Value::Array(array) => {
+                    let len = array.len();
+                    let iter = array.into_iter();
+                    stack.push(StackItem::Array(iter));
+                    Event::StartArray(Some(len as u64))
+                }
+                Value::Dictionary(dict) => {
+                    let len = dict.len();
+                    let iter = dict.into_iter();
+                    stack.push(StackItem::Dict(iter));
+                    Event::StartDictionary(Some(len as u64))
+                }
+                Value::Boolean(value) => Event::Boolean(value),
+                Value::Data(value) => Event::Data(value),
+                Value::Date(value) => Event::Date(value),
+                Value::Real(value) => Event::Real(value),
+                Value::Integer(value) => Event::Integer(value),
+                Value::String(value) => Event::String(value),
+                Value::__Nonexhaustive => unreachable!(),
+            }
+        }
+
+        Some(match self.stack.pop()? {
+            StackItem::Root(value) => handle_value(value, &mut self.stack),
+            StackItem::Array(mut array) => {
+                if let Some(value) = array.next() {
+                    // There might still be more items in the array so return it to the stack.
+                    self.stack.push(StackItem::Array(array));
+                    handle_value(value, &mut self.stack)
+                } else {
+                    Event::EndArray
+                }
+            }
+            StackItem::Dict(mut dict) => {
+                if let Some((key, value)) = dict.next() {
+                    // There might still be more items in the dictionary so return it to the stack.
+                    self.stack.push(StackItem::Dict(dict));
+                    // The next event to be returned must be the dictionary value.
+                    self.stack.push(StackItem::DictValue(value));
+                    // Return the key event now.
+                    Event::String(key)
+                } else {
+                    Event::EndDictionary
+                }
+            }
+            StackItem::DictValue(value) => handle_value(value, &mut self.stack),
+        })
     }
 }
 
