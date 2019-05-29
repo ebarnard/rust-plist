@@ -266,9 +266,11 @@ impl<R: Read + Seek> BinaryReader<R> {
                 let key_refs = self.read_refs(len)?;
                 let value_refs = self.read_refs(len)?;
 
-                let mut child_object_refs = self.allocate_vec(len * 2, self.ref_size as usize)?;
+                let keys_and_values_len = len.checked_mul(2).ok_or(Error::InvalidData)?;
+                let mut child_object_refs =
+                    self.allocate_vec(keys_and_values_len, self.ref_size as usize)?;
                 let len = key_refs.len();
-                for i in 1..len + 1 {
+                for i in 1..=len {
                     // Reverse so we can pop off the end of the stack in order
                     child_object_refs.push(value_refs[len - i]);
                     child_object_refs.push(key_refs[len - i]);
