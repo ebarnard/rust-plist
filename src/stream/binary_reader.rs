@@ -1,22 +1,9 @@
 use byteorder::{BigEndian, ReadBytesExt};
 use std::io::{Read, Seek, SeekFrom};
 use std::mem::size_of;
-use std::string::{FromUtf16Error, FromUtf8Error};
 
 use stream::Event;
 use {u64_to_usize, Date, Error};
-
-impl From<FromUtf8Error> for Error {
-    fn from(_: FromUtf8Error) -> Error {
-        Error::InvalidData
-    }
-}
-
-impl From<FromUtf16Error> for Error {
-    fn from(_: FromUtf16Error) -> Error {
-        Error::InvalidData
-    }
-}
 
 struct StackItem {
     object_ref: u64,
@@ -243,7 +230,7 @@ impl<R: Read + Seek> BinaryReader<R> {
                 // ASCII string
                 let len = self.read_object_len(n)?;
                 let raw = self.read_data(len)?;
-                let string = String::from_utf8(raw)?;
+                let string = String::from_utf8(raw).map_err(|_| Error::InvalidData)?;
                 Some(Event::String(string))
             }
             (0x6, n) => {
@@ -255,7 +242,7 @@ impl<R: Read + Seek> BinaryReader<R> {
                     raw_utf16.push(self.reader.read_u16::<BigEndian>()?);
                 }
 
-                let string = String::from_utf16(&raw_utf16)?;
+                let string = String::from_utf16(&raw_utf16).map_err(|_| Error::InvalidData)?;
                 Some(Event::String(string))
             }
             (0xa, n) => {
