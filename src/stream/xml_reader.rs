@@ -187,6 +187,8 @@ mod tests {
             Integer(18446744073709551615u64.into()),
             String("SmallestNumber".to_owned()),
             Integer((-9223372036854775808i64).into()),
+            String("HexademicalNumber".to_owned()),
+            Integer(0xdead_beef_u64.into()),
             EndDictionary,
         ];
 

@@ -42,19 +42,22 @@ impl FromStr for Integer {
     type Err = ParseIntError;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        let (s, radix) = if s.starts_with("0x") {
-            let s = s.trim_start_matches("0x");
-            (s, 16)
-        } else {
-            (s, 10)
-        };
+        if s.starts_with("0x") {
+            // NetBSD dialect adds the `0x` numeric objects,
+            // which are always unsigned.
+            // See the `PROP_NUMBER(3)` man page
+            let s = s.trim_left_matches("0x");
 
-        // Match Apple's implementation in CFPropertyList.h - always try to parse as an i64 first.
-        // TODO: Use IntErrorKind once stable and retry parsing on overflow only.
-        Ok(match i64::from_str_radix(s, radix) {
-            Ok(v) => v.into(),
-            Err(_) => u64::from_str_radix(s, radix)?.into(),
-        })
+            u64::from_str_radix(s, 16).map(Into::into)
+        } else {
+            // Match Apple's implementation in CFPropertyList.h - always try to parse as an i64 first.
+            // TODO: Use IntErrorKind once stable and retry parsing on overflow only.
+            Ok(match s.parse::<i64>() {
+                Ok(v) => v.into(),
+                Err(_) => s.parse::<u64>()?.into(),
+            })
+        }
+
     }
 }
 
