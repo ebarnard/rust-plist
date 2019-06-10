@@ -82,9 +82,21 @@ impl<R: Read> XmlReader<R> {
                             }));
                         }
                         "integer" => {
-                            return Some(self.read_content(|s| match FromStr::from_str(&s) {
-                                Ok(i) => Ok(Event::IntegerValue(i)),
-                                Err(_) => Err(Error::InvalidData),
+                            return Some(self.read_content(|s| {
+                                if s.starts_with("0x") {
+                                    // NetBSD dialect adds the `0x` numeric objects,
+                                    // which are always unsigned.
+                                    // See the `PROP_NUMBER(3)` man page
+                                    let s = s.trim_left_matches("0x");
+                                    Ok(Event::IntegerValue(
+                                        i64::from_str_radix(s, 16)
+                                            .map_err(|_| Error::InvalidData)?,
+                                    ))
+                                } else {
+                                    Ok(Event::IntegerValue(
+                                        i64::from_str(&s).map_err(|_| Error::InvalidData)?,
+                                    ))
+                                }
                             }));
                         }
                         "real" => {
@@ -183,6 +195,8 @@ mod tests {
             DateValue(parse_rfc3339_weak("1981-05-16 11:32:06").unwrap().into()),
             StringValue("Blank".to_owned()),
             StringValue("".to_owned()),
+            StringValue("HexademicalNumber".to_owned()),
+            IntegerValue(0xdead_beef_i64),
             EndDictionary,
         ];
 
