@@ -59,12 +59,6 @@ fn issue_22_binary_with_byte_ref_size() {
     test_fuzzer_data_ok(data);
 }
 
-#[test]
-fn netbsd_extended_plist_format() {
-    let data = include_bytes!("data/netbsd_xml.plist");
-    test_fuzzer_data_ok(data);
-}
-
 fn test_fuzzer_data(data: &[u8]) -> Result<Value, Error> {
     let cursor = Cursor::new(data);
     Value::from_reader(cursor)
