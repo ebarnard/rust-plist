@@ -81,7 +81,7 @@ mod ser;
 #[cfg(feature = "serde")]
 pub use self::de::{from_file, from_reader, from_reader_xml, Deserializer};
 #[cfg(feature = "serde")]
-pub use self::ser::{to_writer_xml, Serializer};
+pub use self::ser::{to_writer, to_writer_xml, Serializer};
 
 use std::fmt;
 use std::io;
