@@ -4,7 +4,7 @@ use std::io::Write;
 use std::mem;
 
 use date::serde_impls::DATE_NEWTYPE_STRUCT_NAME;
-use stream::{self, Writer};
+use stream::{self, BinaryWriter, VecWriter, Writer};
 use {Date, Error, Integer};
 
 impl ser::Error for Error {
@@ -598,9 +598,20 @@ impl<'a, W: Writer> ser::SerializeStructVariant for Compound<'a, W> {
 
 /// Serializes the given data structure as a binary encoded plist file.
 pub fn to_writer<W: Write, T: ser::Serialize>(writer: W, value: &T) -> Result<(), Error> {
-    let writer = stream::XmlWriter::new(writer);
-    let mut ser = Serializer::new(writer);
-    value.serialize(&mut ser)
+    use std::ops::Drop;
+    let mut ser = Serializer::new(VecWriter::new());
+    value.serialize(&mut ser)?;
+
+    // TODO: this needs to be done better imo. perhaps from_events can be
+    //       made to work on a non-Result iterator? (involves impl for Builder)
+    let mut events_oked: Vec<Result<stream::Event, Error>> = Vec::new();
+    for event in ser.into_inner().into_inner() {
+        events_oked.push(Ok(event))
+    }
+    let value = ::Value::from_events(events_oked)?;
+
+    let bin_writer = BinaryWriter::new(writer, value)?;
+    bin_writer.write()
 }
 
 /// Serializes the given data structure as an XML encoded plist file.

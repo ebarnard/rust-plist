@@ -3,7 +3,8 @@ use std::io::Write;
 use std::io::{BufReader, Read, Seek};
 use std::path::Path;
 
-use stream::{Event, IntoEvents, Reader, Writer, XmlReader, XmlWriter};
+use std::hash::{Hash, Hasher};
+use stream::{BinaryWriter, Event, IntoEvents, Reader, Writer, XmlReader, XmlWriter};
 use {u64_to_usize, Date, Dictionary, Error, Integer};
 
 /// Represents any plist value.
@@ -38,6 +39,12 @@ impl Value {
     pub fn from_reader_xml<R: Read>(reader: R) -> Result<Value, Error> {
         let reader = XmlReader::new(reader);
         Value::from_events(reader)
+    }
+
+    /// Serializes the given data structure as a binary plist file.
+    pub fn to_writer<W: Write>(&self, writer: W) -> Result<(), Error> {
+        let binary_writer = BinaryWriter::new(writer, self.clone())?;
+        binary_writer.write()
     }
 
     /// Serializes the given data structure as an XML encoded plist file.
@@ -553,3 +560,23 @@ mod tests {
         assert_eq!(plist.unwrap(), Value::Dictionary(dict));
     }
 }
+
+impl Hash for Value {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        match self {
+            Value::Array(v) => v.hash(state),
+            Value::Dictionary(d) => d.hash(state),
+            Value::Boolean(b) => b.hash(state),
+            Value::Data(d) => d.hash(state),
+            Value::Date(d) => d.hash(state),
+            Value::Real(f) => state.write_u64(f.to_bits()),
+            Value::Integer(i) => i.hash(state),
+            Value::String(s) => s.hash(state),
+            Value::__Nonexhaustive => unreachable!(),
+        }
+    }
+}
+
+// force an Eq instance as we can't derive it due to Real(f64) lacking
+// an Eq
+impl Eq for Value {}

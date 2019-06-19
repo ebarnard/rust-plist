@@ -3,10 +3,10 @@ use std::fmt;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 /// A UTC timestamp used for serialization to and from the plist date type.
-/// 
+///
 /// Note that while this type implements `Serialize` and `Deserialize` it will behave strangely if
 /// used with serializers from outside this crate.
-#[derive(Clone, Copy, Hash, PartialEq)]
+#[derive(Clone, Copy, Hash, PartialEq, Eq)]
 pub struct Date {
     inner: SystemTime,
 }

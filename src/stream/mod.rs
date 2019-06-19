@@ -3,6 +3,9 @@
 mod binary_reader;
 pub use self::binary_reader::BinaryReader;
 
+mod binary_writer;
+pub use self::binary_writer::BinaryWriter;
+
 mod xml_reader;
 pub use self::xml_reader::XmlReader;
 

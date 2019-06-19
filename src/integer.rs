@@ -57,7 +57,6 @@ impl FromStr for Integer {
                 Err(_) => s.parse::<u64>()?.into(),
             })
         }
-
     }
 }
 

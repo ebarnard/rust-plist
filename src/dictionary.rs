@@ -15,6 +15,7 @@ use std::ops;
 use Value;
 
 /// Represents a plist dictionary type.
+#[derive(Eq, Hash)]
 pub struct Dictionary {
     map: BTreeMap<String, Value>,
 }
