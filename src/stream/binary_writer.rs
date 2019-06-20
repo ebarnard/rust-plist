@@ -1,6 +1,9 @@
-use std::io::Write;
-use std::collections::HashMap;
 use super::{Date, Error, Integer, Value};
+use std::collections::HashMap;
+use std::io::Write;
+
+#[cfg(not(feature = "int_to_from_bytes"))]
+use self::shim_feature_int_to_from_bytes::IntToBEBytes;
 
 #[derive(Copy, Clone, Debug, Eq, PartialEq, Ord, PartialOrd)]
 enum RefSize {
@@ -30,7 +33,6 @@ pub struct BinaryWriter<W: Write> {
     object_offsets: Vec<usize>,
     flattened: bool,
     written: usize,
-    ref_size: RefSize,
 }
 
 impl<W: Write> BinaryWriter<W> {
@@ -44,7 +46,6 @@ impl<W: Write> BinaryWriter<W> {
                 object_offsets: Vec::new(),
                 flattened: false,
                 written: 0,
-                ref_size: RefSize::U8,
             }),
             _ => Err(Error::Serde(
                 "root object needs to be an Array or Dictionary".into(),
@@ -58,15 +59,14 @@ impl<W: Write> BinaryWriter<W> {
         for _ in 0..num_objects {
             self.object_offsets.push(0);
         }
-        self.ref_size = BinaryWriter::<W>::size_of_count(&num_objects);
+        let ref_size = BinaryWriter::<W>::size_of_count(&num_objects);
 
         // write bplist header
         self.written += self.write_header()?;
 
         // write object list
-        // TODO: get rid of this clone
         for o in self.object_list.clone() {
-            self.written += self.write_object(&o)?;
+            self.written += self.write_object(ref_size, &o)?;
         }
 
         // write offset table
@@ -75,7 +75,7 @@ impl<W: Write> BinaryWriter<W> {
         let offset_table_offset_size = BinaryWriter::<W>::size_of_count(&offset_table_offset);
         // TODO: get rid of this clone
         for offset in self.object_offsets.clone() {
-            self.written += self.write_int_sized(offset_table_offset_size, offset)?;
+            self.written += self.write_reference(offset_table_offset_size, offset)?;
         }
 
         // write trailer
@@ -88,7 +88,7 @@ impl<W: Write> BinaryWriter<W> {
             0,
             sort_version, // then sort_version, whatever that is, which is apparently 0
             offset_table_offset_size.into_offset_size(), // followed by size of an offset table entry
-            self.ref_size.clone().into_offset_size(),    // followed size of a reference entry
+            ref_size.into_offset_size(),                 // followed size of a reference entry
         ])?;
         // number of objects in object list, as u64be
         self.written += self.writer.write(&(num_objects as u64).to_be_bytes())?;
@@ -127,7 +127,7 @@ impl<W: Write> BinaryWriter<W> {
         Ok(count)
     }
 
-    fn write_int_sized(&mut self, ref_size: RefSize, ref_num: usize) -> Result<usize, Error> {
+    fn write_reference(&mut self, ref_size: RefSize, ref_num: usize) -> Result<usize, Error> {
         let bytes = match ref_size {
             RefSize::U8 => [ref_num as u8].to_vec(),
             RefSize::U16 => (ref_num as u16).to_be_bytes().to_vec(),
@@ -137,11 +137,7 @@ impl<W: Write> BinaryWriter<W> {
         self.writer.write(bytes.as_slice()).map_err(Into::into)
     }
 
-    fn write_ref_num(&mut self, ref_num: usize) -> Result<usize, Error> {
-        self.write_int_sized(self.ref_size, ref_num)
-    }
-
-    fn write_object(&mut self, v: &Value) -> Result<usize, Error> {
+    fn write_object(&mut self, ref_size: RefSize, v: &Value) -> Result<usize, Error> {
         let ref_num = self.expect_ref_num(v)?;
         self.object_offsets[ref_num] = self.written;
         let mut count = 0usize;
@@ -209,7 +205,7 @@ impl<W: Write> BinaryWriter<W> {
                 count += self.write_size(0xA0, a.len())?;
                 for elem in a {
                     let ref_num = self.expect_ref_num(elem)?;
-                    count += self.write_ref_num(ref_num)?;
+                    count += self.write_reference(ref_size, ref_num)?;
                 }
             }
             Value::Dictionary(d) => {
@@ -220,10 +216,10 @@ impl<W: Write> BinaryWriter<W> {
                 }
                 count += self.write_size(0xD0, key_refs.len())?;
                 for kr in key_refs {
-                    count += self.write_ref_num(kr)?;
+                    count += self.write_reference(ref_size, kr)?;
                 }
                 for vr in val_refs {
-                    count += self.write_ref_num(vr)?;
+                    count += self.write_reference(ref_size, vr)?;
                 }
             }
             Value::__Nonexhaustive => unreachable!(),
@@ -234,7 +230,8 @@ impl<W: Write> BinaryWriter<W> {
 
     fn flatten(&mut self) {
         if !self.flattened {
-            self.flatten_inner(&self.value.clone());
+            let value = self.value.clone();
+            self.flatten_inner(&value);
             self.flattened = true;
         }
     }
@@ -338,5 +335,49 @@ mod tests {
     #[test]
     fn utf16_roundtrip() {
         test_roundtrip(&Path::new("./tests/data/utf16_bplist.plist"))
+    }
+}
+
+#[cfg(not(feature = "int_to_from_bytes"))]
+mod shim_feature_int_to_from_bytes {
+    use std::mem;
+    pub(super) trait IntToBEBytes {
+        type Bytes;
+        fn to_be_bytes(self) -> Self::Bytes;
+    }
+
+    impl IntToBEBytes for u16 {
+        type Bytes = [u8; mem::size_of::<u16>()];
+        fn to_be_bytes(self) -> [u8; 2] {
+            unsafe { mem::transmute(self.to_be()) }
+        }
+    }
+
+    impl IntToBEBytes for u32 {
+        type Bytes = [u8; mem::size_of::<u32>()];
+        fn to_be_bytes(self) -> Self::Bytes {
+            unsafe { mem::transmute(self.to_be()) }
+        }
+    }
+
+    impl IntToBEBytes for i64 {
+        type Bytes = [u8; mem::size_of::<i64>()];
+        fn to_be_bytes(self) -> Self::Bytes {
+            unsafe { mem::transmute(self.to_be()) }
+        }
+    }
+
+    impl IntToBEBytes for u64 {
+        type Bytes = [u8; mem::size_of::<u64>()];
+        fn to_be_bytes(self) -> Self::Bytes {
+            unsafe { mem::transmute(self.to_be()) }
+        }
+    }
+
+    impl IntToBEBytes for i128 {
+        type Bytes = [u8; mem::size_of::<i128>()];
+        fn to_be_bytes(self) -> Self::Bytes {
+            unsafe { mem::transmute(self.to_be()) }
+        }
     }
 }

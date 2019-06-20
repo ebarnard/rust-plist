@@ -52,7 +52,7 @@ impl Date {
     pub(crate) fn to_seconds_since_plist_epoch(&self) -> f64 {
         // needed until #![feature(duration_float)] is stabilized
         fn as_secs_f64(d: Duration) -> f64 {
-            const NANOS_PER_SEC:f64 = 1_000_000_000.00;
+            const NANOS_PER_SEC: f64 = 1_000_000_000.00;
             (d.as_secs() as f64) + ((d.subsec_nanos() as f64) / NANOS_PER_SEC)
         }
 
