@@ -610,8 +610,9 @@ pub fn to_writer<W: Write, T: ser::Serialize>(writer: W, value: &T) -> Result<()
     }
     let value = ::Value::from_events(events_oked)?;
 
-    let bin_writer = BinaryWriter::new(writer, value)?;
-    bin_writer.write()
+    let mut bin_writer = BinaryWriter::new(writer, value)?;
+    bin_writer.write()?;
+    Ok(())
 }
 
 /// Serializes the given data structure as an XML encoded plist file.

@@ -9,6 +9,10 @@ pub struct Integer {
 }
 
 impl Integer {
+    pub fn into_inner(self) -> i128 {
+        self.value
+    }
+
     pub fn as_signed(self) -> Option<i64> {
         if self.value >= i64::min_value().into() && self.value <= i64::max_value().into() {
             Some(self.value as i64)

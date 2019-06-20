@@ -1,6 +1,6 @@
 use humantime;
 use std::fmt;
-use std::time::{Duration, SystemTime, UNIX_EPOCH};
+use std::time::{Duration, SystemTime, SystemTimeError, UNIX_EPOCH};
 
 /// A UTC timestamp used for serialization to and from the plist date type.
 ///
@@ -12,6 +12,7 @@ pub struct Date {
 }
 
 impl Date {
+    pub(crate) const PLIST_EPOCH_UNIX_TIMESTAMP: u64 = 978_307_200;
     pub(crate) fn from_rfc3339(date: &str) -> Result<Self, ()> {
         Ok(Date {
             inner: humantime::parse_rfc3339(date).map_err(|_| ())?,
@@ -26,7 +27,7 @@ impl Date {
         // `timestamp` is the number of seconds since the plist epoch of 1/1/2001 00:00:00.
         // `PLIST_EPOCH_UNIX_TIMESTAMP` is the unix timestamp of the plist epoch.
         const PLIST_EPOCH_UNIX_TIMESTAMP: u64 = 978_307_200;
-        let plist_epoch = UNIX_EPOCH + Duration::from_secs(PLIST_EPOCH_UNIX_TIMESTAMP);
+        let plist_epoch = UNIX_EPOCH + Duration::from_secs(Date::PLIST_EPOCH_UNIX_TIMESTAMP);
 
         if !timestamp.is_finite() {
             return Err(());
@@ -46,6 +47,18 @@ impl Date {
         };
 
         Ok(Date { inner })
+    }
+
+    pub(crate) fn to_seconds_since_plist_epoch(&self) -> Result<f64, super::Error> {
+        let plist_epoch = UNIX_EPOCH + Duration::from_secs(Date::PLIST_EPOCH_UNIX_TIMESTAMP);
+        if let Ok(dur_since_plist_epoch) = self.inner.duration_since(plist_epoch) {
+            Ok(dur_since_plist_epoch.as_secs_f64())
+        } else if let Ok(dur_until_plist_epoch) = plist_epoch.duration_since(self.inner) {
+            // TODO: is this right?
+            Ok(-dur_until_plist_epoch.as_secs_f64())
+        } else {
+            unreachable!() // should be, at least...
+        }
     }
 }
 

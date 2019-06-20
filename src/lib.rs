@@ -51,6 +51,9 @@
 //! # #[cfg(not(feature = "serde"))]
 //! # fn main() {}
 //! ```
+//!
+//!
+#![feature(duration_float)]
 
 extern crate base64;
 extern crate byteorder;
@@ -92,6 +95,7 @@ pub enum Error {
     UnexpectedEof,
     Io(io::Error),
     Serde(String),
+    InvalidDate(std::time::SystemTimeError),
 }
 
 impl ::std::error::Error for Error {
@@ -101,12 +105,14 @@ impl ::std::error::Error for Error {
             Error::UnexpectedEof => "unexpected eof",
             Error::Io(ref err) => err.description(),
             Error::Serde(ref err) => &err,
+            Error::InvalidDate(ref err) => "date is neither before nor after plist epoch?",
         }
     }
 
     fn cause(&self) -> Option<&::std::error::Error> {
         match *self {
             Error::Io(ref err) => Some(err),
+            Error::InvalidDate(ref err) => Some(err),
             _ => None,
         }
     }
@@ -124,6 +130,12 @@ impl fmt::Display for Error {
 impl From<io::Error> for Error {
     fn from(err: io::Error) -> Error {
         Error::Io(err)
+    }
+}
+
+impl From<std::time::SystemTimeError> for Error {
+    fn from(err: std::time::SystemTimeError) -> Error {
+        Error::InvalidDate(err)
     }
 }
 

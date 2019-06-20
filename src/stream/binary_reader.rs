@@ -91,7 +91,6 @@ impl<R: Read + Seek> BinaryReader<R> {
         self.reader.seek(SeekFrom::Start(offset_table_offset))?;
         self.object_offsets = self.read_ints(num_objects, offset_size)?;
         self.object_on_stack = vec![false; self.object_offsets.len()];
-
         Ok(())
     }
 

@@ -43,8 +43,9 @@ impl Value {
 
     /// Serializes the given data structure as a binary plist file.
     pub fn to_writer<W: Write>(&self, writer: W) -> Result<(), Error> {
-        let binary_writer = BinaryWriter::new(writer, self.clone())?;
-        binary_writer.write()
+        let mut binary_writer = BinaryWriter::new(writer, self.clone())?;
+        binary_writer.write()?;
+        Ok(())
     }
 
     /// Serializes the given data structure as an XML encoded plist file.
