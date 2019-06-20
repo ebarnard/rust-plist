@@ -204,7 +204,7 @@ impl<W: Write> BinaryWriter<W> {
                     count += self.writer.write(ascii)?;
                 } else {
                     let utf16: Vec<u16> = s.encode_utf16().collect();
-                    count += self.write_size(0x60, utf16.len() * 2)?;
+                    count += self.write_size(0x60, utf16.len())?;
                     for c in utf16 {
                         count += self.writer.write(&c.to_be_bytes())?;
                     }
@@ -340,6 +340,7 @@ mod tests {
         test_roundtrip(&Path::new("./tests/data/binary.plist"))
     }
 
+    #[test]
     fn utf16_roundtrip() {
         test_roundtrip(&Path::new("./tests/data/utf16_bplist.plist"))
     }
