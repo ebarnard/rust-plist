@@ -53,7 +53,6 @@
 //! ```
 //!
 //!
-#![feature(duration_float)]
 
 extern crate base64;
 extern crate byteorder;

@@ -49,15 +49,20 @@ impl Date {
         Ok(Date { inner })
     }
 
-    pub(crate) fn to_seconds_since_plist_epoch(&self) -> Result<f64, super::Error> {
+    pub(crate) fn to_seconds_since_plist_epoch(&self) -> f64 {
+        // needed until #![feature(duration_float)] is stabilized
+        fn as_secs_f64(d: Duration) -> f64 {
+            const NANOS_PER_SEC:f64 = 1_000_000_000.00;
+            (d.as_secs() as f64) + ((d.subsec_nanos() as f64) / NANOS_PER_SEC)
+        }
+
         let plist_epoch = UNIX_EPOCH + Duration::from_secs(Date::PLIST_EPOCH_UNIX_TIMESTAMP);
         if let Ok(dur_since_plist_epoch) = self.inner.duration_since(plist_epoch) {
-            Ok(dur_since_plist_epoch.as_secs_f64())
+            as_secs_f64(dur_since_plist_epoch)
         } else if let Ok(dur_until_plist_epoch) = plist_epoch.duration_since(self.inner) {
-            // TODO: is this right?
-            Ok(-dur_until_plist_epoch.as_secs_f64())
+            -(as_secs_f64(dur_until_plist_epoch))
         } else {
-            unreachable!() // should be, at least...
+            0.0f64 // should be unreachable, at least in principle
         }
     }
 }

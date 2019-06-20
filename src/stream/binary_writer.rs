@@ -184,9 +184,7 @@ impl<W: Write> BinaryWriter<W> {
                 count += self.writer.write(&r.to_bits().to_be_bytes())?;
             }
             Value::Date(d) => {
-                let secs = &d
-                    .to_seconds_since_plist_epoch()
-                    .map_err(|e| Error::Serde(e.to_string()))?;
+                let secs = &d.to_seconds_since_plist_epoch();
                 count += self.writer.write(&[0x33])?;
                 count += self.writer.write(&secs.to_bits().to_be_bytes())?;
             }
