@@ -1,9 +1,6 @@
 use std::io::Write;
-
 use std::collections::HashMap;
-use stream::{Event, Writer};
-use {Date, Error, Integer};
-use {Serializer, Value};
+use super::{Date, Error, Integer, Value};
 
 #[derive(Copy, Clone, Debug, Eq, PartialEq, Ord, PartialOrd)]
 enum RefSize {
