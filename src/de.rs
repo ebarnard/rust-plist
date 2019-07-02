@@ -370,14 +370,14 @@ pub fn from_file<P: AsRef<Path>, T: de::DeserializeOwned>(path: P) -> Result<T, 
     from_reader(BufReader::new(file))
 }
 
-/// Deserializes an instance of type `T` from a seekable byte stream containing a plist file of any encoding.
+/// Deserializes an instance of type `T` from a seekable byte stream containing a plist of any encoding.
 pub fn from_reader<R: Read + Seek, T: de::DeserializeOwned>(reader: R) -> Result<T, Error> {
     let reader = stream::Reader::new(reader);
     let mut de = Deserializer::new(reader);
     de::Deserialize::deserialize(&mut de)
 }
 
-/// Deserializes an instance of type `T` from a byte stream containing an XML encoded plist file.
+/// Deserializes an instance of type `T` from a byte stream containing an XML encoded plist.
 pub fn from_reader_xml<R: Read, T: de::DeserializeOwned>(reader: R) -> Result<T, Error> {
     let reader = stream::XmlReader::new(reader);
     let mut de = Deserializer::new(reader);

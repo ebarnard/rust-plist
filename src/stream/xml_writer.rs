@@ -110,6 +110,7 @@ impl<W: Write> XmlWriter<W> {
             // We didn't tell the xml_writer about the <plist> tag so we'll skip telling it
             // about the </plist> tag as well.
             self.xml_writer.inner_mut().write_all(b"\n</plist>")?;
+            self.xml_writer.inner_mut().flush()?;
         }
 
         Ok(())

@@ -1,6 +1,6 @@
 use std::{
     fs::File,
-    io::{BufReader, Read, Seek, Write},
+    io::{BufReader, BufWriter, Read, Seek, Write},
     path::Path,
 };
 
@@ -31,25 +31,41 @@ impl Value {
         Value::from_reader(BufReader::new(file))
     }
 
-    /// Reads a `Value` from a seekable byte stream containing a plist file of any encoding.
+    /// Reads a `Value` from a seekable byte stream containing a plist of any encoding.
     pub fn from_reader<R: Read + Seek>(reader: R) -> Result<Value, Error> {
         let reader = Reader::new(reader);
         Value::from_events(reader)
     }
 
-    /// Reads a `Value` from a seekable byte stream containing an XML encoded plist file.
+    /// Reads a `Value` from a seekable byte stream containing an XML encoded plist.
     pub fn from_reader_xml<R: Read>(reader: R) -> Result<Value, Error> {
         let reader = XmlReader::new(reader);
         Value::from_events(reader)
     }
 
-    /// Serializes the given data structure as a binary encoded plist file.
+    /// Serializes a `Value` to a file as a binary encoded plist.
+    pub fn to_file_binary<P: AsRef<Path>>(&self, path: P) -> Result<(), Error> {
+        let mut file = File::create(path)?;
+        self.to_writer_binary(BufWriter::new(&mut file))?;
+        file.sync_all()?;
+        Ok(())
+    }
+
+    /// Serializes a `Value` to a file as an XML encoded plist.
+    pub fn to_file_xml<P: AsRef<Path>>(&self, path: P) -> Result<(), Error> {
+        let mut file = File::create(path)?;
+        self.to_writer_xml(BufWriter::new(&mut file))?;
+        file.sync_all()?;
+        Ok(())
+    }
+
+    /// Serializes a `Value` to a byte stream as a binary encoded plist.
     pub fn to_writer_binary<W: Write>(&self, writer: W) -> Result<(), Error> {
         let mut writer = BinaryWriter::new(writer);
         self.to_writer_inner(&mut writer)
     }
 
-    /// Serializes the given data structure as an XML encoded plist file.
+    /// Serializes a `Value` to a byte stream as an XML encoded plist.
     pub fn to_writer_xml<W: Write>(&self, writer: W) -> Result<(), Error> {
         let mut writer = XmlWriter::new(writer);
         self.to_writer_inner(&mut writer)
