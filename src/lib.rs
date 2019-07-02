@@ -77,8 +77,7 @@ pub use self::de::{from_file, from_reader, from_reader_xml, Deserializer};
 #[cfg(feature = "serde")]
 pub use self::ser::{to_writer_xml, Serializer};
 
-use std::fmt;
-use std::io;
+use std::{fmt, io};
 
 #[derive(Debug)]
 pub enum Error {

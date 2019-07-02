@@ -1,10 +1,8 @@
 use base64;
-use std::io::Read;
-use std::str::FromStr;
+use std::{io::Read, str::FromStr};
 use xml_rs::reader::{EventReader, ParserConfig, XmlEvent};
 
-use crate::stream::Event;
-use crate::{Date, Error};
+use crate::{stream::Event, Date, Error};
 
 pub struct XmlReader<R: Read> {
     xml_reader: EventReader<R>,
@@ -151,12 +149,10 @@ impl<R: Read> Iterator for XmlReader<R> {
 #[cfg(test)]
 mod tests {
     use humantime::parse_rfc3339_weak;
-    use std::fs::File;
-    use std::path::Path;
+    use std::{fs::File, path::Path};
 
     use super::*;
-    use crate::stream::Event;
-    use crate::stream::Event::*;
+    use crate::stream::Event::{self, *};
 
     #[test]
     fn streaming_parser() {

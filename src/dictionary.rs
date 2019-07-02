@@ -5,12 +5,14 @@
 //! [`BTreeMap`]: https://doc.rust-lang.org/std/collections/struct.BTreeMap.html
 
 //use serde::{de, ser};
-use std::borrow::Borrow;
-use std::collections::{btree_map, BTreeMap};
-use std::fmt::{self, Debug};
-use std::hash::Hash;
-use std::iter::FromIterator;
-use std::ops;
+use std::{
+    borrow::Borrow,
+    collections::{btree_map, BTreeMap},
+    fmt::{self, Debug},
+    hash::Hash,
+    iter::FromIterator,
+    ops,
+};
 
 use crate::Value;
 

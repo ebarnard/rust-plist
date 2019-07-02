@@ -1,10 +1,13 @@
-use std::fs::File;
-use std::io::Write;
-use std::io::{BufReader, Read, Seek};
-use std::path::Path;
+use std::{
+    fs::File,
+    io::{BufReader, Read, Seek, Write},
+    path::Path,
+};
 
-use crate::stream::{Event, IntoEvents, Reader, Writer, XmlReader, XmlWriter};
-use crate::{u64_to_usize, Date, Dictionary, Error, Integer};
+use crate::{
+    stream::{Event, IntoEvents, Reader, Writer, XmlReader, XmlWriter},
+    u64_to_usize, Date, Dictionary, Error, Integer,
+};
 
 /// Represents any plist value.
 #[derive(Clone, Debug, PartialEq)]
@@ -469,8 +472,7 @@ mod tests {
     use std::time::SystemTime;
 
     use super::*;
-    use crate::stream::Event::*;
-    use crate::{Date, Dictionary, Value};
+    use crate::{stream::Event::*, Date, Dictionary, Value};
 
     #[test]
     fn value_accessors() {

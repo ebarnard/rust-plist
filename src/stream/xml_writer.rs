@@ -1,13 +1,16 @@
 use base64;
 use line_wrap;
-use std::borrow::Cow;
-use std::io::Write;
-use xml_rs::name::Name;
-use xml_rs::namespace::Namespace;
-use xml_rs::writer::{EmitterConfig, Error as XmlWriterError, EventWriter, XmlEvent};
+use std::{borrow::Cow, io::Write};
+use xml_rs::{
+    name::Name,
+    namespace::Namespace,
+    writer::{EmitterConfig, Error as XmlWriterError, EventWriter, XmlEvent},
+};
 
-use crate::stream::{Event, Writer};
-use crate::{Date, Error, Integer};
+use crate::{
+    stream::{Event, Writer},
+    Date, Error, Integer,
+};
 
 static XML_PROLOGUE: &str = r#"<?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">

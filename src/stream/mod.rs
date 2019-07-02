@@ -9,8 +9,10 @@ pub use self::xml_reader::XmlReader;
 mod xml_writer;
 pub use self::xml_writer::XmlWriter;
 
-use std::io::{Read, Seek, SeekFrom};
-use std::vec;
+use std::{
+    io::{Read, Seek, SeekFrom},
+    vec,
+};
 
 use crate::{dictionary, Date, Error, Integer, Value};
 

@@ -1,13 +1,17 @@
 use serde::de;
-use std::fmt::Display;
-use std::fs::File;
-use std::io::{BufReader, Read, Seek};
-use std::iter::Peekable;
-use std::mem;
-use std::path::Path;
+use std::{
+    fmt::Display,
+    fs::File,
+    io::{BufReader, Read, Seek},
+    iter::Peekable,
+    mem,
+    path::Path,
+};
 
-use crate::stream::{self, Event};
-use crate::{u64_to_usize, Error};
+use crate::{
+    stream::{self, Event},
+    u64_to_usize, Error,
+};
 
 macro_rules! expect {
     ($next:expr, $pat:pat) => {

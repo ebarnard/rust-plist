@@ -1,6 +1,8 @@
 use humantime;
-use std::fmt;
-use std::time::{Duration, SystemTime, UNIX_EPOCH};
+use std::{
+    fmt,
+    time::{Duration, SystemTime, UNIX_EPOCH},
+};
 
 /// A UTC timestamp used for serialization to and from the plist date type.
 ///
@@ -70,8 +72,10 @@ impl Into<SystemTime> for Date {
 
 #[cfg(feature = "serde")]
 pub mod serde_impls {
-    use serde::de::{Deserialize, Deserializer, Error, Unexpected, Visitor};
-    use serde::ser::{Serialize, Serializer};
+    use serde::{
+        de::{Deserialize, Deserializer, Error, Unexpected, Visitor},
+        ser::{Serialize, Serializer},
+    };
     use std::fmt;
 
     use crate::Date;

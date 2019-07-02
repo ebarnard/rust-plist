@@ -1,10 +1,9 @@
-use plist::stream::{Event, VecWriter};
-use plist::{Date, Deserializer, Error, Serializer};
-use serde::de::DeserializeOwned;
-use serde::ser::Serialize;
-use std::collections::BTreeMap;
-use std::fmt::Debug;
-use std::time::SystemTime;
+use plist::{
+    stream::{Event, VecWriter},
+    Date, Deserializer, Error, Serializer,
+};
+use serde::{de::DeserializeOwned, ser::Serialize};
+use std::{collections::BTreeMap, fmt::Debug, time::SystemTime};
 
 fn new_serializer() -> Serializer<VecWriter> {
     Serializer::new(VecWriter::new())

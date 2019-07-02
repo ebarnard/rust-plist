@@ -1,6 +1,4 @@
-use std::fmt;
-use std::num::ParseIntError;
-use std::str::FromStr;
+use std::{fmt, num::ParseIntError, str::FromStr};
 
 /// A type capable of representing either an `i64` or a `u64`.
 #[derive(Clone, Copy, Eq, Hash, Ord, PartialEq, PartialOrd)]
