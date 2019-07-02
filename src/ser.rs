@@ -591,6 +591,13 @@ impl<'a, W: Writer> ser::SerializeStructVariant for Compound<'a, W> {
     }
 }
 
+/// Serializes the given data structure as a binary encoded plist file.
+pub fn to_writer_binary<W: Write, T: ser::Serialize>(writer: W, value: &T) -> Result<(), Error> {
+    let writer = stream::BinaryWriter::new(writer);
+    let mut ser = Serializer::new(writer);
+    value.serialize(&mut ser)
+}
+
 /// Serializes the given data structure as an XML encoded plist file.
 pub fn to_writer_xml<W: Write, T: ser::Serialize>(writer: W, value: &T) -> Result<(), Error> {
     let writer = stream::XmlWriter::new(writer);

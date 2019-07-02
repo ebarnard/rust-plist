@@ -357,7 +357,7 @@ mod tests {
         let events: Vec<Event> = streaming_parser.map(|e| e.unwrap()).collect();
 
         let comparison = &[
-            StartDictionary(Some(9)),
+            StartDictionary(Some(11)),
             String("Author".into()),
             String("William Shakespeare".into()),
             String("Height".into()),
@@ -370,6 +370,9 @@ mod tests {
             Integer(18446744073709551615u64.into()),
             String("SmallestNumber".into()),
             Integer((-9223372036854775808i64).into()),
+            String("EmptyArray".into()),
+            StartArray(Some(0)),
+            EndCollection,
             String("Lines".into()),
             StartArray(Some(2)),
             String("It is a tale told by an idiot,".into()),
@@ -377,6 +380,9 @@ mod tests {
             EndCollection,
             String("Death".into()),
             Integer(1564.into()),
+            String("EmptyDictionary".into()),
+            StartDictionary(Some(0)),
+            EndCollection,
             String("Blank".into()),
             String("".into()),
             EndCollection,

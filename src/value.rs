@@ -5,7 +5,7 @@ use std::{
 };
 
 use crate::{
-    stream::{Event, IntoEvents, Reader, Writer, XmlReader, XmlWriter},
+    stream::{BinaryWriter, Event, IntoEvents, Reader, Writer, XmlReader, XmlWriter},
     u64_to_usize, Date, Dictionary, Error, Integer,
 };
 
@@ -43,13 +43,19 @@ impl Value {
         Value::from_events(reader)
     }
 
+    /// Serializes the given data structure as a binary encoded plist file.
+    pub fn to_writer_binary<W: Write>(&self, writer: W) -> Result<(), Error> {
+        let mut writer = BinaryWriter::new(writer);
+        self.to_writer_inner(&mut writer)
+    }
+
     /// Serializes the given data structure as an XML encoded plist file.
     pub fn to_writer_xml<W: Write>(&self, writer: W) -> Result<(), Error> {
         let mut writer = XmlWriter::new(writer);
-        self.to_writer_xml_inner(&mut writer)
+        self.to_writer_inner(&mut writer)
     }
 
-    fn to_writer_xml_inner(&self, writer: &mut dyn Writer) -> Result<(), Error> {
+    fn to_writer_inner(&self, writer: &mut dyn Writer) -> Result<(), Error> {
         let events = self.clone().into_events();
         for event in events {
             writer.write(&event)?;

@@ -8,12 +8,15 @@ use std::{
 ///
 /// Note that while this type implements `Serialize` and `Deserialize` it will behave strangely if
 /// used with serializers from outside this crate.
-#[derive(Clone, Copy, Hash, PartialEq)]
+#[derive(Clone, Copy, Eq, Hash, PartialEq)]
 pub struct Date {
     inner: SystemTime,
 }
 
 impl Date {
+    /// The unix timestamp of the plist epoch.
+    const PLIST_EPOCH_UNIX_TIMESTAMP: Duration = Duration::from_secs(978_307_200);
+
     pub(crate) fn from_rfc3339(date: &str) -> Result<Self, ()> {
         Ok(Date {
             inner: humantime::parse_rfc3339(date).map_err(|_| ())?,
@@ -26,9 +29,7 @@ impl Date {
 
     pub(crate) fn from_seconds_since_plist_epoch(timestamp: f64) -> Result<Date, ()> {
         // `timestamp` is the number of seconds since the plist epoch of 1/1/2001 00:00:00.
-        // `PLIST_EPOCH_UNIX_TIMESTAMP` is the unix timestamp of the plist epoch.
-        const PLIST_EPOCH_UNIX_TIMESTAMP: u64 = 978_307_200;
-        let plist_epoch = UNIX_EPOCH + Duration::from_secs(PLIST_EPOCH_UNIX_TIMESTAMP);
+        let plist_epoch = UNIX_EPOCH + Date::PLIST_EPOCH_UNIX_TIMESTAMP;
 
         if !timestamp.is_finite() {
             return Err(());
@@ -48,6 +49,20 @@ impl Date {
         };
 
         Ok(Date { inner })
+    }
+
+    pub(crate) fn to_seconds_since_plist_epoch(&self) -> f64 {
+        // needed until #![feature(duration_float)] is stabilized
+        fn as_secs_f64(d: Duration) -> f64 {
+            const NANOS_PER_SEC: f64 = 1_000_000_000.00;
+            (d.as_secs() as f64) + f64::from(d.subsec_nanos()) / NANOS_PER_SEC
+        }
+
+        let plist_epoch = UNIX_EPOCH + Date::PLIST_EPOCH_UNIX_TIMESTAMP;
+        match self.inner.duration_since(plist_epoch) {
+            Ok(dur_since_plist_epoch) => as_secs_f64(dur_since_plist_epoch),
+            Err(err) => -as_secs_f64(err.duration()),
+        }
     }
 }
 
