@@ -3,8 +3,8 @@ use std::io::Write;
 use std::io::{BufReader, Read, Seek};
 use std::path::Path;
 
-use stream::{Event, IntoEvents, Reader, Writer, XmlReader, XmlWriter};
-use {u64_to_usize, Date, Dictionary, Error, Integer};
+use crate::stream::{Event, IntoEvents, Reader, Writer, XmlReader, XmlWriter};
+use crate::{u64_to_usize, Date, Dictionary, Error, Integer};
 
 /// Represents any plist value.
 #[derive(Clone, Debug, PartialEq)]
@@ -46,7 +46,7 @@ impl Value {
         self.to_writer_xml_inner(&mut writer)
     }
 
-    fn to_writer_xml_inner(&self, writer: &mut Writer) -> Result<(), Error> {
+    fn to_writer_xml_inner(&self, writer: &mut dyn Writer) -> Result<(), Error> {
         let events = self.clone().into_events();
         for event in events {
             writer.write(&event)?;
@@ -469,8 +469,8 @@ mod tests {
     use std::time::SystemTime;
 
     use super::*;
-    use stream::Event::*;
-    use {Date, Dictionary, Value};
+    use crate::stream::Event::*;
+    use crate::{Date, Dictionary, Value};
 
     #[test]
     fn value_accessors() {

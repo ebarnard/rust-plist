@@ -3,9 +3,9 @@ use std::fmt::Display;
 use std::io::Write;
 use std::mem;
 
-use date::serde_impls::DATE_NEWTYPE_STRUCT_NAME;
-use stream::{self, Writer};
-use {Date, Error, Integer};
+use crate::date::serde_impls::DATE_NEWTYPE_STRUCT_NAME;
+use crate::stream::{self, Writer};
+use crate::{Date, Error, Integer};
 
 impl ser::Error for Error {
     fn custom<T: Display>(msg: T) -> Self {

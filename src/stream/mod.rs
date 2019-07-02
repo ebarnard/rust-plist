@@ -11,7 +11,8 @@ pub use self::xml_writer::XmlWriter;
 
 use std::io::{Read, Seek, SeekFrom};
 use std::vec;
-use {dictionary, Date, Error, Integer, Value};
+
+use crate::{dictionary, Date, Error, Integer, Value};
 
 /// An encoding of a plist as a flat structure.
 ///

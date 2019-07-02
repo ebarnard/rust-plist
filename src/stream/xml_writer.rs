@@ -6,8 +6,8 @@ use xml_rs::name::Name;
 use xml_rs::namespace::Namespace;
 use xml_rs::writer::{EmitterConfig, Error as XmlWriterError, EventWriter, XmlEvent};
 
-use stream::{Event, Writer};
-use {Date, Error, Integer};
+use crate::stream::{Event, Writer};
+use crate::{Date, Error, Integer};
 
 static XML_PROLOGUE: &str = r#"<?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
@@ -267,7 +267,7 @@ mod tests {
     use std::io::Cursor;
 
     use super::*;
-    use stream::Event;
+    use crate::stream::Event;
 
     #[test]
     fn streaming_parser() {

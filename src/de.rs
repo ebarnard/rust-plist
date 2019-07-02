@@ -6,8 +6,8 @@ use std::iter::Peekable;
 use std::mem;
 use std::path::Path;
 
-use stream::{self, Event};
-use {u64_to_usize, Error};
+use crate::stream::{self, Event};
+use crate::{u64_to_usize, Error};
 
 macro_rules! expect {
     ($next:expr, $pat:pat) => {

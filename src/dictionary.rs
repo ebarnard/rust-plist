@@ -12,7 +12,7 @@ use std::hash::Hash;
 use std::iter::FromIterator;
 use std::ops;
 
-use Value;
+use crate::Value;
 
 /// Represents a plist dictionary type.
 pub struct Dictionary {

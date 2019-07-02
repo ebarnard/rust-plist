@@ -3,7 +3,7 @@ use std::fmt;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 /// A UTC timestamp used for serialization to and from the plist date type.
-/// 
+///
 /// Note that while this type implements `Serialize` and `Deserialize` it will behave strangely if
 /// used with serializers from outside this crate.
 #[derive(Clone, Copy, Hash, PartialEq)]
@@ -74,7 +74,7 @@ pub mod serde_impls {
     use serde::ser::{Serialize, Serializer};
     use std::fmt;
 
-    use Date;
+    use crate::Date;
 
     pub const DATE_NEWTYPE_STRUCT_NAME: &str = "PLIST-DATE";
 

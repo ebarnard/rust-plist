@@ -1,9 +1,8 @@
-use byteorder::{BigEndian, ReadBytesExt};
-use std::io::{Read, Seek, SeekFrom};
+use std::io::{self, Read, Seek, SeekFrom};
 use std::mem::size_of;
 
-use stream::Event;
-use {u64_to_usize, Date, Error};
+use crate::stream::Event;
+use crate::{u64_to_usize, Date, Error};
 
 struct StackItem {
     object_ref: u64,
@@ -67,21 +66,21 @@ impl<R: Read + Seek> BinaryReader<R> {
         // Trailer starts with 6 bytes of padding
         let trailer_start = self.reader.seek(SeekFrom::End(-32 + 6))?;
 
-        let offset_size = self.reader.read_u8()?;
+        let offset_size = self.read_u8()?;
         match offset_size {
             1 | 2 | 4 | 8 => (),
             _ => return Err(Error::InvalidData),
         }
 
-        self.ref_size = self.reader.read_u8()?;
+        self.ref_size = self.read_u8()?;
         match self.ref_size {
             1 | 2 | 4 | 8 => (),
             _ => return Err(Error::InvalidData),
         }
 
-        let num_objects = self.reader.read_u64::<BigEndian>()?;
-        self.root_object = self.reader.read_u64::<BigEndian>()?;
-        let offset_table_offset = self.reader.read_u64::<BigEndian>()?;
+        let num_objects = self.read_be_u64()?;
+        self.root_object = self.read_be_u64()?;
+        let offset_table_offset = self.read_be_u64()?;
 
         // File size minus trailer and header
         // Truncated to max(usize)
@@ -99,10 +98,10 @@ impl<R: Read + Seek> BinaryReader<R> {
         let mut ints = self.allocate_vec(len, size as usize)?;
         for _ in 0..len {
             match size {
-                1 => ints.push(self.reader.read_u8()?.into()),
-                2 => ints.push(self.reader.read_u16::<BigEndian>()?.into()),
-                4 => ints.push(self.reader.read_u32::<BigEndian>()?.into()),
-                8 => ints.push(self.reader.read_u64::<BigEndian>()?),
+                1 => ints.push(self.read_u8()?.into()),
+                2 => ints.push(self.read_be_u16()?.into()),
+                4 => ints.push(self.read_be_u32()?.into()),
+                8 => ints.push(self.read_be_u64()?),
                 _ => return Err(Error::InvalidData),
             }
         }
@@ -116,12 +115,12 @@ impl<R: Read + Seek> BinaryReader<R> {
 
     fn read_object_len(&mut self, len: u8) -> Result<u64, Error> {
         if (len & 0x0f) == 0x0f {
-            let len_power_of_two = self.reader.read_u8()? & 0x03;
+            let len_power_of_two = self.read_u8()? & 0x03;
             Ok(match len_power_of_two {
-                0 => self.reader.read_u8()?.into(),
-                1 => self.reader.read_u16::<BigEndian>()?.into(),
-                2 => self.reader.read_u32::<BigEndian>()?.into(),
-                3 => self.reader.read_u64::<BigEndian>()?,
+                0 => self.read_u8()?.into(),
+                1 => self.read_be_u16()?.into(),
+                2 => self.read_be_u32()?.into(),
+                3 => self.read_be_u64()?,
                 _ => return Err(Error::InvalidData),
             })
         } else {
@@ -190,7 +189,7 @@ impl<R: Read + Seek> BinaryReader<R> {
 
         self.seek_to_object(object_ref)?;
 
-        let token = self.reader.read_u8()?;
+        let token = self.read_u8()?;
         let ty = (token & 0xf0) >> 4;
         let size = token & 0x0f;
 
@@ -199,24 +198,24 @@ impl<R: Read + Seek> BinaryReader<R> {
             (0x0, 0x08) => Some(Event::Boolean(false)),
             (0x0, 0x09) => Some(Event::Boolean(true)),
             (0x0, 0x0f) => return Err(Error::InvalidData), // fill
-            (0x1, 0) => Some(Event::Integer(self.reader.read_u8()?.into())),
-            (0x1, 1) => Some(Event::Integer(self.reader.read_u16::<BigEndian>()?.into())),
-            (0x1, 2) => Some(Event::Integer(self.reader.read_u32::<BigEndian>()?.into())),
-            (0x1, 3) => Some(Event::Integer(self.reader.read_i64::<BigEndian>()?.into())),
+            (0x1, 0) => Some(Event::Integer(self.read_u8()?.into())),
+            (0x1, 1) => Some(Event::Integer(self.read_be_u16()?.into())),
+            (0x1, 2) => Some(Event::Integer(self.read_be_u32()?.into())),
+            (0x1, 3) => Some(Event::Integer(self.read_be_i64()?.into())),
             (0x1, 4) => {
-                let value = self.reader.read_i128::<BigEndian>()?;
+                let value = self.read_be_i128()?;
                 if value < 0 || value > u64::max_value().into() {
                     return Err(Error::InvalidData);
                 }
                 Some(Event::Integer((value as u64).into()))
             }
             (0x1, _) => return Err(Error::InvalidData), // variable length int
-            (0x2, 2) => Some(Event::Real(self.reader.read_f32::<BigEndian>()?.into())),
-            (0x2, 3) => Some(Event::Real(self.reader.read_f64::<BigEndian>()?)),
+            (0x2, 2) => Some(Event::Real(f32::from_bits(self.read_be_u32()?).into())),
+            (0x2, 3) => Some(Event::Real(f64::from_bits(self.read_be_u64()?))),
             (0x2, _) => return Err(Error::InvalidData), // odd length float
             (0x3, 3) => {
                 // Date. Seconds since 1/1/2001 00:00:00.
-                let secs = self.reader.read_f64::<BigEndian>()?;
+                let secs = f64::from_bits(self.read_be_u64()?);
                 Some(Event::Date(
                     Date::from_seconds_since_plist_epoch(secs).map_err(|()| Error::InvalidData)?,
                 ))
@@ -239,7 +238,7 @@ impl<R: Read + Seek> BinaryReader<R> {
                 let mut raw_utf16 = self.allocate_vec(len_utf16_codepoints, size_of::<u16>())?;
 
                 for _ in 0..len_utf16_codepoints {
-                    raw_utf16.push(self.reader.read_u16::<BigEndian>()?);
+                    raw_utf16.push(self.read_be_u16()?);
                 }
 
                 let string = String::from_utf16(&raw_utf16).map_err(|_| Error::InvalidData)?;
@@ -289,6 +288,42 @@ impl<R: Read + Seek> BinaryReader<R> {
 
         Ok(result)
     }
+
+    fn read_u8(&mut self) -> io::Result<u8> {
+        let mut buf = [0; 1];
+        self.reader.read_exact(&mut buf)?;
+        Ok(buf[0])
+    }
+
+    fn read_be_u16(&mut self) -> io::Result<u16> {
+        let mut buf = [0; 2];
+        self.reader.read_exact(&mut buf)?;
+        Ok(u16::from_be_bytes(buf))
+    }
+
+    fn read_be_u32(&mut self) -> io::Result<u32> {
+        let mut buf = [0; 4];
+        self.reader.read_exact(&mut buf)?;
+        Ok(u32::from_be_bytes(buf))
+    }
+
+    fn read_be_u64(&mut self) -> io::Result<u64> {
+        let mut buf = [0; 8];
+        self.reader.read_exact(&mut buf)?;
+        Ok(u64::from_be_bytes(buf))
+    }
+
+    fn read_be_i64(&mut self) -> io::Result<i64> {
+        let mut buf = [0; 8];
+        self.reader.read_exact(&mut buf)?;
+        Ok(i64::from_be_bytes(buf))
+    }
+
+    fn read_be_i128(&mut self) -> io::Result<i128> {
+        let mut buf = [0; 16];
+        self.reader.read_exact(&mut buf)?;
+        Ok(i128::from_be_bytes(buf))
+    }
 }
 
 impl<R: Read + Seek> Iterator for BinaryReader<R> {
@@ -314,8 +349,8 @@ mod tests {
     use std::path::Path;
 
     use super::*;
-    use stream::Event;
-    use stream::Event::*;
+    use crate::stream::Event;
+    use crate::stream::Event::*;
 
     #[test]
     fn streaming_parser() {
