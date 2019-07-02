@@ -17,6 +17,7 @@ enable_unstable_features_that_may_break_with_minor_version_bumps = []
 [dependencies]
 base64 = "0.10.1"
 humantime = "1.1.1"
+indexmap = "1.0.2"
 line-wrap = "0.1.1"
 xml_rs = { package = "xml-rs", version = "0.8.0" }
 serde = { version = "1.0.2", optional = true }
