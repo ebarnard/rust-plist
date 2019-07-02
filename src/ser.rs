@@ -1,5 +1,11 @@
 use serde::ser;
-use std::{fmt::Display, io::Write, mem};
+use std::{
+    fmt::Display,
+    fs::File,
+    io::{BufWriter, Write},
+    mem,
+    path::Path,
+};
 
 use crate::{
     date::serde_impls::DATE_NEWTYPE_STRUCT_NAME,
@@ -591,14 +597,30 @@ impl<'a, W: Writer> ser::SerializeStructVariant for Compound<'a, W> {
     }
 }
 
-/// Serializes the given data structure as a binary encoded plist file.
+/// Serializes the given data structure to a file as a binary encoded plist.
+pub fn to_file_binary<P: AsRef<Path>, T: ser::Serialize>(path: P, value: &T) -> Result<(), Error> {
+    let mut file = File::create(path)?;
+    to_writer_binary(BufWriter::new(&mut file), value)?;
+    file.sync_all()?;
+    Ok(())
+}
+
+/// Serializes the given data structure to a file as an XML encoded plist.
+pub fn to_file_xml<P: AsRef<Path>, T: ser::Serialize>(path: P, value: &T) -> Result<(), Error> {
+    let mut file = File::create(path)?;
+    to_writer_xml(BufWriter::new(&mut file), value)?;
+    file.sync_all()?;
+    Ok(())
+}
+
+/// Serializes the given data structure to a byte stream as a binary encoded plist.
 pub fn to_writer_binary<W: Write, T: ser::Serialize>(writer: W, value: &T) -> Result<(), Error> {
     let writer = stream::BinaryWriter::new(writer);
     let mut ser = Serializer::new(writer);
     value.serialize(&mut ser)
 }
 
-/// Serializes the given data structure as an XML encoded plist file.
+/// Serializes the given data structure to a byte stream as an XML encoded plist.
 pub fn to_writer_xml<W: Write, T: ser::Serialize>(writer: W, value: &T) -> Result<(), Error> {
     let writer = stream::XmlWriter::new(writer);
     let mut ser = Serializer::new(writer);
