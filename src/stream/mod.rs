@@ -35,10 +35,8 @@ pub enum Event {
     // While the length of an array or dict cannot be feasably greater than max(usize) this better
     // conveys the concept of an effectively unbounded event stream.
     StartArray(Option<u64>),
-    EndArray,
-
     StartDictionary(Option<u64>),
-    EndDictionary,
+    EndCollection,
 
     Boolean(bool),
     Data(Vec<u8>),
@@ -107,7 +105,7 @@ impl Iterator for IntoEvents {
                     self.stack.push(StackItem::Array(array));
                     handle_value(value, &mut self.stack)
                 } else {
-                    Event::EndArray
+                    Event::EndCollection
                 }
             }
             StackItem::Dict(mut dict) => {
@@ -119,7 +117,7 @@ impl Iterator for IntoEvents {
                     // Return the key event now.
                     Event::String(key)
                 } else {
-                    Event::EndDictionary
+                    Event::EndCollection
                 }
             }
             StackItem::DictValue(value) => handle_value(value, &mut self.stack),
@@ -180,9 +178,8 @@ pub trait Writer: private::Sealed {
     fn write(&mut self, event: &Event) -> Result<(), Error> {
         match event {
             Event::StartArray(len) => self.write_start_array(*len),
-            Event::EndArray => self.write_end_array(),
             Event::StartDictionary(len) => self.write_start_dictionary(*len),
-            Event::EndDictionary => self.write_end_dictionary(),
+            Event::EndCollection => self.write_end_collection(),
             Event::Boolean(value) => self.write_boolean(*value),
             Event::Data(value) => self.write_data(value),
             Event::Date(value) => self.write_date(*value),
@@ -194,10 +191,8 @@ pub trait Writer: private::Sealed {
     }
 
     fn write_start_array(&mut self, len: Option<u64>) -> Result<(), Error>;
-    fn write_end_array(&mut self) -> Result<(), Error>;
-
     fn write_start_dictionary(&mut self, len: Option<u64>) -> Result<(), Error>;
-    fn write_end_dictionary(&mut self) -> Result<(), Error>;
+    fn write_end_collection(&mut self) -> Result<(), Error>;
 
     fn write_boolean(&mut self, value: bool) -> Result<(), Error>;
     fn write_data(&mut self, value: &[u8]) -> Result<(), Error>;
@@ -228,18 +223,13 @@ impl Writer for VecWriter {
         Ok(())
     }
 
-    fn write_end_array(&mut self) -> Result<(), Error> {
-        self.events.push(Event::EndArray);
-        Ok(())
-    }
-
     fn write_start_dictionary(&mut self, len: Option<u64>) -> Result<(), Error> {
         self.events.push(Event::StartDictionary(len));
         Ok(())
     }
 
-    fn write_end_dictionary(&mut self) -> Result<(), Error> {
-        self.events.push(Event::EndDictionary);
+    fn write_end_collection(&mut self) -> Result<(), Error> {
+        self.events.push(Event::EndCollection);
         Ok(())
     }
 

@@ -104,8 +104,7 @@ impl<R: Read> XmlReader<R> {
                     }
 
                     match &name.local_name[..] {
-                        "array" => return Some(Ok(Event::EndArray)),
-                        "dict" => return Some(Ok(Event::EndDictionary)),
+                        "array" | "dict" => return Some(Ok(Event::EndCollection)),
                         "plist" => (),
                         _ => (),
                     }
@@ -168,7 +167,7 @@ mod tests {
             StartArray(None),
             String("It is a tale told by an idiot,".to_owned()),
             String("Full of sound and fury, signifying nothing.".to_owned()),
-            EndArray,
+            EndCollection,
             String("Death".to_owned()),
             Integer(1564.into()),
             String("Height".to_owned()),
@@ -185,7 +184,7 @@ mod tests {
             Integer((-9223372036854775808i64).into()),
             String("HexademicalNumber".to_owned()),
             Integer(0xdead_beef_u64.into()),
-            EndDictionary,
+            EndCollection,
         ];
 
         assert_eq!(events, comparison);

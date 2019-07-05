@@ -421,8 +421,7 @@ impl<T: Iterator<Item = Result<Event, Error>>> Builder<T> {
             Some(Event::Real(f)) => Ok(Value::Real(f)),
             Some(Event::String(s)) => Ok(Value::String(s)),
 
-            Some(Event::EndArray) => Err(Error::InvalidData),
-            Some(Event::EndDictionary) => Err(Error::InvalidData),
+            Some(Event::EndCollection) => Err(Error::InvalidData),
 
             Some(Event::__Nonexhaustive) => unreachable!(),
 
@@ -439,7 +438,7 @@ impl<T: Iterator<Item = Result<Event, Error>>> Builder<T> {
 
         loop {
             self.bump()?;
-            if let Some(Event::EndArray) = self.token {
+            if let Some(Event::EndCollection) = self.token {
                 self.token.take();
                 return Ok(values);
             }
@@ -453,7 +452,7 @@ impl<T: Iterator<Item = Result<Event, Error>>> Builder<T> {
         loop {
             self.bump()?;
             match self.token.take() {
-                Some(Event::EndDictionary) => return Ok(dict),
+                Some(Event::EndCollection) => return Ok(dict),
                 Some(Event::String(s)) => {
                     self.bump()?;
                     dict.insert(s, self.build_value()?);
@@ -525,12 +524,12 @@ mod tests {
             StartArray(None),
             String("It is a tale told by an idiot,".to_owned()),
             String("Full of sound and fury, signifying nothing.".to_owned()),
-            EndArray,
+            EndCollection,
             String("Birthdate".to_owned()),
             Integer(1564.into()),
             String("Height".to_owned()),
             Real(1.60),
-            EndDictionary,
+            EndCollection,
         ];
 
         let builder = Builder::new(events.into_iter().map(|e| Ok(e)));

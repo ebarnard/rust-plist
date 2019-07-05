@@ -146,13 +146,6 @@ impl<W: Write> Writer for XmlWriter<W> {
         })
     }
 
-    fn write_end_array(&mut self) -> Result<(), Error> {
-        self.write_value_event(|this| match this.stack.pop() {
-            Some(Element::Array) => this.end_element("array"),
-            _ => Err(Error::InvalidData),
-        })
-    }
-
     fn write_start_dictionary(&mut self, _len: Option<u64>) -> Result<(), Error> {
         self.write_value_event(|this| {
             this.start_element("dict")?;
@@ -161,20 +154,19 @@ impl<W: Write> Writer for XmlWriter<W> {
         })
     }
 
-    fn write_end_dictionary(&mut self) -> Result<(), Error> {
+    fn write_end_collection(&mut self) -> Result<(), Error> {
         self.write_event(|this| {
-            if this.expecting_key {
-                match this.stack.pop() {
-                    Some(Element::Dictionary) => {
-                        this.end_element("dict")?;
-                        this.expecting_key = this.stack.last() == Some(&Element::Dictionary);
-                        Ok(())
-                    }
-                    _ => Err(Error::InvalidData),
+            match this.stack.pop() {
+                Some(Element::Dictionary) if this.expecting_key => {
+                    this.end_element("dict")?;
                 }
-            } else {
-                Err(Error::InvalidData)
+                Some(Element::Array) if !this.expecting_key => {
+                    this.end_element("array")?;
+                }
+                _ => return Err(Error::InvalidData),
             }
+            this.expecting_key = this.stack.last() == Some(&Element::Dictionary);
+            Ok(())
         })
     }
 
@@ -283,7 +275,7 @@ mod tests {
             Event::String("It is a tale told by an idiot,".to_owned()),
             Event::String("Full of sound and fury, signifying nothing.".to_owned()),
             Event::Data((0..128).collect::<Vec<_>>()),
-            Event::EndArray,
+            Event::EndCollection,
             Event::String("Death".to_owned()),
             Event::Integer(1564.into()),
             Event::String("Height".to_owned()),
@@ -298,7 +290,7 @@ mod tests {
             Event::Integer(18446744073709551615u64.into()),
             Event::String("SmallestNumber".to_owned()),
             Event::Integer((-9223372036854775808i64).into()),
-            Event::EndDictionary,
+            Event::EndCollection,
         ];
 
         let mut cursor = Cursor::new(Vec::new());

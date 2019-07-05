@@ -182,8 +182,7 @@ impl<R: Read + Seek> BinaryReader<R> {
                 // We're at the end of an array or dict. Pop the top stack item and return.
                 let stack_item = self.pop_stack_item();
                 match stack_item.ty {
-                    StackType::Array => return Ok(Some(Event::EndArray)),
-                    StackType::Dict => return Ok(Some(Event::EndDictionary)),
+                    StackType::Array | StackType::Dict => return Ok(Some(Event::EndCollection)),
                 }
             }
         };
@@ -375,12 +374,12 @@ mod tests {
             StartArray(Some(2)),
             String("It is a tale told by an idiot,".into()),
             String("Full of sound and fury, signifying nothing.".into()),
-            EndArray,
+            EndCollection,
             String("Death".into()),
             Integer(1564.into()),
             String("Blank".into()),
             String("".into()),
-            EndDictionary,
+            EndCollection,
         ];
 
         assert_eq!(events, comparison);

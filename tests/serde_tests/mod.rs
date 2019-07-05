@@ -67,7 +67,7 @@ fn cow() {
         Event::StartDictionary(Some(1)),
         Event::String("Cow".to_owned()),
         Event::String("".to_owned()),
-        Event::EndDictionary,
+        Event::EndCollection,
     ];
 
     assert_roundtrip(cow, Some(comparison));
@@ -98,11 +98,11 @@ fn dog() {
         Event::StartArray(Some(2)),
         Event::String("a".to_owned()),
         Event::String("b".to_owned()),
-        Event::EndArray,
-        Event::EndDictionary,
-        Event::EndArray,
-        Event::EndDictionary,
-        Event::EndDictionary,
+        Event::EndCollection,
+        Event::EndCollection,
+        Event::EndCollection,
+        Event::EndCollection,
+        Event::EndCollection,
     ];
 
     assert_roundtrip(dog, Some(comparison));
@@ -122,7 +122,7 @@ fn frog() {
         Event::StartDictionary(Some(1)),
         Event::String("Ok".to_owned()),
         Event::String("hello".to_owned()),
-        Event::EndDictionary,
+        Event::EndCollection,
         Event::StartDictionary(Some(1)),
         Event::String("Some".to_owned()),
         Event::StartArray(Some(5)),
@@ -131,10 +131,10 @@ fn frog() {
         Event::Real(3.14159),
         Event::Real(0.000000001),
         Event::Real(1.27e31),
-        Event::EndArray,
-        Event::EndDictionary,
-        Event::EndArray,
-        Event::EndDictionary,
+        Event::EndCollection,
+        Event::EndCollection,
+        Event::EndCollection,
+        Event::EndCollection,
     ];
 
     assert_roundtrip(frog, Some(comparison));
@@ -167,9 +167,9 @@ fn cat_with_firmware() {
         Event::Integer(6.into()),
         Event::Integer(7.into()),
         Event::Integer(8.into()),
-        Event::EndArray,
-        Event::EndDictionary,
-        Event::EndDictionary,
+        Event::EndCollection,
+        Event::EndCollection,
+        Event::EndCollection,
     ];
 
     assert_roundtrip(cat, Some(comparison));
@@ -191,8 +191,8 @@ fn cat_without_firmware() {
         Event::Integer(12.into()),
         Event::String("name".to_owned()),
         Event::String("Paws".to_owned()),
-        Event::EndDictionary,
-        Event::EndDictionary,
+        Event::EndCollection,
+        Event::EndCollection,
     ];
 
     assert_roundtrip(cat, Some(comparison));
@@ -213,7 +213,7 @@ fn newtype_struct() {
         Event::Integer(34.into()),
         Event::Integer(32.into()),
         Event::Integer(13.into()),
-        Event::EndArray,
+        Event::EndCollection,
     ];
 
     assert_roundtrip(newtype, Some(comparison));
@@ -248,16 +248,16 @@ fn type_with_options() {
         Event::StartDictionary(Some(1)),
         Event::String("None".to_owned()),
         Event::String("".to_owned()),
-        Event::EndDictionary,
+        Event::EndCollection,
         Event::String("c".to_owned()),
         Event::StartDictionary(None),
         Event::String("b".to_owned()),
         Event::StartDictionary(Some(1)),
         Event::String("Some".to_owned()),
         Event::Integer(12.into()),
-        Event::EndDictionary,
-        Event::EndDictionary,
-        Event::EndDictionary,
+        Event::EndCollection,
+        Event::EndCollection,
+        Event::EndCollection,
     ];
 
     assert_roundtrip(obj, Some(comparison));
@@ -284,7 +284,7 @@ fn type_with_date() {
         Event::Integer(28.into()),
         Event::String("b".to_owned()),
         Event::Date(date),
-        Event::EndDictionary,
+        Event::EndCollection,
     ];
 
     assert_roundtrip(obj, Some(comparison));
@@ -316,7 +316,7 @@ fn option_some_some() {
         Event::StartDictionary(Some(1)),
         Event::String("Some".to_owned()),
         Event::Integer(12.into()),
-        Event::EndDictionary,
+        Event::EndCollection,
     ];
 
     assert_roundtrip(obj, Some(comparison));
@@ -330,7 +330,7 @@ fn option_some_none() {
         Event::StartDictionary(Some(1)),
         Event::String("None".to_owned()),
         Event::String("".to_owned()),
-        Event::EndDictionary,
+        Event::EndCollection,
     ];
 
     assert_roundtrip(obj, Some(comparison));
@@ -349,24 +349,24 @@ fn option_dictionary_values() {
         Event::StartDictionary(Some(1)),
         Event::String("None".to_owned()),
         Event::String("".to_owned()),
-        Event::EndDictionary,
+        Event::EndCollection,
         Event::String("b".to_owned()),
         Event::StartDictionary(Some(1)),
         Event::String("Some".to_owned()),
         Event::StartDictionary(Some(1)),
         Event::String("None".to_owned()),
         Event::String("".to_owned()),
-        Event::EndDictionary,
-        Event::EndDictionary,
+        Event::EndCollection,
+        Event::EndCollection,
         Event::String("c".to_owned()),
         Event::StartDictionary(Some(1)),
         Event::String("Some".to_owned()),
         Event::StartDictionary(Some(1)),
         Event::String("Some".to_owned()),
         Event::Integer(144.into()),
-        Event::EndDictionary,
-        Event::EndDictionary,
-        Event::EndDictionary,
+        Event::EndCollection,
+        Event::EndCollection,
+        Event::EndCollection,
     ];
 
     assert_roundtrip(obj, Some(comparison));
@@ -384,25 +384,25 @@ fn option_dictionary_keys() {
         Event::StartDictionary(Some(1)),
         Event::String("None".to_owned()),
         Event::String("".to_owned()),
-        Event::EndDictionary,
+        Event::EndCollection,
         Event::Integer(1.into()),
         Event::StartDictionary(Some(1)),
         Event::String("Some".to_owned()),
         Event::StartDictionary(Some(1)),
         Event::String("None".to_owned()),
         Event::String("".to_owned()),
-        Event::EndDictionary,
-        Event::EndDictionary,
+        Event::EndCollection,
+        Event::EndCollection,
         Event::Integer(2.into()),
         Event::StartDictionary(Some(1)),
         Event::String("Some".to_owned()),
         Event::StartDictionary(Some(1)),
         Event::String("Some".to_owned()),
         Event::Integer(144.into()),
-        Event::EndDictionary,
-        Event::EndDictionary,
+        Event::EndCollection,
+        Event::EndCollection,
         Event::Integer(3.into()),
-        Event::EndDictionary,
+        Event::EndCollection,
     ];
 
     assert_roundtrip(obj, Some(comparison));
@@ -417,22 +417,22 @@ fn option_array() {
         Event::StartDictionary(Some(1)),
         Event::String("None".to_owned()),
         Event::String("".to_owned()),
-        Event::EndDictionary,
+        Event::EndCollection,
         Event::StartDictionary(Some(1)),
         Event::String("Some".to_owned()),
         Event::StartDictionary(Some(1)),
         Event::String("None".to_owned()),
         Event::String("".to_owned()),
-        Event::EndDictionary,
-        Event::EndDictionary,
+        Event::EndCollection,
+        Event::EndCollection,
         Event::StartDictionary(Some(1)),
         Event::String("Some".to_owned()),
         Event::StartDictionary(Some(1)),
         Event::String("Some".to_owned()),
         Event::Integer(144.into()),
-        Event::EndDictionary,
-        Event::EndDictionary,
-        Event::EndArray,
+        Event::EndCollection,
+        Event::EndCollection,
+        Event::EndCollection,
     ];
 
     assert_roundtrip(obj, Some(comparison));

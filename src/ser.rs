@@ -62,19 +62,14 @@ impl<W: Writer> Serializer<W> {
         self.writer.write_start_array(len)
     }
 
-    fn write_end_array(&mut self) -> Result<(), Error> {
-        self.maybe_write_pending_struct_field_name()?;
-        self.writer.write_end_array()
-    }
-
     fn write_start_dictionary(&mut self, len: Option<u64>) -> Result<(), Error> {
         self.maybe_write_pending_struct_field_name()?;
         self.writer.write_start_dictionary(len)
     }
 
-    fn write_end_dictionary(&mut self) -> Result<(), Error> {
+    fn write_end_collection(&mut self) -> Result<(), Error> {
         self.maybe_write_pending_struct_field_name()?;
-        self.writer.write_end_dictionary()
+        self.writer.write_end_collection()
     }
 
     fn write_boolean(&mut self, value: bool) -> Result<(), Error> {
@@ -186,7 +181,7 @@ impl<'a, W: Writer> ser::Serializer for &'a mut Serializer<W> {
                 self.write_start_dictionary(Some(1))?;
                 self.write_string("None")?;
                 self.serialize_unit()?;
-                self.write_end_dictionary()?;
+                self.write_end_collection()?;
             }
         }
         Ok(())
@@ -205,7 +200,7 @@ impl<'a, W: Writer> ser::Serializer for &'a mut Serializer<W> {
                 self.write_start_dictionary(Some(1))?;
                 self.write_string("Some")?;
                 value.serialize(&mut *self)?;
-                self.write_end_dictionary()?;
+                self.write_end_collection()?;
             }
         }
         Ok(())
@@ -228,7 +223,7 @@ impl<'a, W: Writer> ser::Serializer for &'a mut Serializer<W> {
         self.write_start_dictionary(Some(1))?;
         self.write_string(variant)?;
         self.serialize_unit()?;
-        self.write_end_dictionary()
+        self.write_end_collection()
     }
 
     fn serialize_newtype_struct<T: ?Sized + ser::Serialize>(
@@ -253,7 +248,7 @@ impl<'a, W: Writer> ser::Serializer for &'a mut Serializer<W> {
         self.write_start_dictionary(Some(1))?;
         self.write_string(variant)?;
         value.serialize(&mut *self)?;
-        self.write_end_dictionary()
+        self.write_end_collection()
     }
 
     fn serialize_seq(self, len: Option<usize>) -> Result<Self::SerializeSeq, Error> {
@@ -491,7 +486,7 @@ impl<'a, W: Writer> ser::SerializeSeq for Compound<'a, W> {
     }
 
     fn end(self) -> Result<Self::Ok, Self::Error> {
-        self.ser.write_end_array()
+        self.ser.write_end_collection()
     }
 }
 
@@ -505,7 +500,7 @@ impl<'a, W: Writer> ser::SerializeTuple for Compound<'a, W> {
     }
 
     fn end(self) -> Result<(), Error> {
-        self.ser.write_end_array()
+        self.ser.write_end_collection()
     }
 }
 
@@ -519,7 +514,7 @@ impl<'a, W: Writer> ser::SerializeTupleStruct for Compound<'a, W> {
     }
 
     fn end(self) -> Result<(), Error> {
-        self.ser.write_end_array()
+        self.ser.write_end_collection()
     }
 }
 
@@ -533,8 +528,8 @@ impl<'a, W: Writer> ser::SerializeTupleVariant for Compound<'a, W> {
     }
 
     fn end(self) -> Result<Self::Ok, Self::Error> {
-        self.ser.write_end_array()?;
-        self.ser.write_end_dictionary()
+        self.ser.write_end_collection()?;
+        self.ser.write_end_collection()
     }
 }
 
@@ -553,7 +548,7 @@ impl<'a, W: Writer> ser::SerializeMap for Compound<'a, W> {
     }
 
     fn end(self) -> Result<Self::Ok, Self::Error> {
-        self.ser.write_end_dictionary()
+        self.ser.write_end_collection()
     }
 }
 
@@ -573,7 +568,7 @@ impl<'a, W: Writer> ser::SerializeStruct for Compound<'a, W> {
     }
 
     fn end(self) -> Result<(), Error> {
-        self.ser.write_end_dictionary()
+        self.ser.write_end_collection()
     }
 }
 
@@ -591,8 +586,8 @@ impl<'a, W: Writer> ser::SerializeStructVariant for Compound<'a, W> {
     }
 
     fn end(self) -> Result<(), Error> {
-        self.ser.write_end_dictionary()?;
-        self.ser.write_end_dictionary()
+        self.ser.write_end_collection()?;
+        self.ser.write_end_collection()
     }
 }
 

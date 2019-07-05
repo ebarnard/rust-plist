@@ -102,18 +102,16 @@ where
             Event::StartArray(len) => {
                 let len = len.and_then(u64_to_usize);
                 let ret = visitor.visit_seq(MapAndSeqAccess::new(self, false, len))?;
-                expect!(self.events.next(), Event::EndArray);
+                expect!(self.events.next(), Event::EndCollection);
                 Ok(ret)
             }
-            Event::EndArray => Err(event_mismatch_error()),
-
             Event::StartDictionary(len) => {
                 let len = len.and_then(u64_to_usize);
                 let ret = visitor.visit_map(MapAndSeqAccess::new(self, false, len))?;
-                expect!(self.events.next(), Event::EndDictionary);
+                expect!(self.events.next(), Event::EndCollection);
                 Ok(ret)
             }
-            Event::EndDictionary => Err(event_mismatch_error()),
+            Event::EndCollection => Err(event_mismatch_error()),
 
             Event::Boolean(v) => visitor.visit_bool(v),
             Event::Data(v) => visitor.visit_byte_buf(v),
@@ -176,7 +174,7 @@ where
                     _ => return Err(event_mismatch_error()),
                 };
 
-                expect!(self.events.next(), Event::EndDictionary);
+                expect!(self.events.next(), Event::EndCollection);
 
                 Ok(ret)
             }
@@ -205,7 +203,7 @@ where
     {
         expect!(self.events.next(), Event::StartDictionary(_));
         let ret = visitor.visit_map(MapAndSeqAccess::new(self, true, None))?;
-        expect!(self.events.next(), Event::EndDictionary);
+        expect!(self.events.next(), Event::EndCollection);
         Ok(ret)
     }
 
@@ -220,7 +218,7 @@ where
     {
         expect!(self.events.next(), Event::StartDictionary(_));
         let ret = visitor.visit_enum(&mut *self)?;
-        expect!(self.events.next(), Event::EndDictionary);
+        expect!(self.events.next(), Event::EndCollection);
         Ok(ret)
     }
 }
@@ -313,7 +311,7 @@ where
     where
         T: de::DeserializeSeed<'de>,
     {
-        if let Some(&Ok(Event::EndArray)) = self.de.events.peek() {
+        if let Some(&Ok(Event::EndCollection)) = self.de.events.peek() {
             return Ok(None);
         }
 
@@ -338,7 +336,7 @@ where
     where
         K: de::DeserializeSeed<'de>,
     {
-        if let Some(&Ok(Event::EndDictionary)) = self.de.events.peek() {
+        if let Some(&Ok(Event::EndCollection)) = self.de.events.peek() {
             return Ok(None);
         }
 
