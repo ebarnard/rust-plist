@@ -7,10 +7,7 @@ use xml_rs::{
     writer::{EmitterConfig, Error as XmlWriterError, EventWriter, XmlEvent},
 };
 
-use crate::{
-    stream::{Event, Writer},
-    Date, Error, Integer,
-};
+use crate::{stream::Writer, Date, Error, Integer};
 
 static XML_PROLOGUE: &str = r#"<?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
@@ -88,10 +85,6 @@ impl<W: Write> XmlWriter<W> {
     fn write_value(&mut self, value: &str) -> Result<(), Error> {
         self.xml_writer.write(XmlEvent::Characters(value))?;
         Ok(())
-    }
-
-    pub fn write(&mut self, event: &Event) -> Result<(), Error> {
-        <Self as Writer>::write(self, event)
     }
 
     pub fn into_inner(self) -> W {

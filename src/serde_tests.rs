@@ -1,9 +1,73 @@
-use plist::{
-    stream::{Event, VecWriter},
-    Date, Deserializer, Error, Serializer,
-};
 use serde::{de::DeserializeOwned, ser::Serialize};
 use std::{collections::BTreeMap, fmt::Debug, time::SystemTime};
+
+use crate::{
+    stream::{private::Sealed, Event, Writer},
+    Date, Deserializer, Error, Integer, Serializer,
+};
+
+struct VecWriter {
+    events: Vec<Event>,
+}
+
+impl VecWriter {
+    pub fn new() -> VecWriter {
+        VecWriter { events: Vec::new() }
+    }
+
+    pub fn into_inner(self) -> Vec<Event> {
+        self.events
+    }
+}
+
+impl Writer for VecWriter {
+    fn write_start_array(&mut self, len: Option<u64>) -> Result<(), Error> {
+        self.events.push(Event::StartArray(len));
+        Ok(())
+    }
+
+    fn write_start_dictionary(&mut self, len: Option<u64>) -> Result<(), Error> {
+        self.events.push(Event::StartDictionary(len));
+        Ok(())
+    }
+
+    fn write_end_collection(&mut self) -> Result<(), Error> {
+        self.events.push(Event::EndCollection);
+        Ok(())
+    }
+
+    fn write_boolean(&mut self, value: bool) -> Result<(), Error> {
+        self.events.push(Event::Boolean(value));
+        Ok(())
+    }
+
+    fn write_data(&mut self, value: &[u8]) -> Result<(), Error> {
+        self.events.push(Event::Data(value.to_owned()));
+        Ok(())
+    }
+
+    fn write_date(&mut self, value: Date) -> Result<(), Error> {
+        self.events.push(Event::Date(value));
+        Ok(())
+    }
+
+    fn write_integer(&mut self, value: Integer) -> Result<(), Error> {
+        self.events.push(Event::Integer(value));
+        Ok(())
+    }
+
+    fn write_real(&mut self, value: f64) -> Result<(), Error> {
+        self.events.push(Event::Real(value));
+        Ok(())
+    }
+
+    fn write_string(&mut self, value: &str) -> Result<(), Error> {
+        self.events.push(Event::String(value.to_owned()));
+        Ok(())
+    }
+}
+
+impl Sealed for VecWriter {}
 
 fn new_serializer() -> Serializer<VecWriter> {
     Serializer::new(VecWriter::new())
