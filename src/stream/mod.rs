@@ -202,73 +202,10 @@ pub trait Writer: private::Sealed {
     fn write_string(&mut self, value: &str) -> Result<(), Error>;
 }
 
-#[doc(hidden)]
-pub struct VecWriter {
-    events: Vec<Event>,
-}
-
-impl VecWriter {
-    pub fn new() -> VecWriter {
-        VecWriter { events: Vec::new() }
-    }
-
-    pub fn into_inner(self) -> Vec<Event> {
-        self.events
-    }
-}
-
-impl Writer for VecWriter {
-    fn write_start_array(&mut self, len: Option<u64>) -> Result<(), Error> {
-        self.events.push(Event::StartArray(len));
-        Ok(())
-    }
-
-    fn write_start_dictionary(&mut self, len: Option<u64>) -> Result<(), Error> {
-        self.events.push(Event::StartDictionary(len));
-        Ok(())
-    }
-
-    fn write_end_collection(&mut self) -> Result<(), Error> {
-        self.events.push(Event::EndCollection);
-        Ok(())
-    }
-
-    fn write_boolean(&mut self, value: bool) -> Result<(), Error> {
-        self.events.push(Event::Boolean(value));
-        Ok(())
-    }
-
-    fn write_data(&mut self, value: &[u8]) -> Result<(), Error> {
-        self.events.push(Event::Data(value.to_owned()));
-        Ok(())
-    }
-
-    fn write_date(&mut self, value: Date) -> Result<(), Error> {
-        self.events.push(Event::Date(value));
-        Ok(())
-    }
-
-    fn write_integer(&mut self, value: Integer) -> Result<(), Error> {
-        self.events.push(Event::Integer(value));
-        Ok(())
-    }
-
-    fn write_real(&mut self, value: f64) -> Result<(), Error> {
-        self.events.push(Event::Real(value));
-        Ok(())
-    }
-
-    fn write_string(&mut self, value: &str) -> Result<(), Error> {
-        self.events.push(Event::String(value.to_owned()));
-        Ok(())
-    }
-}
-
-mod private {
+pub(crate) mod private {
     use std::io::Write;
 
     pub trait Sealed {}
 
     impl<W: Write> Sealed for super::XmlWriter<W> {}
-    impl Sealed for super::VecWriter {}
 }

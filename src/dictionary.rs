@@ -1,15 +1,13 @@
 //! A map of String to plist::Value.
 //!
-//! The map is backed by a [`BTreeMap`].
+//! The map is currently backed by a [`BTreeMap`]. This may be changed in a future minor release.
 //!
 //! [`BTreeMap`]: https://doc.rust-lang.org/std/collections/struct.BTreeMap.html
 
 //use serde::{de, ser};
 use std::{
-    borrow::Borrow,
     collections::{btree_map, BTreeMap},
     fmt::{self, Debug},
-    hash::Hash,
     iter::FromIterator,
     ops,
 };
@@ -37,41 +35,20 @@ impl Dictionary {
     }
 
     /// Returns a reference to the value corresponding to the key.
-    ///
-    /// The key may be any borrowed form of the dictionary's key type, but the ordering on the
-    /// borrowed form *must* match the ordering on the key type.
     #[inline]
-    pub fn get<Q: ?Sized>(&self, key: &Q) -> Option<&Value>
-    where
-        String: Borrow<Q>,
-        Q: Ord + Eq + Hash,
-    {
+    pub fn get(&self, key: &str) -> Option<&Value> {
         self.map.get(key)
     }
 
     /// Returns true if the dictionary contains a value for the specified key.
-    ///
-    /// The key may be any borrowed form of the dictionary's key type, but the ordering on the
-    /// borrowed form *must* match the ordering on the key type.
     #[inline]
-    pub fn contains_key<Q: ?Sized>(&self, key: &Q) -> bool
-    where
-        String: Borrow<Q>,
-        Q: Ord + Eq + Hash,
-    {
+    pub fn contains_key(&self, key: &str) -> bool {
         self.map.contains_key(key)
     }
 
     /// Returns a mutable reference to the value corresponding to the key.
-    ///
-    /// The key may be any borrowed form of the dictionary's key type, but the ordering on the
-    /// borrowed form *must* match the ordering on the key type.
     #[inline]
-    pub fn get_mut<Q: ?Sized>(&mut self, key: &Q) -> Option<&mut Value>
-    where
-        String: Borrow<Q>,
-        Q: Ord + Eq + Hash,
-    {
+    pub fn get_mut(&mut self, key: &str) -> Option<&mut Value> {
         self.map.get_mut(key)
     }
 
@@ -88,19 +65,18 @@ impl Dictionary {
 
     /// Removes a key from the dictionary, returning the value at the key if the key was previously
     /// in the dictionary.
-    ///
-    /// The key may be any borrowed form of the dictionary's key type, but the ordering on the
-    /// borrowed form *must* match the ordering on the key type.
     #[inline]
-    pub fn remove<Q: ?Sized>(&mut self, key: &Q) -> Option<Value>
-    where
-        String: Borrow<Q>,
-        Q: Ord + Eq + Hash,
-    {
+    pub fn remove(&mut self, key: &str) -> Option<Value> {
         self.map.remove(key)
     }
 
     /// Gets the given key's corresponding entry in the dictionary for in-place manipulation.
+    // Entry functionality is unstable until I can figure out how to use either Cow<str> or
+    // T: AsRef<str> + Into<String>
+    #[cfg(any(
+        test,
+        feature = "enable_unstable_features_that_may_break_with_minor_version_bumps"
+    ))]
     pub fn entry<S>(&mut self, key: S) -> Entry
     where
         S: Into<String>,
@@ -206,14 +182,10 @@ impl PartialEq for Dictionary {
 /// }
 /// # ;
 /// ```
-impl<'a, Q: ?Sized> ops::Index<&'a Q> for Dictionary
-where
-    String: Borrow<Q>,
-    Q: Ord + Eq + Hash,
-{
+impl<'a> ops::Index<&'a str> for Dictionary {
     type Output = Value;
 
-    fn index(&self, index: &Q) -> &Value {
+    fn index(&self, index: &str) -> &Value {
         self.map.index(index)
     }
 }
@@ -227,12 +199,8 @@ where
 /// #
 /// dict["key"] = "value".into();
 /// ```
-impl<'a, Q: ?Sized> ops::IndexMut<&'a Q> for Dictionary
-where
-    String: Borrow<Q>,
-    Q: Ord + Eq + Hash,
-{
-    fn index_mut(&mut self, index: &Q) -> &mut Value {
+impl<'a> ops::IndexMut<&'a str> for Dictionary {
+    fn index_mut(&mut self, index: &str) -> &mut Value {
         self.map.get_mut(index).expect("no entry found for key")
     }
 }
@@ -336,12 +304,12 @@ macro_rules! delegate_iterator {
             }
         }
 
-        impl $($generics)* DoubleEndedIterator for $name $($generics)* {
+        /*impl $($generics)* DoubleEndedIterator for $name $($generics)* {
             #[inline]
             fn next_back(&mut self) -> Option<Self::Item> {
                 self.iter.next_back()
             }
-        }
+        }*/
 
         impl $($generics)* ExactSizeIterator for $name $($generics)* {
             #[inline]
@@ -359,6 +327,10 @@ macro_rules! delegate_iterator {
 ///
 /// [`entry`]: struct.Dictionary.html#method.entry
 /// [`Dictionary`]: struct.Dictionary.html
+#[cfg(any(
+    test,
+    feature = "enable_unstable_features_that_may_break_with_minor_version_bumps"
+))]
 pub enum Entry<'a> {
     /// A vacant Entry.
     Vacant(VacantEntry<'a>),
@@ -369,6 +341,10 @@ pub enum Entry<'a> {
 /// A vacant Entry. It is part of the [`Entry`] enum.
 ///
 /// [`Entry`]: enum.Entry.html
+#[cfg(any(
+    test,
+    feature = "enable_unstable_features_that_may_break_with_minor_version_bumps"
+))]
 pub struct VacantEntry<'a> {
     vacant: btree_map::VacantEntry<'a, String, Value>,
 }
@@ -376,10 +352,18 @@ pub struct VacantEntry<'a> {
 /// An occupied Entry. It is part of the [`Entry`] enum.
 ///
 /// [`Entry`]: enum.Entry.html
+#[cfg(any(
+    test,
+    feature = "enable_unstable_features_that_may_break_with_minor_version_bumps"
+))]
 pub struct OccupiedEntry<'a> {
     occupied: btree_map::OccupiedEntry<'a, String, Value>,
 }
 
+#[cfg(any(
+    test,
+    feature = "enable_unstable_features_that_may_break_with_minor_version_bumps"
+))]
 impl<'a> Entry<'a> {
     /// Returns a reference to this entry's key.
     ///
@@ -436,6 +420,10 @@ impl<'a> Entry<'a> {
     }
 }
 
+#[cfg(any(
+    test,
+    feature = "enable_unstable_features_that_may_break_with_minor_version_bumps"
+))]
 impl<'a> VacantEntry<'a> {
     /// Gets a reference to the key that would be used when inserting a value through the
     /// VacantEntry.
@@ -478,6 +466,10 @@ impl<'a> VacantEntry<'a> {
     }
 }
 
+#[cfg(any(
+    test,
+    feature = "enable_unstable_features_that_may_break_with_minor_version_bumps"
+))]
 impl<'a> OccupiedEntry<'a> {
     /// Gets a reference to the key in the entry.
     ///

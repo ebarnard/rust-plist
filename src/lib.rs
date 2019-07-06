@@ -53,7 +53,11 @@
 //! ```
 
 pub mod dictionary;
+
+#[cfg(feature = "enable_unstable_features_that_may_break_with_minor_version_bumps")]
 pub mod stream;
+#[cfg(not(feature = "enable_unstable_features_that_may_break_with_minor_version_bumps"))]
+mod stream;
 
 mod date;
 mod integer;
@@ -72,10 +76,26 @@ extern crate serde;
 mod de;
 #[cfg(feature = "serde")]
 mod ser;
+#[cfg(all(
+    feature = "serde",
+    any(
+        test,
+        feature = "enable_unstable_features_that_may_break_with_minor_version_bumps"
+    )
+))]
+pub use self::{de::Deserializer, ser::Serializer};
 #[cfg(feature = "serde")]
-pub use self::de::{from_file, from_reader, from_reader_xml, Deserializer};
-#[cfg(feature = "serde")]
-pub use self::ser::{to_writer_xml, Serializer};
+pub use self::{
+    de::{from_file, from_reader, from_reader_xml},
+    ser::to_writer_xml,
+};
+
+#[cfg(all(test, feature = "serde"))]
+#[macro_use]
+extern crate serde_derive;
+
+#[cfg(all(test, feature = "serde"))]
+mod serde_tests;
 
 use std::{fmt, io};
 

@@ -58,6 +58,7 @@ impl Value {
     }
 
     /// Creates a `Value` from an event source.
+    #[cfg(feature = "enable_unstable_features_that_may_break_with_minor_version_bumps")]
     pub fn from_events<T>(events: T) -> Result<Value, Error>
     where
         T: IntoIterator<Item = Result<Event, Error>>,
@@ -65,8 +66,24 @@ impl Value {
         Builder::new(events.into_iter()).build()
     }
 
+    /// Creates a `Value` from an event source.
+    #[cfg(not(feature = "enable_unstable_features_that_may_break_with_minor_version_bumps"))]
+    pub(crate) fn from_events<T>(events: T) -> Result<Value, Error>
+    where
+        T: IntoIterator<Item = Result<Event, Error>>,
+    {
+        Builder::new(events.into_iter()).build()
+    }
+
     /// Converts a `Value` into an `Event` stream.
+    #[cfg(feature = "enable_unstable_features_that_may_break_with_minor_version_bumps")]
     pub fn into_events(self) -> IntoEvents {
+        IntoEvents::new(self)
+    }
+
+    /// Converts a `Value` into an `Event` stream.
+    #[cfg(not(feature = "enable_unstable_features_that_may_break_with_minor_version_bumps"))]
+    pub(crate) fn into_events(self) -> IntoEvents {
         IntoEvents::new(self)
     }
 
