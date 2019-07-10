@@ -9,7 +9,11 @@ use std::{
     num::NonZeroUsize,
 };
 
-use crate::{stream::Writer, Date, Error, Integer, Uid};
+use crate::{
+    error::{self, Error, ErrorKind, EventKind},
+    stream::Writer,
+    Date, Integer, Uid,
+};
 
 pub struct BinaryWriter<W: Write> {
     writer: PosWriter<W>,
@@ -121,8 +125,15 @@ impl<W: Write> BinaryWriter<W> {
 
     fn write_start_collection(&mut self, ty: CollectionType) -> Result<(), Error> {
         if self.expecting_dictionary_key() {
-            // Error: Expecting dictionary key
-            return Err(Error::InvalidData);
+            let ty_event_kind = match ty {
+                CollectionType::Array => EventKind::StartArray,
+                CollectionType::Dictionary => EventKind::StartDictionary,
+            };
+            return Err(ErrorKind::UnexpectedEventType {
+                expected: EventKind::DictionaryKeyOrEndCollection,
+                found: ty_event_kind,
+            }
+            .without_position());
         }
         self.increment_current_collection_len();
         self.collection_stack.push(self.events.len());
@@ -137,8 +148,13 @@ impl<W: Write> BinaryWriter<W> {
     }
 
     fn write_end_collection(&mut self) -> Result<(), Error> {
-        // Error: unpaired end array
-        let collection_event_index = self.collection_stack.pop().ok_or(Error::InvalidData)?;
+        let collection_event_index = self.collection_stack.pop().ok_or_else(|| {
+            ErrorKind::UnexpectedEventType {
+                expected: EventKind::ValueOrStartCollection,
+                found: EventKind::EndCollection,
+            }
+            .without_position()
+        })?;
 
         let current_event_index = self.events.len() - 1;
         let c = if let Event::Collection(c) = &mut self.events[collection_event_index] {
@@ -152,8 +168,11 @@ impl<W: Write> BinaryWriter<W> {
         if let CollectionType::Dictionary = c.ty {
             // Ensure that every dictionary key is paired with a value.
             if !is_even(c.len) {
-                // Error: Expecting dictionary key
-                return Err(Error::InvalidData);
+                return Err(ErrorKind::UnexpectedEventType {
+                    expected: EventKind::DictionaryKeyOrEndCollection,
+                    found: EventKind::EndCollection,
+                }
+                .without_position());
             }
 
             // Fix up the dictionary length. It should contain the number of key-value pairs,
@@ -188,8 +207,13 @@ impl<W: Write> BinaryWriter<W> {
         // Ensure that all dictionary keys are strings.
         match (&value, expecting_dictionary_key) {
             (Value::String(_), true) | (_, false) => (),
-            // Error: Expecting dictionary key
-            (_, true) => return Err(Error::InvalidData),
+            (_, true) => {
+                return Err(ErrorKind::UnexpectedEventType {
+                    expected: EventKind::DictionaryKeyOrEndCollection,
+                    found: value.event_kind(),
+                }
+                .without_position())
+            }
         }
 
         // Deduplicate `value`. There is one entry in `values` for each unqiue `Value` in the
@@ -246,7 +270,7 @@ impl<W: Write> BinaryWriter<W> {
         assert!(self.collection_stack.is_empty());
 
         // Write header
-        self.writer.write_all(b"bplist00")?;
+        self.writer.write_exact(b"bplist00")?;
 
         // Write objects
         let mut events_vec = mem::replace(&mut self.events, Vec::new());
@@ -312,9 +336,11 @@ impl<W: Write> BinaryWriter<W> {
         trailer[7] = ref_size;
         trailer[8..16].copy_from_slice(&(self.num_objects as u64).to_be_bytes());
         trailer[24..32].copy_from_slice(&offset_table_offset.to_be_bytes());
-        self.writer.write_all(&trailer)?;
+        self.writer.write_exact(&trailer)?;
 
-        self.writer.flush()?;
+        self.writer
+            .flush()
+            .map_err(error::from_io_without_position)?;
 
         // Reset plist writer
         self.writer.pos = 0;
@@ -428,44 +454,44 @@ impl<W: Write> BinaryWriter<W> {
 
         match value {
             Value::Boolean(true) => {
-                self.writer.write_all(&[0x08])?;
+                self.writer.write_exact(&[0x08])?;
             }
             Value::Boolean(false) => {
-                self.writer.write_all(&[0x09])?;
+                self.writer.write_exact(&[0x09])?;
             }
             Value::Data(v) => {
                 write_plist_value_ty_and_size(&mut self.writer, 0x40, v.len())?;
-                self.writer.write_all(&v[..])?;
+                self.writer.write_exact(&v[..])?;
             }
             Value::Date(v) => {
                 let secs = v.to_seconds_since_plist_epoch();
                 let mut buf: [_; 9] = [0x33, 0, 0, 0, 0, 0, 0, 0, 0];
                 buf[1..].copy_from_slice(&secs.to_bits().to_be_bytes());
-                self.writer.write_all(&buf)?;
+                self.writer.write_exact(&buf)?;
             }
             Value::Integer(v) => {
                 if let Some(v) = v.as_signed() {
                     if v >= 0 && v <= i64::from(u8::max_value()) {
-                        self.writer.write_all(&[0x10, v as u8])?;
+                        self.writer.write_exact(&[0x10, v as u8])?;
                     } else if v >= 0 && v <= i64::from(u16::max_value()) {
                         let mut buf: [_; 3] = [0x11, 0, 0];
                         buf[1..].copy_from_slice(&(v as u16).to_be_bytes());
-                        self.writer.write_all(&buf)?;
+                        self.writer.write_exact(&buf)?;
                     } else if v >= 0 && v <= i64::from(u32::max_value()) {
                         let mut buf: [_; 5] = [0x12, 0, 0, 0, 0];
                         buf[1..].copy_from_slice(&(v as u32).to_be_bytes());
-                        self.writer.write_all(&buf)?;
+                        self.writer.write_exact(&buf)?;
                     } else {
                         let mut buf: [_; 9] = [0x13, 0, 0, 0, 0, 0, 0, 0, 0];
                         buf[1..].copy_from_slice(&v.to_be_bytes());
-                        self.writer.write_all(&buf)?;
+                        self.writer.write_exact(&buf)?;
                     }
                 } else if let Some(v) = v.as_unsigned() {
                     // `u64`s larger than `i64::max_value()` are stored as signed 128 bit
                     // integers.
                     let mut buf: [_; 17] = [0x14, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
                     buf[1..].copy_from_slice(&i128::from(v).to_be_bytes());
-                    self.writer.write_all(&buf)?;
+                    self.writer.write_exact(&buf)?;
                 } else {
                     unreachable!("an integer can be represented as either an i64 or u64");
                 }
@@ -473,36 +499,36 @@ impl<W: Write> BinaryWriter<W> {
             Value::Real(v) => {
                 let mut buf: [_; 9] = [0x23, 0, 0, 0, 0, 0, 0, 0, 0];
                 buf[1..].copy_from_slice(&v.to_be_bytes());
-                self.writer.write_all(&buf)?;
+                self.writer.write_exact(&buf)?;
             }
             Value::String(v) if v.is_ascii() => {
                 let ascii = v.as_bytes();
                 write_plist_value_ty_and_size(&mut self.writer, 0x50, ascii.len())?;
-                self.writer.write_all(ascii)?;
+                self.writer.write_exact(ascii)?;
             }
             Value::String(v) => {
                 let utf16_len = v.encode_utf16().count();
                 write_plist_value_ty_and_size(&mut self.writer, 0x60, utf16_len)?;
                 for c in v.encode_utf16() {
-                    self.writer.write_all(&c.to_be_bytes())?;
+                    self.writer.write_exact(&c.to_be_bytes())?;
                 }
             }
             Value::Uid(v) => {
                 let v = v.get();
                 if v <= u64::from(u8::max_value()) {
-                    self.writer.write_all(&[0x80, v as u8])?;
+                    self.writer.write_exact(&[0x80, v as u8])?;
                 } else if v <= u64::from(u16::max_value()) {
                     let mut buf: [_; 3] = [0x81, 0, 0];
                     buf[1..].copy_from_slice(&(v as u16).to_be_bytes());
-                    self.writer.write_all(&buf)?;
+                    self.writer.write_exact(&buf)?;
                 } else if v <= u64::from(u32::max_value()) {
                     let mut buf: [_; 5] = [0x83, 0, 0, 0, 0];
                     buf[1..].copy_from_slice(&(v as u32).to_be_bytes());
-                    self.writer.write_all(&buf)?;
+                    self.writer.write_exact(&buf)?;
                 } else {
                     let mut buf: [_; 9] = [0x87, 0, 0, 0, 0, 0, 0, 0, 0];
                     buf[1..].copy_from_slice(&(v as u64).to_be_bytes());
-                    self.writer.write_all(&buf)?;
+                    self.writer.write_exact(&buf)?;
                 }
             }
         }
@@ -558,26 +584,26 @@ fn value_mut<'a>(
 }
 
 fn write_plist_value_ty_and_size(
-    writer: &mut impl Write,
+    writer: &mut PosWriter<impl Write>,
     token: u8,
     size: usize,
 ) -> Result<(), Error> {
     if size < 0x0f {
-        writer.write_all(&[token | (size as u8)])?;
+        writer.write_exact(&[token | (size as u8)])?;
     } else if size <= u8::max_value() as usize {
-        writer.write_all(&[token | 0x0f, 0x10, size as u8])?;
+        writer.write_exact(&[token | 0x0f, 0x10, size as u8])?;
     } else if size <= u16::max_value() as usize {
         let mut buf: [_; 4] = [token | 0x0f, 0x11, 0, 0];
         buf[2..].copy_from_slice(&(size as u16).to_be_bytes());
-        writer.write_all(&buf)?;
+        writer.write_exact(&buf)?;
     } else if size <= u32::max_value() as usize {
         let mut buf: [_; 6] = [token | 0x0f, 0x12, 0, 0, 0, 0];
         buf[2..].copy_from_slice(&(size as u32).to_be_bytes());
-        writer.write_all(&buf)?;
+        writer.write_exact(&buf)?;
     } else {
         let mut buf: [_; 10] = [token | 0x0f, 0x13, 0, 0, 0, 0, 0, 0, 0, 0];
         buf[2..].copy_from_slice(&(size as u64).to_be_bytes());
-        writer.write_all(&buf)?;
+        writer.write_exact(&buf)?;
     }
     Ok(())
 }
@@ -590,15 +616,26 @@ fn plist_ref_size(max_value: usize) -> u8 {
     significant_bytes.next_power_of_two()
 }
 
-fn write_plist_ref(writer: &mut impl Write, ref_size: u8, value: usize) -> Result<(), Error> {
+fn write_plist_ref(
+    writer: &mut PosWriter<impl Write>,
+    ref_size: u8,
+    value: usize,
+) -> Result<(), Error> {
     match ref_size {
-        1 => writer.write_all(&[value as u8])?,
-        2 => writer.write_all(&(value as u16).to_be_bytes())?,
-        4 => writer.write_all(&(value as u32).to_be_bytes())?,
-        8 => writer.write_all(&(value as u64).to_be_bytes())?,
+        1 => writer.write_exact(&[value as u8]),
+        2 => writer.write_exact(&(value as u16).to_be_bytes()),
+        4 => writer.write_exact(&(value as u32).to_be_bytes()),
+        8 => writer.write_exact(&(value as u64).to_be_bytes()),
         _ => unreachable!("`ref_size` is a power of two less than or equal to 8"),
     }
-    Ok(())
+}
+
+impl<W: Write> PosWriter<W> {
+    fn write_exact(&mut self, buf: &[u8]) -> Result<(), Error> {
+        self.write_all(buf)
+            .map_err(error::from_io_without_position)?;
+        Ok(())
+    }
 }
 
 impl<W: Write> Write for PosWriter<W> {
@@ -642,6 +679,18 @@ impl<'a> Value<'a> {
             Value::Real(v) => Value::Real(v),
             Value::String(v) => Value::String(Cow::Owned(v.into_owned())),
             Value::Uid(v) => Value::Uid(v),
+        }
+    }
+
+    fn event_kind(&self) -> EventKind {
+        match self {
+            Value::Boolean(_) => EventKind::Boolean,
+            Value::Data(_) => EventKind::Data,
+            Value::Date(_) => EventKind::Date,
+            Value::Integer(_) => EventKind::Integer,
+            Value::Real(_) => EventKind::Real,
+            Value::String(_) => EventKind::String,
+            Value::Uid(_) => EventKind::Uid,
         }
     }
 }

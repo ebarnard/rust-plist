@@ -13,6 +13,8 @@ pub struct Date {
     inner: SystemTime,
 }
 
+pub(crate) struct InfiniteOrNanDate;
+
 impl Date {
     /// The unix timestamp of the plist epoch.
     const PLIST_EPOCH_UNIX_TIMESTAMP: Duration = Duration::from_secs(978_307_200);
@@ -27,12 +29,14 @@ impl Date {
         format!("{}", humantime::format_rfc3339(self.inner))
     }
 
-    pub(crate) fn from_seconds_since_plist_epoch(timestamp: f64) -> Result<Date, ()> {
+    pub(crate) fn from_seconds_since_plist_epoch(
+        timestamp: f64,
+    ) -> Result<Date, InfiniteOrNanDate> {
         // `timestamp` is the number of seconds since the plist epoch of 1/1/2001 00:00:00.
         let plist_epoch = UNIX_EPOCH + Date::PLIST_EPOCH_UNIX_TIMESTAMP;
 
         if !timestamp.is_finite() {
-            return Err(());
+            return Err(InfiniteOrNanDate);
         }
 
         let is_negative = timestamp < 0.0;

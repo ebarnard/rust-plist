@@ -9,23 +9,20 @@ use std::{
 };
 
 use crate::{
+    error::{self, Error, ErrorKind, EventKind},
     stream::{self, Event},
-    u64_to_usize, Error,
+    u64_to_usize,
 };
 
 macro_rules! expect {
-    ($next:expr, $pat:pat) => {
+    ($next:expr, $kind:expr) => {
         match $next {
-            Some(Ok(v @ $pat)) => v,
-            None => return Err(Error::UnexpectedEof),
-            _ => return Err(event_mismatch_error()),
-        }
-    };
-    ($next:expr, $pat:pat => $save:expr) => {
-        match $next {
-            Some(Ok($pat)) => $save,
-            None => return Err(Error::UnexpectedEof),
-            _ => return Err(event_mismatch_error()),
+            Some(Ok(ref event)) if EventKind::of_event(event) != $kind => {
+                return Err(error::unexpected_event_type($kind, event))?;
+            }
+            Some(Ok(event)) => event,
+            Some(Err(err)) => return Err(err),
+            None => return Err(ErrorKind::UnexpectedEndOfEventStream.without_position()),
         }
     };
 }
@@ -33,20 +30,17 @@ macro_rules! expect {
 macro_rules! try_next {
     ($next:expr) => {
         match $next {
-            Some(Ok(v)) => v,
-            Some(Err(_)) => return Err(event_mismatch_error()),
-            None => return Err(Error::UnexpectedEof),
+            Some(Ok(event)) => event,
+            Some(Err(err)) => return Err(err)?,
+            None => return Err(ErrorKind::UnexpectedEndOfEventStream.without_position())?,
         }
     };
 }
 
-fn event_mismatch_error() -> Error {
-    Error::InvalidData
-}
-
+#[doc(hidden)]
 impl de::Error for Error {
     fn custom<T: Display>(msg: T) -> Self {
-        Error::Serde(msg.to_string())
+        ErrorKind::Serde(msg.to_string()).without_position()
     }
 }
 
@@ -102,16 +96,19 @@ where
             Event::StartArray(len) => {
                 let len = len.and_then(u64_to_usize);
                 let ret = visitor.visit_seq(MapAndSeqAccess::new(self, false, len))?;
-                expect!(self.events.next(), Event::EndCollection);
+                expect!(self.events.next(), EventKind::EndCollection);
                 Ok(ret)
             }
             Event::StartDictionary(len) => {
                 let len = len.and_then(u64_to_usize);
                 let ret = visitor.visit_map(MapAndSeqAccess::new(self, false, len))?;
-                expect!(self.events.next(), Event::EndCollection);
+                expect!(self.events.next(), EventKind::EndCollection);
                 Ok(ret)
             }
-            Event::EndCollection => Err(event_mismatch_error()),
+            event @ Event::EndCollection => Err(error::unexpected_event_type(
+                EventKind::ValueOrStartCollection,
+                &event,
+            )),
 
             Event::Boolean(v) => visitor.visit_bool(v),
             Event::Data(v) => visitor.visit_byte_buf(v),
@@ -143,7 +140,7 @@ where
     where
         V: de::Visitor<'de>,
     {
-        expect!(self.events.next(), Event::String(_));
+        expect!(self.events.next(), EventKind::String);
         visitor.visit_unit()
     }
 
@@ -164,18 +161,18 @@ where
                 self.with_option_mode(OptionMode::Explicit, |this| Ok(visitor.visit_some(this)?))
             }
             OptionMode::Explicit => {
-                expect!(self.events.next(), Event::StartDictionary(_));
+                expect!(self.events.next(), EventKind::StartDictionary);
 
                 let ret = match try_next!(self.events.next()) {
                     Event::String(ref s) if &s[..] == "None" => {
-                        expect!(self.events.next(), Event::String(_));
+                        expect!(self.events.next(), EventKind::String);
                         visitor.visit_none::<Error>()?
                     }
                     Event::String(ref s) if &s[..] == "Some" => visitor.visit_some(&mut *self)?,
-                    _ => return Err(event_mismatch_error()),
+                    event => return Err(error::unexpected_event_type(EventKind::String, &event))?,
                 };
 
-                expect!(self.events.next(), Event::EndCollection);
+                expect!(self.events.next(), EventKind::EndCollection);
 
                 Ok(ret)
             }
@@ -202,9 +199,9 @@ where
     where
         V: de::Visitor<'de>,
     {
-        expect!(self.events.next(), Event::StartDictionary(_));
+        expect!(self.events.next(), EventKind::StartDictionary);
         let ret = visitor.visit_map(MapAndSeqAccess::new(self, true, None))?;
-        expect!(self.events.next(), Event::EndCollection);
+        expect!(self.events.next(), EventKind::EndCollection);
         Ok(ret)
     }
 
@@ -217,9 +214,9 @@ where
     where
         V: de::Visitor<'de>,
     {
-        expect!(self.events.next(), Event::StartDictionary(_));
+        expect!(self.events.next(), EventKind::StartDictionary);
         let ret = visitor.visit_enum(&mut *self)?;
-        expect!(self.events.next(), Event::EndCollection);
+        expect!(self.events.next(), EventKind::EndCollection);
         Ok(ret)
     }
 }
@@ -367,7 +364,7 @@ where
 
 /// Deserializes an instance of type `T` from a plist file of any encoding.
 pub fn from_file<P: AsRef<Path>, T: de::DeserializeOwned>(path: P) -> Result<T, Error> {
-    let file = File::open(path)?;
+    let file = File::open(path).map_err(error::from_io_without_position)?;
     from_reader(BufReader::new(file))
 }
 

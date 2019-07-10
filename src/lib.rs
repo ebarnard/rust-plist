@@ -60,12 +60,14 @@ pub mod stream;
 mod stream;
 
 mod date;
+mod error;
 mod integer;
 mod uid;
 mod value;
 
 pub use date::Date;
 pub use dictionary::Dictionary;
+pub use error::Error;
 pub use integer::Integer;
 pub use uid::Uid;
 pub use value::Value;
@@ -98,49 +100,6 @@ extern crate serde_derive;
 
 #[cfg(all(test, feature = "serde"))]
 mod serde_tests;
-
-use std::{fmt, io};
-
-#[derive(Debug)]
-pub enum Error {
-    InvalidData,
-    UnexpectedEof,
-    Io(io::Error),
-    Serde(String),
-}
-
-impl ::std::error::Error for Error {
-    fn description(&self) -> &str {
-        match *self {
-            Error::InvalidData => "invalid data",
-            Error::UnexpectedEof => "unexpected eof",
-            Error::Io(ref err) => err.description(),
-            Error::Serde(ref err) => &err,
-        }
-    }
-
-    fn cause(&self) -> Option<&dyn ::std::error::Error> {
-        match *self {
-            Error::Io(ref err) => Some(err),
-            _ => None,
-        }
-    }
-}
-
-impl fmt::Display for Error {
-    fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
-        match *self {
-            Error::Io(ref err) => err.fmt(fmt),
-            _ => <Self as ::std::error::Error>::description(self).fmt(fmt),
-        }
-    }
-}
-
-impl From<io::Error> for Error {
-    fn from(err: io::Error) -> Error {
-        Error::Io(err)
-    }
-}
 
 fn u64_to_usize(len_u64: u64) -> Option<usize> {
     let len = len_u64 as usize;

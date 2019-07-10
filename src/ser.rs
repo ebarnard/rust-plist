@@ -9,14 +9,16 @@ use std::{
 
 use crate::{
     date::serde_impls::DATE_NEWTYPE_STRUCT_NAME,
+    error::{self, Error, ErrorKind},
     stream::{self, Writer},
     uid::serde_impls::UID_NEWTYPE_STRUCT_NAME,
-    Date, Error, Integer, Uid,
+    Date, Integer, Uid,
 };
 
+#[doc(hidden)]
 impl ser::Error for Error {
     fn custom<T: Display>(msg: T) -> Self {
-        Error::Serde(msg.to_string())
+        ErrorKind::Serde(msg.to_string()).without_position()
     }
 }
 
@@ -766,17 +768,17 @@ impl<'a, W: Writer> ser::SerializeStructVariant for Compound<'a, W> {
 
 /// Serializes the given data structure to a file as a binary encoded plist.
 pub fn to_file_binary<P: AsRef<Path>, T: ser::Serialize>(path: P, value: &T) -> Result<(), Error> {
-    let mut file = File::create(path)?;
+    let mut file = File::create(path).map_err(error::from_io_without_position)?;
     to_writer_binary(BufWriter::new(&mut file), value)?;
-    file.sync_all()?;
+    file.sync_all().map_err(error::from_io_without_position)?;
     Ok(())
 }
 
 /// Serializes the given data structure to a file as an XML encoded plist.
 pub fn to_file_xml<P: AsRef<Path>, T: ser::Serialize>(path: P, value: &T) -> Result<(), Error> {
-    let mut file = File::create(path)?;
+    let mut file = File::create(path).map_err(error::from_io_without_position)?;
     to_writer_xml(BufWriter::new(&mut file), value)?;
-    file.sync_all()?;
+    file.sync_all().map_err(error::from_io_without_position)?;
     Ok(())
 }
 

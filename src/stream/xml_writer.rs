@@ -7,21 +7,16 @@ use xml_rs::{
     writer::{EmitterConfig, Error as XmlWriterError, EventWriter, XmlEvent},
 };
 
-use crate::{stream::Writer, Date, Error, Integer, Uid};
+use crate::{
+    error::{self, Error, ErrorKind, EventKind},
+    stream::Writer,
+    Date, Integer, Uid,
+};
 
 static XML_PROLOGUE: &str = r#"<?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 "#;
-
-impl From<XmlWriterError> for Error {
-    fn from(err: XmlWriterError) -> Error {
-        match err {
-            XmlWriterError::Io(err) => Error::Io(err),
-            _ => Error::InvalidData,
-        }
-    }
-}
 
 #[derive(PartialEq)]
 enum Element {
@@ -67,23 +62,29 @@ impl<W: Write> XmlWriter<W> {
     }
 
     fn start_element(&mut self, name: &str) -> Result<(), Error> {
-        self.xml_writer.write(XmlEvent::StartElement {
-            name: Name::local(name),
-            attributes: Cow::Borrowed(&[]),
-            namespace: Cow::Borrowed(&self.empty_namespace),
-        })?;
+        self.xml_writer
+            .write(XmlEvent::StartElement {
+                name: Name::local(name),
+                attributes: Cow::Borrowed(&[]),
+                namespace: Cow::Borrowed(&self.empty_namespace),
+            })
+            .map_err(from_xml_error)?;
         Ok(())
     }
 
     fn end_element(&mut self, name: &str) -> Result<(), Error> {
-        self.xml_writer.write(XmlEvent::EndElement {
-            name: Some(Name::local(name)),
-        })?;
+        self.xml_writer
+            .write(XmlEvent::EndElement {
+                name: Some(Name::local(name)),
+            })
+            .map_err(from_xml_error)?;
         Ok(())
     }
 
     fn write_value(&mut self, value: &str) -> Result<(), Error> {
-        self.xml_writer.write(XmlEvent::Characters(value))?;
+        self.xml_writer
+            .write(XmlEvent::Characters(value))
+            .map_err(from_xml_error)?;
         Ok(())
     }
 
@@ -98,7 +99,8 @@ impl<W: Write> XmlWriter<W> {
         if !self.written_prologue {
             self.xml_writer
                 .inner_mut()
-                .write_all(XML_PROLOGUE.as_bytes())?;
+                .write_all(XML_PROLOGUE.as_bytes())
+                .map_err(error::from_io_without_position)?;
 
             self.written_prologue = true;
         }
@@ -109,8 +111,14 @@ impl<W: Write> XmlWriter<W> {
         if self.stack.is_empty() {
             // We didn't tell the xml_writer about the <plist> tag so we'll skip telling it
             // about the </plist> tag as well.
-            self.xml_writer.inner_mut().write_all(b"\n</plist>")?;
-            self.xml_writer.inner_mut().flush()?;
+            self.xml_writer
+                .inner_mut()
+                .write_all(b"\n</plist>")
+                .map_err(error::from_io_without_position)?;
+            self.xml_writer
+                .inner_mut()
+                .flush()
+                .map_err(error::from_io_without_position)?;
         }
 
         Ok(())
@@ -118,11 +126,16 @@ impl<W: Write> XmlWriter<W> {
 
     fn write_value_event<F: FnOnce(&mut Self) -> Result<(), Error>>(
         &mut self,
+        event_kind: EventKind,
         f: F,
     ) -> Result<(), Error> {
         self.write_event(|this| {
             if this.expecting_key {
-                return Err(Error::InvalidData);
+                return Err(ErrorKind::UnexpectedEventType {
+                    expected: EventKind::DictionaryKeyOrEndCollection,
+                    found: event_kind,
+                }
+                .without_position());
             }
             f(this)?;
             this.expecting_key = this.stack.last() == Some(&Element::Dictionary);
@@ -133,7 +146,7 @@ impl<W: Write> XmlWriter<W> {
 
 impl<W: Write> Writer for XmlWriter<W> {
     fn write_start_array(&mut self, _len: Option<u64>) -> Result<(), Error> {
-        self.write_value_event(|this| {
+        self.write_value_event(EventKind::StartArray, |this| {
             this.start_element("array")?;
             this.stack.push(Element::Array);
             Ok(())
@@ -141,7 +154,7 @@ impl<W: Write> Writer for XmlWriter<W> {
     }
 
     fn write_start_dictionary(&mut self, _len: Option<u64>) -> Result<(), Error> {
-        self.write_value_event(|this| {
+        self.write_value_event(EventKind::StartDictionary, |this| {
             this.start_element("dict")?;
             this.stack.push(Element::Dictionary);
             Ok(())
@@ -150,14 +163,20 @@ impl<W: Write> Writer for XmlWriter<W> {
 
     fn write_end_collection(&mut self) -> Result<(), Error> {
         self.write_event(|this| {
-            match this.stack.pop() {
-                Some(Element::Dictionary) if this.expecting_key => {
+            match (this.stack.pop(), this.expecting_key) {
+                (Some(Element::Dictionary), true) => {
                     this.end_element("dict")?;
                 }
-                Some(Element::Array) if !this.expecting_key => {
+                (Some(Element::Array), _) => {
                     this.end_element("array")?;
                 }
-                _ => return Err(Error::InvalidData),
+                (Some(Element::Dictionary), false) | (None, _) => {
+                    return Err(ErrorKind::UnexpectedEventType {
+                        expected: EventKind::ValueOrStartCollection,
+                        found: EventKind::EndCollection,
+                    }
+                    .without_position());
+                }
             }
             this.expecting_key = this.stack.last() == Some(&Element::Dictionary);
             Ok(())
@@ -165,7 +184,7 @@ impl<W: Write> Writer for XmlWriter<W> {
     }
 
     fn write_boolean(&mut self, value: bool) -> Result<(), Error> {
-        self.write_value_event(|this| {
+        self.write_value_event(EventKind::Boolean, |this| {
             let value_str = if value { "true" } else { "false" };
             this.start_element(value_str)?;
             this.end_element(value_str)
@@ -173,22 +192,28 @@ impl<W: Write> Writer for XmlWriter<W> {
     }
 
     fn write_data(&mut self, value: &[u8]) -> Result<(), Error> {
-        self.write_value_event(|this| {
+        self.write_value_event(EventKind::Data, |this| {
             let base64_data = base64_encode_plist(&value, this.stack.len());
             this.write_element_and_value("data", &base64_data)
         })
     }
 
     fn write_date(&mut self, value: Date) -> Result<(), Error> {
-        self.write_value_event(|this| this.write_element_and_value("date", &value.to_rfc3339()))
+        self.write_value_event(EventKind::Date, |this| {
+            this.write_element_and_value("date", &value.to_rfc3339())
+        })
     }
 
     fn write_integer(&mut self, value: Integer) -> Result<(), Error> {
-        self.write_value_event(|this| this.write_element_and_value("integer", &value.to_string()))
+        self.write_value_event(EventKind::Integer, |this| {
+            this.write_element_and_value("integer", &value.to_string())
+        })
     }
 
     fn write_real(&mut self, value: f64) -> Result<(), Error> {
-        self.write_value_event(|this| this.write_element_and_value("real", &value.to_string()))
+        self.write_value_event(EventKind::Real, |this| {
+            this.write_element_and_value("real", &value.to_string())
+        })
     }
 
     fn write_string(&mut self, value: &str) -> Result<(), Error> {
@@ -205,8 +230,17 @@ impl<W: Write> Writer for XmlWriter<W> {
     }
 
     fn write_uid(&mut self, _value: Uid) -> Result<(), Error> {
-        // `Uid`s are not supported in xml plists
-        Err(Error::InvalidData)
+        Err(ErrorKind::UidNotSupportedInXmlPlist.without_position())
+    }
+}
+
+pub(crate) fn from_xml_error(err: XmlWriterError) -> Error {
+    match err {
+        XmlWriterError::Io(err) => ErrorKind::Io(err).without_position(),
+        XmlWriterError::DocumentStartAlreadyEmitted
+        | XmlWriterError::LastElementNameNotAvailable
+        | XmlWriterError::EndElementNameIsNotEqualToLastStartElementName
+        | XmlWriterError::EndElementNameIsNotSpecified => unreachable!(),
     }
 }
 

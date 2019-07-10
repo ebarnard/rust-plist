@@ -13,11 +13,15 @@ mod xml_writer;
 pub use self::xml_writer::XmlWriter;
 
 use std::{
-    io::{Read, Seek, SeekFrom},
+    io::{self, Read, Seek, SeekFrom},
     vec,
 };
 
-use crate::{dictionary, Date, Error, Integer, Uid, Value};
+use crate::{
+    dictionary,
+    error::{Error, ErrorKind},
+    Date, Integer, Uid, Value,
+};
 
 /// An encoding of a plist as a flat structure.
 ///
@@ -144,10 +148,14 @@ impl<R: Read + Seek> Reader<R> {
     }
 
     fn is_binary(reader: &mut R) -> Result<bool, Error> {
-        reader.seek(SeekFrom::Start(0))?;
+        fn from_io_offset_0(err: io::Error) -> Error {
+            ErrorKind::Io(err).with_byte_offset(0)
+        }
+
+        reader.seek(SeekFrom::Start(0)).map_err(from_io_offset_0)?;
         let mut magic = [0; 8];
-        reader.read_exact(&mut magic)?;
-        reader.seek(SeekFrom::Start(0))?;
+        reader.read_exact(&mut magic).map_err(from_io_offset_0)?;
+        reader.seek(SeekFrom::Start(0)).map_err(from_io_offset_0)?;
 
         Ok(&magic == b"bplist00")
     }

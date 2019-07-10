@@ -5,8 +5,9 @@ use std::{
 };
 
 use crate::{
+    error::{self, Error, ErrorKind, EventKind},
     stream::{BinaryWriter, Event, IntoEvents, Reader, Writer, XmlReader, XmlWriter},
-    u64_to_usize, Date, Dictionary, Error, Integer, Uid,
+    u64_to_usize, Date, Dictionary, Integer, Uid,
 };
 
 /// Represents any plist value.
@@ -28,7 +29,7 @@ pub enum Value {
 impl Value {
     /// Reads a `Value` from a plist file of any encoding.
     pub fn from_file<P: AsRef<Path>>(path: P) -> Result<Value, Error> {
-        let file = File::open(path)?;
+        let file = File::open(path).map_err(error::from_io_without_position)?;
         Value::from_reader(BufReader::new(file))
     }
 
@@ -46,17 +47,17 @@ impl Value {
 
     /// Serializes a `Value` to a file as a binary encoded plist.
     pub fn to_file_binary<P: AsRef<Path>>(&self, path: P) -> Result<(), Error> {
-        let mut file = File::create(path)?;
+        let mut file = File::create(path).map_err(error::from_io_without_position)?;
         self.to_writer_binary(BufWriter::new(&mut file))?;
-        file.sync_all()?;
+        file.sync_all().map_err(error::from_io_without_position)?;
         Ok(())
     }
 
     /// Serializes a `Value` to a file as an XML encoded plist.
     pub fn to_file_xml<P: AsRef<Path>>(&self, path: P) -> Result<(), Error> {
-        let mut file = File::create(path)?;
+        let mut file = File::create(path).map_err(error::from_io_without_position)?;
         self.to_writer_xml(BufWriter::new(&mut file))?;
-        file.sync_all()?;
+        file.sync_all().map_err(error::from_io_without_position)?;
         Ok(())
     }
 
@@ -80,7 +81,8 @@ impl Value {
         Ok(())
     }
 
-    /// Creates a `Value` from an event source.
+    /// Builds a single `Value` from an `Event` iterator.
+    /// On success any excess `Event`s will remain in the iterator.
     #[cfg(feature = "enable_unstable_features_that_may_break_with_minor_version_bumps")]
     pub fn from_events<T>(events: T) -> Result<Value, Error>
     where
@@ -89,7 +91,8 @@ impl Value {
         Builder::new(events.into_iter()).build()
     }
 
-    /// Creates a `Value` from an event source.
+    /// Builds a single `Value` from an `Event` iterator.
+    /// On success any excess `Event`s will remain in the iterator.
     #[cfg(not(feature = "enable_unstable_features_that_may_break_with_minor_version_bumps"))]
     pub(crate) fn from_events<T>(events: T) -> Result<Value, Error>
     where
@@ -98,13 +101,13 @@ impl Value {
         Builder::new(events.into_iter()).build()
     }
 
-    /// Converts a `Value` into an `Event` stream.
+    /// Converts a `Value` into an `Event` iterator.
     #[cfg(feature = "enable_unstable_features_that_may_break_with_minor_version_bumps")]
     pub fn into_events(self) -> IntoEvents {
         IntoEvents::new(self)
     }
 
-    /// Converts a `Value` into an `Event` stream.
+    /// Converts a `Value` into an `Event` iterator.
     #[cfg(not(feature = "enable_unstable_features_that_may_break_with_minor_version_bumps"))]
     pub(crate) fn into_events(self) -> IntoEvents {
         IntoEvents::new(self)
@@ -430,14 +433,7 @@ impl<T: Iterator<Item = Result<Event, Error>>> Builder<T> {
 
     fn build(mut self) -> Result<Value, Error> {
         self.bump()?;
-        let plist = self.build_value()?;
-
-        // Ensure the stream has been fully consumed
-        self.bump()?;
-        match self.token {
-            None => Ok(plist),
-            _ => Err(Error::InvalidData),
-        }
+        self.build_value()
     }
 
     fn bump(&mut self) -> Result<(), Error> {
@@ -462,12 +458,14 @@ impl<T: Iterator<Item = Result<Event, Error>>> Builder<T> {
             Some(Event::String(s)) => Ok(Value::String(s)),
             Some(Event::Uid(u)) => Ok(Value::Uid(u)),
 
-            Some(Event::EndCollection) => Err(Error::InvalidData),
+            Some(event @ Event::EndCollection) => Err(error::unexpected_event_type(
+                EventKind::ValueOrStartCollection,
+                &event,
+            )),
 
             Some(Event::__Nonexhaustive) => unreachable!(),
 
-            // The stream should not have ended here
-            None => Err(Error::InvalidData),
+            None => Err(ErrorKind::UnexpectedEndOfEventStream.without_position()),
         }
     }
 
@@ -498,10 +496,13 @@ impl<T: Iterator<Item = Result<Event, Error>>> Builder<T> {
                     self.bump()?;
                     dict.insert(s, self.build_value()?);
                 }
-                _ => {
-                    // Only string keys are supported in plists
-                    return Err(Error::InvalidData);
+                Some(event) => {
+                    return Err(error::unexpected_event_type(
+                        EventKind::DictionaryKeyOrEndCollection,
+                        &event,
+                    ))
                 }
+                None => return Err(ErrorKind::UnexpectedEndOfEventStream.without_position()),
             }
         }
     }
