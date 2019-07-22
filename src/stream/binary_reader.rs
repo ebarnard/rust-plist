@@ -3,7 +3,7 @@ use std::{
     mem::size_of,
 };
 
-use crate::{stream::Event, u64_to_usize, Date, Error};
+use crate::{stream::Event, u64_to_usize, Date, Error, Uid};
 
 struct StackItem {
     object_ref: u64,
@@ -244,6 +244,21 @@ impl<R: Read + Seek> BinaryReader<R> {
                 let string = String::from_utf16(&raw_utf16).map_err(|_| Error::InvalidData)?;
                 Some(Event::String(string))
             }
+            (0x8, n) => {
+                // Uid
+                let len_bytes = n as usize + 1;
+                if len_bytes > 8 {
+                    return Err(Error::InvalidData);
+                }
+
+                let mut buf = [0; 8];
+                // Values are stored in big-endian so we must put the least significant bytes at
+                // the end of the buffer.
+                self.reader.read_exact(&mut buf[8 - len_bytes..])?;
+                let value = u64::from_be_bytes(buf);
+
+                Some(Event::Uid(Uid::new(value)))
+            }
             (0xa, n) => {
                 // Array
                 let len = self.read_object_len(n)?;
@@ -348,10 +363,12 @@ mod tests {
     use std::{fs::File, path::Path};
 
     use super::*;
-    use crate::stream::Event::{self, *};
+    use crate::{stream::Event, Uid};
 
     #[test]
     fn streaming_parser() {
+        use crate::stream::Event::*;
+
         let reader = File::open(&Path::new("./tests/data/binary.plist")).unwrap();
         let streaming_parser = BinaryReader::new(reader);
         let events: Vec<Event> = streaming_parser.map(|e| e.unwrap()).collect();
@@ -397,14 +414,26 @@ mod tests {
         let streaming_parser = BinaryReader::new(reader);
         let mut events: Vec<Event> = streaming_parser.map(|e| e.unwrap()).collect();
 
-        assert_eq!(events[2], String("\u{2605} or better".to_owned()));
+        assert_eq!(events[2], Event::String("\u{2605} or better".to_owned()));
 
-        let poem = if let String(ref mut poem) = events[4] {
+        let poem = if let Event::String(ref mut poem) = events[4] {
             poem
         } else {
             panic!("not a string")
         };
         assert_eq!(poem.len(), 643);
         assert_eq!(poem.pop().unwrap(), '\u{2605}');
+    }
+
+    #[test]
+    fn nskeyedarchiver_plist() {
+        let reader = File::open(&Path::new("./tests/data/binary_NSKeyedArchiver.plist")).unwrap();
+        let streaming_parser = BinaryReader::new(reader);
+        let events: Vec<Event> = streaming_parser.map(|e| e.unwrap()).collect();
+
+        assert_eq!(events[10], Event::Uid(Uid::new(4)));
+        assert_eq!(events[12], Event::Uid(Uid::new(2)));
+        assert_eq!(events[18], Event::Uid(Uid::new(3)));
+        assert_eq!(events[46], Event::Uid(Uid::new(1)));
     }
 }

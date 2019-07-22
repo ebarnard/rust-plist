@@ -10,7 +10,8 @@ use std::{
 use crate::{
     date::serde_impls::DATE_NEWTYPE_STRUCT_NAME,
     stream::{self, Writer},
-    Date, Error, Integer,
+    uid::serde_impls::UID_NEWTYPE_STRUCT_NAME,
+    Date, Error, Integer, Uid,
 };
 
 impl ser::Error for Error {
@@ -106,6 +107,11 @@ impl<W: Writer> Serializer<W> {
     fn write_string(&mut self, value: &str) -> Result<(), Error> {
         self.maybe_write_pending_struct_field_name()?;
         self.writer.write_string(value)
+    }
+
+    fn write_uid(&mut self, value: Uid) -> Result<(), Error> {
+        self.maybe_write_pending_struct_field_name()?;
+        self.writer.write_uid(value)
     }
 }
 
@@ -237,10 +243,10 @@ impl<'a, W: Writer> ser::Serializer for &'a mut Serializer<W> {
         name: &'static str,
         value: &T,
     ) -> Result<(), Error> {
-        if name == DATE_NEWTYPE_STRUCT_NAME {
-            value.serialize(DateSerializer { ser: &mut *self })
-        } else {
-            value.serialize(self)
+        match name {
+            DATE_NEWTYPE_STRUCT_NAME => value.serialize(DateSerializer { ser: &mut *self }),
+            UID_NEWTYPE_STRUCT_NAME => value.serialize(UidSerializer { ser: &mut *self }),
+            _ => value.serialize(self),
         }
     }
 
@@ -474,6 +480,167 @@ impl<'a, W: Writer> ser::Serializer for DateSerializer<'a, W> {
         _: usize,
     ) -> Result<Self::SerializeStructVariant, Error> {
         Err(self.expecting_date_error())
+    }
+}
+
+struct UidSerializer<'a, W: 'a + Writer> {
+    ser: &'a mut Serializer<W>,
+}
+
+impl<'a, W: Writer> UidSerializer<'a, W> {
+    fn expecting_uid_error(&self) -> Error {
+        ser::Error::custom("plist uid expected")
+    }
+}
+
+impl<'a, W: Writer> ser::Serializer for UidSerializer<'a, W> {
+    type Ok = ();
+    type Error = Error;
+
+    type SerializeSeq = ser::Impossible<(), Error>;
+    type SerializeTuple = ser::Impossible<(), Error>;
+    type SerializeTupleStruct = ser::Impossible<(), Error>;
+    type SerializeTupleVariant = ser::Impossible<(), Error>;
+    type SerializeMap = ser::Impossible<(), Error>;
+    type SerializeStruct = ser::Impossible<(), Error>;
+    type SerializeStructVariant = ser::Impossible<(), Error>;
+
+    fn serialize_bool(self, _: bool) -> Result<(), Error> {
+        Err(self.expecting_uid_error())
+    }
+
+    fn serialize_i8(self, _: i8) -> Result<(), Error> {
+        Err(self.expecting_uid_error())
+    }
+
+    fn serialize_i16(self, _: i16) -> Result<(), Error> {
+        Err(self.expecting_uid_error())
+    }
+
+    fn serialize_i32(self, _: i32) -> Result<(), Error> {
+        Err(self.expecting_uid_error())
+    }
+
+    fn serialize_i64(self, _: i64) -> Result<(), Error> {
+        Err(self.expecting_uid_error())
+    }
+
+    fn serialize_u8(self, _: u8) -> Result<(), Error> {
+        Err(self.expecting_uid_error())
+    }
+
+    fn serialize_u16(self, _: u16) -> Result<(), Error> {
+        Err(self.expecting_uid_error())
+    }
+
+    fn serialize_u32(self, _: u32) -> Result<(), Error> {
+        Err(self.expecting_uid_error())
+    }
+
+    fn serialize_u64(self, v: u64) -> Result<(), Error> {
+        self.ser.write_uid(Uid::new(v))
+    }
+
+    fn serialize_f32(self, _: f32) -> Result<(), Error> {
+        Err(self.expecting_uid_error())
+    }
+
+    fn serialize_f64(self, _: f64) -> Result<(), Error> {
+        Err(self.expecting_uid_error())
+    }
+
+    fn serialize_char(self, _: char) -> Result<(), Error> {
+        Err(self.expecting_uid_error())
+    }
+
+    fn serialize_str(self, _: &str) -> Result<(), Error> {
+        Err(self.expecting_uid_error())
+    }
+
+    fn serialize_bytes(self, _: &[u8]) -> Result<(), Error> {
+        Err(self.expecting_uid_error())
+    }
+
+    fn serialize_none(self) -> Result<(), Error> {
+        Err(self.expecting_uid_error())
+    }
+
+    fn serialize_some<T: ?Sized + ser::Serialize>(self, _: &T) -> Result<(), Error> {
+        Err(self.expecting_uid_error())
+    }
+
+    fn serialize_unit(self) -> Result<(), Error> {
+        Err(self.expecting_uid_error())
+    }
+
+    fn serialize_unit_struct(self, _: &'static str) -> Result<(), Error> {
+        Err(self.expecting_uid_error())
+    }
+
+    fn serialize_unit_variant(self, _: &'static str, _: u32, _: &'static str) -> Result<(), Error> {
+        Err(self.expecting_uid_error())
+    }
+
+    fn serialize_newtype_struct<T: ?Sized + ser::Serialize>(
+        self,
+        _: &'static str,
+        _: &T,
+    ) -> Result<(), Error> {
+        Err(self.expecting_uid_error())
+    }
+
+    fn serialize_newtype_variant<T: ?Sized + ser::Serialize>(
+        self,
+        _: &'static str,
+        _: u32,
+        _: &'static str,
+        _: &T,
+    ) -> Result<(), Error> {
+        Err(self.expecting_uid_error())
+    }
+
+    fn serialize_seq(self, _: Option<usize>) -> Result<Self::SerializeSeq, Error> {
+        Err(self.expecting_uid_error())
+    }
+
+    fn serialize_tuple(self, _: usize) -> Result<Self::SerializeTuple, Error> {
+        Err(self.expecting_uid_error())
+    }
+
+    fn serialize_tuple_struct(
+        self,
+        _: &'static str,
+        _: usize,
+    ) -> Result<Self::SerializeTupleStruct, Error> {
+        Err(self.expecting_uid_error())
+    }
+
+    fn serialize_tuple_variant(
+        self,
+        _: &'static str,
+        _: u32,
+        _: &'static str,
+        _: usize,
+    ) -> Result<Self::SerializeTupleVariant, Error> {
+        Err(self.expecting_uid_error())
+    }
+
+    fn serialize_map(self, _: Option<usize>) -> Result<Self::SerializeMap, Error> {
+        Err(self.expecting_uid_error())
+    }
+
+    fn serialize_struct(self, _: &'static str, _: usize) -> Result<Self::SerializeStruct, Error> {
+        Err(self.expecting_uid_error())
+    }
+
+    fn serialize_struct_variant(
+        self,
+        _: &'static str,
+        _: u32,
+        _: &'static str,
+        _: usize,
+    ) -> Result<Self::SerializeStructVariant, Error> {
+        Err(self.expecting_uid_error())
     }
 }
 

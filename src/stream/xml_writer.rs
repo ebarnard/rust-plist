@@ -7,7 +7,7 @@ use xml_rs::{
     writer::{EmitterConfig, Error as XmlWriterError, EventWriter, XmlEvent},
 };
 
-use crate::{stream::Writer, Date, Error, Integer};
+use crate::{stream::Writer, Date, Error, Integer, Uid};
 
 static XML_PROLOGUE: &str = r#"<?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
@@ -202,6 +202,11 @@ impl<W: Write> Writer for XmlWriter<W> {
             }
             Ok(())
         })
+    }
+
+    fn write_uid(&mut self, _value: Uid) -> Result<(), Error> {
+        // `Uid`s are not supported in xml plists
+        Err(Error::InvalidData)
     }
 }
 

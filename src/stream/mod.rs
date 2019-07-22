@@ -17,7 +17,7 @@ use std::{
     vec,
 };
 
-use crate::{dictionary, Date, Error, Integer, Value};
+use crate::{dictionary, Date, Error, Integer, Uid, Value};
 
 /// An encoding of a plist as a flat structure.
 ///
@@ -47,6 +47,7 @@ pub enum Event {
     Integer(Integer),
     Real(f64),
     String(String),
+    Uid(Uid),
 
     #[doc(hidden)]
     __Nonexhaustive,
@@ -96,6 +97,7 @@ impl Iterator for IntoEvents {
                 Value::Real(value) => Event::Real(value),
                 Value::Integer(value) => Event::Integer(value),
                 Value::String(value) => Event::String(value),
+                Value::Uid(value) => Event::Uid(value),
                 Value::__Nonexhaustive => unreachable!(),
             }
         }
@@ -189,6 +191,7 @@ pub trait Writer: private::Sealed {
             Event::Integer(value) => self.write_integer(*value),
             Event::Real(value) => self.write_real(*value),
             Event::String(value) => self.write_string(value),
+            Event::Uid(value) => self.write_uid(*value),
             Event::__Nonexhaustive => unreachable!(),
         }
     }
@@ -203,6 +206,7 @@ pub trait Writer: private::Sealed {
     fn write_integer(&mut self, value: Integer) -> Result<(), Error>;
     fn write_real(&mut self, value: f64) -> Result<(), Error>;
     fn write_string(&mut self, value: &str) -> Result<(), Error>;
+    fn write_uid(&mut self, value: Uid) -> Result<(), Error>;
 }
 
 pub(crate) mod private {

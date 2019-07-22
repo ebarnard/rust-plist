@@ -6,7 +6,7 @@ use std::{
 
 use crate::{
     stream::{BinaryWriter, Event, IntoEvents, Reader, Writer, XmlReader, XmlWriter},
-    u64_to_usize, Date, Dictionary, Error, Integer,
+    u64_to_usize, Date, Dictionary, Error, Integer, Uid,
 };
 
 /// Represents any plist value.
@@ -20,6 +20,7 @@ pub enum Value {
     Real(f64),
     Integer(Integer),
     String(String),
+    Uid(Uid),
     #[doc(hidden)]
     __Nonexhaustive,
 }
@@ -459,6 +460,7 @@ impl<T: Iterator<Item = Result<Event, Error>>> Builder<T> {
             Some(Event::Integer(i)) => Ok(Value::Integer(i)),
             Some(Event::Real(f)) => Ok(Value::Real(f)),
             Some(Event::String(s)) => Ok(Value::String(s)),
+            Some(Event::Uid(u)) => Ok(Value::Uid(u)),
 
             Some(Event::EndCollection) => Err(Error::InvalidData),
 

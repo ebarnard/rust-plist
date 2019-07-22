@@ -9,7 +9,7 @@ use std::{
     num::NonZeroUsize,
 };
 
-use crate::{stream::Writer, Date, Error, Integer};
+use crate::{stream::Writer, Date, Error, Integer, Uid};
 
 pub struct BinaryWriter<W: Write> {
     writer: PosWriter<W>,
@@ -95,6 +95,7 @@ enum Value<'a> {
     /// Floats are deduplicated based on their bitwise value.
     Real(u64),
     String(Cow<'a, str>),
+    Uid(Uid),
 }
 
 enum ValueState {
@@ -486,6 +487,24 @@ impl<W: Write> BinaryWriter<W> {
                     self.writer.write(&c.to_be_bytes())?;
                 }
             }
+            Value::Uid(v) => {
+                let v = v.get();
+                if v <= u64::from(u8::max_value()) {
+                    self.writer.write_all(&[0x80, v as u8])?;
+                } else if v <= u64::from(u16::max_value()) {
+                    let mut buf: [_; 3] = [0x81, 0, 0];
+                    &mut buf[1..].copy_from_slice(&(v as u16).to_be_bytes());
+                    self.writer.write_all(&buf)?;
+                } else if v <= u64::from(u32::max_value()) {
+                    let mut buf: [_; 5] = [0x83, 0, 0, 0, 0];
+                    &mut buf[1..].copy_from_slice(&(v as u32).to_be_bytes());
+                    self.writer.write_all(&buf)?;
+                } else {
+                    let mut buf: [_; 9] = [0x87, 0, 0, 0, 0, 0, 0, 0, 0];
+                    &mut buf[1..].copy_from_slice(&(v as u64).to_be_bytes());
+                    self.writer.write_all(&buf)?;
+                }
+            }
         }
         Ok(())
     }
@@ -519,6 +538,9 @@ impl<W: Write> Writer for BinaryWriter<W> {
     }
     fn write_string(&mut self, value: &str) -> Result<(), Error> {
         self.write_value(Value::String(Cow::Borrowed(value)))
+    }
+    fn write_uid(&mut self, value: Uid) -> Result<(), Error> {
+        self.write_value(Value::Uid(value))
     }
 }
 
@@ -620,6 +642,7 @@ impl<'a> Value<'a> {
             Value::Integer(v) => Value::Integer(v),
             Value::Real(v) => Value::Real(v),
             Value::String(v) => Value::String(Cow::Owned(v.into_owned())),
+            Value::Uid(v) => Value::Uid(v),
         }
     }
 }
@@ -656,5 +679,10 @@ mod tests {
     #[test]
     fn utf16_roundtrip() {
         test_roundtrip(&Path::new("./tests/data/utf16_bplist.plist"))
+    }
+
+    #[test]
+    fn nskeyedarchiver_roundtrip() {
+        test_roundtrip(&Path::new("./tests/data/binary_NSKeyedArchiver.plist"))
     }
 }

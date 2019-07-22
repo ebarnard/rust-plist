@@ -127,6 +127,7 @@ where
             }
             Event::Real(v) => visitor.visit_f64(v),
             Event::String(v) => visitor.visit_string(v),
+            Event::Uid(v) => visitor.visit_u64(v.get()),
 
             Event::__Nonexhaustive => unreachable!(),
         }

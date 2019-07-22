@@ -61,11 +61,13 @@ mod stream;
 
 mod date;
 mod integer;
+mod uid;
 mod value;
 
 pub use date::Date;
 pub use dictionary::Dictionary;
 pub use integer::Integer;
+pub use uid::Uid;
 pub use value::Value;
 
 // Optional serde module

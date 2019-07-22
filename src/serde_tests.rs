@@ -3,7 +3,7 @@ use std::{collections::BTreeMap, fmt::Debug, time::SystemTime};
 
 use crate::{
     stream::{private::Sealed, Event, Writer},
-    Date, Deserializer, Error, Integer, Serializer,
+    Date, Deserializer, Error, Integer, Serializer, Uid,
 };
 
 struct VecWriter {
@@ -65,6 +65,11 @@ impl Writer for VecWriter {
         self.events.push(Event::String(value.to_owned()));
         Ok(())
     }
+
+    fn write_uid(&mut self, value: Uid) -> Result<(), Error> {
+        self.events.push(Event::Uid(value));
+        Ok(())
+    }
 }
 
 impl Sealed for VecWriter {}
@@ -121,6 +126,7 @@ struct DogInner {
     a: (),
     b: usize,
     c: Vec<String>,
+    d: Option<Uid>,
 }
 
 #[test]
@@ -144,6 +150,7 @@ fn dog() {
             a: (),
             b: 12,
             c: vec!["a".to_string(), "b".to_string()],
+            d: Some(Uid::new(42)),
         }],
     });
 
@@ -163,6 +170,8 @@ fn dog() {
         Event::String("a".to_owned()),
         Event::String("b".to_owned()),
         Event::EndCollection,
+        Event::String("d".to_owned()),
+        Event::Uid(Uid::new(42)),
         Event::EndCollection,
         Event::EndCollection,
         Event::EndCollection,
