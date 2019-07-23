@@ -82,10 +82,8 @@ impl Dictionary {
         S: Into<String>,
     {
         match self.map.entry(key.into()) {
-            btree_map::Entry::Vacant(vacant) => Entry::Vacant(VacantEntry { vacant: vacant }),
-            btree_map::Entry::Occupied(occupied) => {
-                Entry::Occupied(OccupiedEntry { occupied: occupied })
-            }
+            btree_map::Entry::Vacant(vacant) => Entry::Vacant(VacantEntry { vacant }),
+            btree_map::Entry::Occupied(occupied) => Entry::Occupied(OccupiedEntry { occupied }),
         }
     }
 

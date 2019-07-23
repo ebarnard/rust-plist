@@ -106,7 +106,7 @@ impl<W: Write> XmlWriter<W> {
         f(self)?;
 
         // If there are no more open tags then write the </plist> element
-        if self.stack.len() == 0 {
+        if self.stack.is_empty() {
             // We didn't tell the xml_writer about the <plist> tag so we'll skip telling it
             // about the </plist> tag as well.
             self.xml_writer.inner_mut().write_all(b"\n</plist>")?;
@@ -232,7 +232,7 @@ fn base64_encode_plist(data: &[u8], indent: usize) -> String {
     let mut output = vec![0; base64_max_string_len_with_formatting];
 
     // Start output with a line ending and indent
-    &mut output[..line_ending.len()].copy_from_slice(&line_ending);
+    output[..line_ending.len()].copy_from_slice(&line_ending);
 
     // Encode `data` as a base 64 string
     let base64_string_len =
@@ -247,7 +247,7 @@ fn base64_encode_plist(data: &[u8], indent: usize) -> String {
     );
 
     // Add the final line ending and indent
-    &mut output[line_ending.len() + base64_string_len + line_wrap_len..][..line_ending.len()]
+    output[line_ending.len() + base64_string_len + line_wrap_len..][..line_ending.len()]
         .copy_from_slice(&line_ending);
 
     // Ensure output is the correct length

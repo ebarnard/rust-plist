@@ -13,7 +13,7 @@ impl Uid {
     }
 
     /// Returns the value as a `u64`.
-    pub fn get(&self) -> u64 {
+    pub fn get(self) -> u64 {
         self.value
     }
 }

@@ -76,7 +76,7 @@ where
         }
     }
 
-    fn with_option_mode<'de, T, F: FnOnce(&mut Deserializer<I>) -> Result<T, Error>>(
+    fn with_option_mode<T, F: FnOnce(&mut Deserializer<I>) -> Result<T, Error>>(
         &mut self,
         option_mode: OptionMode,
         f: F,
@@ -153,7 +153,7 @@ where
     {
         match self.option_mode {
             OptionMode::Root => {
-                if let None = self.events.peek() {
+                if self.events.peek().is_none() {
                     visitor.visit_none::<Error>()
                 } else {
                     self.with_option_mode(OptionMode::Explicit, |this| visitor.visit_some(this))

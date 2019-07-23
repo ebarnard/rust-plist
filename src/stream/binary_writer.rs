@@ -310,8 +310,8 @@ impl<W: Write> BinaryWriter<W> {
         let mut trailer = [0; 32];
         trailer[6] = offset_size;
         trailer[7] = ref_size;
-        &mut trailer[8..16].copy_from_slice(&(self.num_objects as u64).to_be_bytes());
-        &mut trailer[24..32].copy_from_slice(&offset_table_offset.to_be_bytes());
+        trailer[8..16].copy_from_slice(&(self.num_objects as u64).to_be_bytes());
+        trailer[24..32].copy_from_slice(&offset_table_offset.to_be_bytes());
         self.writer.write_all(&trailer)?;
 
         self.writer.flush()?;
@@ -440,7 +440,7 @@ impl<W: Write> BinaryWriter<W> {
             Value::Date(v) => {
                 let secs = v.to_seconds_since_plist_epoch();
                 let mut buf: [_; 9] = [0x33, 0, 0, 0, 0, 0, 0, 0, 0];
-                &mut buf[1..].copy_from_slice(&secs.to_bits().to_be_bytes());
+                buf[1..].copy_from_slice(&secs.to_bits().to_be_bytes());
                 self.writer.write_all(&buf)?;
             }
             Value::Integer(v) => {
@@ -449,22 +449,22 @@ impl<W: Write> BinaryWriter<W> {
                         self.writer.write_all(&[0x10, v as u8])?;
                     } else if v >= 0 && v <= i64::from(u16::max_value()) {
                         let mut buf: [_; 3] = [0x11, 0, 0];
-                        &mut buf[1..].copy_from_slice(&(v as u16).to_be_bytes());
+                        buf[1..].copy_from_slice(&(v as u16).to_be_bytes());
                         self.writer.write_all(&buf)?;
                     } else if v >= 0 && v <= i64::from(u32::max_value()) {
                         let mut buf: [_; 5] = [0x12, 0, 0, 0, 0];
-                        &mut buf[1..].copy_from_slice(&(v as u32).to_be_bytes());
+                        buf[1..].copy_from_slice(&(v as u32).to_be_bytes());
                         self.writer.write_all(&buf)?;
                     } else {
                         let mut buf: [_; 9] = [0x13, 0, 0, 0, 0, 0, 0, 0, 0];
-                        &mut buf[1..].copy_from_slice(&v.to_be_bytes());
+                        buf[1..].copy_from_slice(&v.to_be_bytes());
                         self.writer.write_all(&buf)?;
                     }
                 } else if let Some(v) = v.as_unsigned() {
                     // `u64`s larger than `i64::max_value()` are stored as signed 128 bit
                     // integers.
                     let mut buf: [_; 17] = [0x14, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
-                    &mut buf[1..].copy_from_slice(&i128::from(v).to_be_bytes());
+                    buf[1..].copy_from_slice(&i128::from(v).to_be_bytes());
                     self.writer.write_all(&buf)?;
                 } else {
                     unreachable!("an integer can be represented as either an i64 or u64");
@@ -472,7 +472,7 @@ impl<W: Write> BinaryWriter<W> {
             }
             Value::Real(v) => {
                 let mut buf: [_; 9] = [0x23, 0, 0, 0, 0, 0, 0, 0, 0];
-                &mut buf[1..].copy_from_slice(&v.to_be_bytes());
+                buf[1..].copy_from_slice(&v.to_be_bytes());
                 self.writer.write_all(&buf)?;
             }
             Value::String(v) if v.is_ascii() => {
@@ -493,15 +493,15 @@ impl<W: Write> BinaryWriter<W> {
                     self.writer.write_all(&[0x80, v as u8])?;
                 } else if v <= u64::from(u16::max_value()) {
                     let mut buf: [_; 3] = [0x81, 0, 0];
-                    &mut buf[1..].copy_from_slice(&(v as u16).to_be_bytes());
+                    buf[1..].copy_from_slice(&(v as u16).to_be_bytes());
                     self.writer.write_all(&buf)?;
                 } else if v <= u64::from(u32::max_value()) {
                     let mut buf: [_; 5] = [0x83, 0, 0, 0, 0];
-                    &mut buf[1..].copy_from_slice(&(v as u32).to_be_bytes());
+                    buf[1..].copy_from_slice(&(v as u32).to_be_bytes());
                     self.writer.write_all(&buf)?;
                 } else {
                     let mut buf: [_; 9] = [0x87, 0, 0, 0, 0, 0, 0, 0, 0];
-                    &mut buf[1..].copy_from_slice(&(v as u64).to_be_bytes());
+                    buf[1..].copy_from_slice(&(v as u64).to_be_bytes());
                     self.writer.write_all(&buf)?;
                 }
             }
@@ -568,15 +568,15 @@ fn write_plist_value_ty_and_size(
         writer.write_all(&[token | 0x0f, 0x10, size as u8])?;
     } else if size <= u16::max_value() as usize {
         let mut buf: [_; 4] = [token | 0x0f, 0x11, 0, 0];
-        &mut buf[2..].copy_from_slice(&(size as u16).to_be_bytes());
+        buf[2..].copy_from_slice(&(size as u16).to_be_bytes());
         writer.write_all(&buf)?;
     } else if size <= u32::max_value() as usize {
         let mut buf: [_; 6] = [token | 0x0f, 0x12, 0, 0, 0, 0];
-        &mut buf[2..].copy_from_slice(&(size as u32).to_be_bytes());
+        buf[2..].copy_from_slice(&(size as u32).to_be_bytes());
         writer.write_all(&buf)?;
     } else {
         let mut buf: [_; 10] = [token | 0x0f, 0x13, 0, 0, 0, 0, 0, 0, 0, 0];
-        &mut buf[2..].copy_from_slice(&(size as u64).to_be_bytes());
+        buf[2..].copy_from_slice(&(size as u64).to_be_bytes());
         writer.write_all(&buf)?;
     }
     Ok(())
@@ -586,9 +586,8 @@ fn plist_ref_size(max_value: usize) -> u8 {
     let significant_bits = 64 - (max_value as u64).leading_zeros() as u8;
     // Convert to number of bytes
     let significant_bytes = (significant_bits + 7) / 8;
-    // Round up to the next integer bit size which must be power of two.
-    let integer_bytes = significant_bytes.next_power_of_two();
-    integer_bytes
+    // Round up to the next integer byte size which must be power of two.
+    significant_bytes.next_power_of_two()
 }
 
 fn write_plist_ref(writer: &mut impl Write, ref_size: u8, value: usize) -> Result<(), Error> {
