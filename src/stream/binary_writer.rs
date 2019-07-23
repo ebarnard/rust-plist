@@ -484,7 +484,7 @@ impl<W: Write> BinaryWriter<W> {
                 let utf16_len = v.encode_utf16().count();
                 write_plist_value_ty_and_size(&mut self.writer, 0x60, utf16_len)?;
                 for c in v.encode_utf16() {
-                    self.writer.write(&c.to_be_bytes())?;
+                    self.writer.write_all(&c.to_be_bytes())?;
                 }
             }
             Value::Uid(v) => {
