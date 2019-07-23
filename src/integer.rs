@@ -1,22 +1,25 @@
 use std::{fmt, num::ParseIntError, str::FromStr};
 
-/// A type capable of representing either an `i64` or a `u64`.
+/// An integer that can be represented by either an `i64` or a `u64`.
 #[derive(Clone, Copy, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub struct Integer {
     value: i128,
 }
 
 impl Integer {
+    /// Returns the value as an `i64` if it can be represented by that type.
     pub fn as_signed(self) -> Option<i64> {
-        if self.value >= i64::min_value().into() && self.value <= i64::max_value().into() {
+        if self.value >= i128::from(i64::min_value()) && self.value <= i128::from(i64::max_value())
+        {
             Some(self.value as i64)
         } else {
             None
         }
     }
 
+    /// Returns the value as a `u64` if it can be represented by that type.
     pub fn as_unsigned(self) -> Option<u64> {
-        if self.value >= 0 && self.value <= u64::max_value().into() {
+        if self.value >= 0 && self.value <= i128::from(u64::max_value()) {
             Some(self.value as u64)
         } else {
             None
