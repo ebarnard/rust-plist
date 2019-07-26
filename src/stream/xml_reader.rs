@@ -2,7 +2,7 @@ use base64;
 use std::{io::Read, str::FromStr};
 use xml_rs::reader::{EventReader, ParserConfig, XmlEvent};
 
-use crate::{stream::Event, Date, Error};
+use crate::{stream::Event, Date, Error, Integer};
 
 pub struct XmlReader<R: Read> {
     xml_reader: EventReader<R>,
@@ -80,13 +80,13 @@ impl<R: Read> XmlReader<R> {
                             }));
                         }
                         "integer" => {
-                            return Some(self.read_content(|s| match FromStr::from_str(&s) {
+                            return Some(self.read_content(|s| match Integer::from_str(&s) {
                                 Ok(i) => Ok(Event::Integer(i)),
                                 Err(_) => Err(Error::InvalidData),
                             }));
                         }
                         "real" => {
-                            return Some(self.read_content(|s| match FromStr::from_str(&s) {
+                            return Some(self.read_content(|s| match f64::from_str(&s) {
                                 Ok(f) => Ok(Event::Real(f)),
                                 Err(_) => Err(Error::InvalidData),
                             }));

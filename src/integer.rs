@@ -1,4 +1,4 @@
-use std::{fmt, num::ParseIntError, str::FromStr};
+use std::{fmt, num::ParseIntError};
 
 /// An integer that can be represented by either an `i64` or a `u64`.
 #[derive(Clone, Copy, Eq, Hash, Ord, PartialEq, PartialOrd)]
@@ -25,24 +25,8 @@ impl Integer {
             None
         }
     }
-}
 
-impl fmt::Debug for Integer {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        self.value.fmt(f)
-    }
-}
-
-impl fmt::Display for Integer {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        self.value.fmt(f)
-    }
-}
-
-impl FromStr for Integer {
-    type Err = ParseIntError;
-
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
+    pub(crate) fn from_str(s: &str) -> Result<Self, ParseIntError> {
         if s.starts_with("0x") {
             // NetBSD dialect adds the `0x` numeric objects,
             // which are always unsigned.
@@ -57,6 +41,18 @@ impl FromStr for Integer {
                 Err(_) => s.parse::<u64>()?.into(),
             })
         }
+    }
+}
+
+impl fmt::Debug for Integer {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        self.value.fmt(f)
+    }
+}
+
+impl fmt::Display for Integer {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        self.value.fmt(f)
     }
 }
 
@@ -130,18 +126,18 @@ mod tests {
 
     #[test]
     fn from_str_limits() {
-        assert_eq!("-1".parse::<Integer>(), Ok((-1).into()));
-        assert_eq!("0".parse::<Integer>(), Ok(0.into()));
-        assert_eq!("1".parse::<Integer>(), Ok(1.into()));
+        assert_eq!(Integer::from_str("-1"), Ok((-1).into()));
+        assert_eq!(Integer::from_str("0"), Ok(0.into()));
+        assert_eq!(Integer::from_str("1"), Ok(1.into()));
         assert_eq!(
-            "-9223372036854775808".parse::<Integer>(),
+            Integer::from_str("-9223372036854775808"),
             Ok((-9223372036854775808i64).into())
         );
-        assert!("-9223372036854775809".parse::<Integer>().is_err());
+        assert!(Integer::from_str("-9223372036854775809").is_err());
         assert_eq!(
-            "18446744073709551615".parse::<Integer>(),
+            Integer::from_str("18446744073709551615"),
             Ok(18446744073709551615u64.into())
         );
-        assert!("18446744073709551616".parse::<Integer>().is_err());
+        assert!(Integer::from_str("18446744073709551616").is_err());
     }
 }
