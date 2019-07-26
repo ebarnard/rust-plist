@@ -1,12 +1,12 @@
 //! A map of String to plist::Value.
 //!
-//! The map is currently backed by a [`BTreeMap`]. This may be changed in a future minor release.
+//! The map is currently backed by an [`IndexMap`]. This may be changed in a future minor release.
 //!
-//! [`BTreeMap`]: https://doc.rust-lang.org/std/collections/struct.BTreeMap.html
+//! [`IndexMap`]: https://docs.rs/indexmap/latest/indexmap/map/struct.IndexMap.html
 
 //use serde::{de, ser};
+use indexmap::{map, IndexMap};
 use std::{
-    collections::{btree_map, BTreeMap},
     fmt::{self, Debug},
     iter::FromIterator,
     ops,
@@ -16,7 +16,7 @@ use crate::Value;
 
 /// Represents a plist dictionary type.
 pub struct Dictionary {
-    map: BTreeMap<String, Value>,
+    map: IndexMap<String, Value>,
 }
 
 impl Dictionary {
@@ -24,7 +24,7 @@ impl Dictionary {
     #[inline]
     pub fn new() -> Self {
         Dictionary {
-            map: BTreeMap::new(),
+            map: IndexMap::new(),
         }
     }
 
@@ -82,8 +82,8 @@ impl Dictionary {
         S: Into<String>,
     {
         match self.map.entry(key.into()) {
-            btree_map::Entry::Vacant(vacant) => Entry::Vacant(VacantEntry { vacant }),
-            btree_map::Entry::Occupied(occupied) => Entry::Occupied(OccupiedEntry { occupied }),
+            map::Entry::Vacant(vacant) => Entry::Vacant(VacantEntry { vacant }),
+            map::Entry::Occupied(occupied) => Entry::Occupied(OccupiedEntry { occupied }),
         }
     }
 
@@ -144,7 +144,7 @@ impl Default for Dictionary {
     #[inline]
     fn default() -> Self {
         Dictionary {
-            map: BTreeMap::new(),
+            map: Default::default(),
         }
     }
 }
@@ -344,7 +344,7 @@ pub enum Entry<'a> {
     feature = "enable_unstable_features_that_may_break_with_minor_version_bumps"
 ))]
 pub struct VacantEntry<'a> {
-    vacant: btree_map::VacantEntry<'a, String, Value>,
+    vacant: map::VacantEntry<'a, String, Value>,
 }
 
 /// An occupied Entry. It is part of the [`Entry`] enum.
@@ -355,7 +355,7 @@ pub struct VacantEntry<'a> {
     feature = "enable_unstable_features_that_may_break_with_minor_version_bumps"
 ))]
 pub struct OccupiedEntry<'a> {
-    occupied: btree_map::OccupiedEntry<'a, String, Value>,
+    occupied: map::OccupiedEntry<'a, String, Value>,
 }
 
 #[cfg(any(
@@ -624,7 +624,7 @@ pub struct Iter<'a> {
     iter: IterImpl<'a>,
 }
 
-type IterImpl<'a> = btree_map::Iter<'a, String, Value>;
+type IterImpl<'a> = map::Iter<'a, String, Value>;
 
 delegate_iterator!((Iter<'a>) => (&'a String, &'a Value));
 
@@ -643,7 +643,7 @@ impl<'a> IntoIterator for &'a mut Dictionary {
 
 /// A mutable iterator over a plist::Dictionary's entries.
 pub struct IterMut<'a> {
-    iter: btree_map::IterMut<'a, String, Value>,
+    iter: map::IterMut<'a, String, Value>,
 }
 
 delegate_iterator!((IterMut<'a>) => (&'a String, &'a mut Value));
@@ -663,7 +663,7 @@ impl IntoIterator for Dictionary {
 
 /// An owning iterator over a plist::Dictionary's entries.
 pub struct IntoIter {
-    iter: btree_map::IntoIter<String, Value>,
+    iter: map::IntoIter<String, Value>,
 }
 
 delegate_iterator!((IntoIter) => (String, Value));
@@ -672,7 +672,7 @@ delegate_iterator!((IntoIter) => (String, Value));
 
 /// An iterator over a plist::Dictionary's keys.
 pub struct Keys<'a> {
-    iter: btree_map::Keys<'a, String, Value>,
+    iter: map::Keys<'a, String, Value>,
 }
 
 delegate_iterator!((Keys<'a>) => &'a String);
@@ -681,7 +681,7 @@ delegate_iterator!((Keys<'a>) => &'a String);
 
 /// An iterator over a plist::Dictionary's values.
 pub struct Values<'a> {
-    iter: btree_map::Values<'a, String, Value>,
+    iter: map::Values<'a, String, Value>,
 }
 
 delegate_iterator!((Values<'a>) => &'a Value);
@@ -690,7 +690,7 @@ delegate_iterator!((Values<'a>) => &'a Value);
 
 /// A mutable iterator over a plist::Dictionary's values.
 pub struct ValuesMut<'a> {
-    iter: btree_map::ValuesMut<'a, String, Value>,
+    iter: map::ValuesMut<'a, String, Value>,
 }
 
 delegate_iterator!((ValuesMut<'a>) => &'a mut Value);
