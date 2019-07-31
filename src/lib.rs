@@ -19,16 +19,7 @@
 //!
 //! ## Examples
 //!
-//! ```rust
-//! use plist::Value;
-//!
-//! let value = Value::from_file("tests/data/xml.plist").unwrap();
-//!
-//! match value {
-//!     Value::Array(_array) => (),
-//!     _ => ()
-//! }
-//! ```
+//! ### Using `serde`
 //!
 //! ```rust
 //! extern crate plist;
@@ -40,16 +31,37 @@
 //! # fn main() {
 //! #[derive(Deserialize)]
 //! #[serde(rename_all = "PascalCase")]
-//! struct Info {
+//! struct Book {
+//!     title: String,
 //!     author: String,
-//!     height: f32,
+//!     excerpt: String,
+//!     copies_sold: u64,
 //! }
 //!
-//! let info: Info = plist::from_file("tests/data/xml.plist").unwrap();
+//! let book: Book = plist::from_file("tests/data/book.plist")
+//!     .expect("failed to read book.plist");
+//!
+//! assert_eq!(book.title, "Great Expectations");
 //! # }
 //! #
 //! # #[cfg(not(feature = "serde"))]
 //! # fn main() {}
+//! ```
+//!
+//! ### Using `Value`
+//!
+//! ```rust
+//! use plist::Value;
+//!
+//! let book = Value::from_file("tests/data/book.plist")
+//!     .expect("failed to read book.plist");
+//!
+//! let title = book
+//!     .as_dictionary()
+//!     .and_then(|dict| dict.get("Title"))
+//!     .and_then(|title| title.as_string());
+//!
+//! assert_eq!(title, Some("Great Expectations"));
 //! ```
 //!
 //! ## Unstable Features
