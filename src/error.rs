@@ -96,12 +96,23 @@ impl Error {
         }
     }
 
-    /// Returns the underlying error if it was caused by a failure to read or write bytes on an IO stream.
+    /// Returns the underlying error if it was caused by a failure to read or write bytes on an IO
+    /// stream.
     pub fn as_io(&self) -> Option<&io::Error> {
         if let ErrorKind::Io(err) = &self.inner.kind {
             Some(err)
         } else {
             None
+        }
+    }
+
+    /// Returns the underlying error if it was caused by a failure to read or write bytes on an IO
+    /// stream or `self` if it was not.
+    pub fn into_io(self) -> Result<io::Error, Self> {
+        if let ErrorKind::Io(err) = self.inner.kind {
+            Ok(err)
+        } else {
+            Err(self)
         }
     }
 }
