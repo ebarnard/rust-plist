@@ -110,7 +110,7 @@ enum Animal {
     Dog(DogOuter),
     Frog(Result<String, bool>, Option<Vec<f64>>),
     Cat {
-        age: usize,
+        age: Integer,
         name: String,
         firmware: Option<Vec<u8>>,
     },
@@ -216,7 +216,7 @@ fn frog() {
 #[test]
 fn cat_with_firmware() {
     let cat = Animal::Cat {
-        age: 12,
+        age: 12.into(),
         name: "Paws".to_owned(),
         firmware: Some(vec![0, 1, 2, 3, 4, 5, 6, 7, 8]),
     };
@@ -251,7 +251,7 @@ fn cat_with_firmware() {
 #[test]
 fn cat_without_firmware() {
     let cat = Animal::Cat {
-        age: 12,
+        age: Integer::from(-12),
         name: "Paws".to_owned(),
         firmware: None,
     };
@@ -261,7 +261,7 @@ fn cat_without_firmware() {
         Event::String("Cat".to_owned()),
         Event::StartDictionary(None),
         Event::String("age".to_owned()),
-        Event::Integer(12.into()),
+        Event::Integer(Integer::from(-12)),
         Event::String("name".to_owned()),
         Event::String("Paws".to_owned()),
         Event::EndCollection,
