@@ -12,6 +12,9 @@ pub use self::xml_reader::XmlReader;
 mod xml_writer;
 pub use self::xml_writer::XmlWriter;
 
+mod ascii_reader;
+pub use self::ascii_reader::AsciiReader;
+
 use std::{
     io::{self, Read, Seek, SeekFrom},
     vec,
