@@ -1,6 +1,6 @@
 {
-    AnimalSmells = { pig = piggish; lamb = lambish; worm = wormy; };
-    AnimalSounds = { pig = oink; lamb = baa; worm = baa;
-                    Lisa = "Why is the worm talking like a lamb?"; };
-    AnimalColors = { pig = pink; lamb = black; worm = pink; };
+    AnimalColors = { lamb = black; pig = pink; worm = pink; };
+    AnimalSmells = { lamb = lambish; pig = piggish; worm = wormy; };
+    AnimalSounds = { Lisa = "Why is the worm talking like a lamb?";
+                    lamb = baa; pig = oink; worm = baa; };
 }

@@ -27,9 +27,9 @@ pub enum TokenKind {
     Quote,
     Slash,
     Star,
+    Equal,
 
     // One or two character tokens.
-    Equal,
     LineComment,
     BlockCommentLeft,  // ie., /*
     BlockCommentRight, // ie., */
@@ -58,34 +58,37 @@ impl Token {
     }
 }
 
-
-
-
-pub struct AsciiReader<R: Read + Seek> {
+struct Scanner<R: Read + Seek> {
     reader: R,
-    current_token: Vec<u8>,
-    finished: bool,
-    tokens: Vec<String>,
-    had_errors: bool,
-
+    total_length: u64,
+    tokens: Vec<Token>,
     /// start of the current lexeme
-    lexeme_start: usize,
-    current: usize,
+    current_token: String,
+    current_token_start: u64,
+    current_pos: u64,
     line: usize,
 }
 
-impl<R: Read + Seek> AsciiReader<R> {
+impl<R: Read + Seek> Scanner<R> {
     pub fn new(reader: R) -> Self {
+
+        // Ouch
+        let total_length = reader.seek(SeekFrom::End(0)).unwrap_or(0);
+        reader.seek(SeekFrom::Start(0));
+
         Self {
-            reader: reader,
-            current_token: Vec::new(),
-            finished: false,
+            reader,
+            total_length,
             tokens: Vec::new(),
-            had_errors: false,
-            start: 0,
-            current: 0,
+            current_token: String::new(),
+            current_token_start: 0,
+            current_pos: 0,
             line: 1,
         }
+    }
+
+    fn is_at_end(&self) -> bool {
+        self.current_pos >= self.total_length
     }
 
     /// Get the char without consuming it.
@@ -113,7 +116,9 @@ impl<R: Read + Seek> AsciiReader<R> {
                 if n == 0 {
                     None
                 } else {
-                    Some(buf[0] as char)
+                    let c = buf[0] as char;
+                    self.current_token.push(c);
+                    Some(c)
                 }
             }
             Err(_) => None
@@ -121,18 +126,11 @@ impl<R: Read + Seek> AsciiReader<R> {
     }
 
     fn add_token(&mut self, kind: TokenKind) {
-        let reader_pos = self.reader.seek(SeekFrom::Current(0)).unwrap();
-        let length = self.current - self.lexeme_start;
-
-        let buf: Vec<u8> = Vec::with_capacity(length);
-        self.reader.read(buf.as_mut_slice());
-
-        // Goes back FIXME: NEEDED?
-        self.reader.seek(SeekFrom::Start(reader_pos));
-
-        // See add_token from rlox
-
-        let token = Token::new(kind, text_slice.to_owned(), self.line);
+        let token = Token::new(
+            kind,
+            self.current_token.clone(),
+            self.line
+        );
 
         self.tokens.push(token);
     }
@@ -153,64 +151,98 @@ impl<R: Read + Seek> AsciiReader<R> {
             ';' => self.add_token(TokenKind::SemiColon),
             '=' => self.add_token(TokenKind::Equal),
 
-            // Single or two char(s) tokens
-            '!' => {
-                let token = if self.advance_if_matches('=') {
-                    TokenKind::BangEqual
-                } else {
-                    TokenKind::Bang
-                };
-                self.add_token(token)
-            },
-            '=' => {
-                let token = if self.advance_if_matches('=') {
-                    TokenKind::EqualEqual
-                } else {
-                    TokenKind::Equal
-                };
-                self.add_token(token)
-            },
-
-            // '/' can be a commented line.
-            '/' => {
-                if self.advance_if_matches('/') {
-                    // consume the comment without doing anything with it.
-                    while self.peek() != '\n' && !self.is_at_end() {
-                        self.advance();
-                    }
-                } else {
-                    self.add_token(TokenKind::Slash);
-                }
-            },
-
             // Eats whitespace
             ' ' | '\r' | '\t' => { /* Do Nothing */},
 
             '\n' => self.line = self.line + 1,
 
             // literals
-            '"' => self.string_literal(),
             '0'..='9' => self.number_literal(),
-
-            // identifer & keywords
-            'a'..='z' | 'A'..='Z' | '_' => self.identifier(),
+            'a'..='z' | 'A'..='Z' => self.unquoted_string_literal(),
+            '"' => self.quoted_string_literal(),
 
             // Don't know what to do with these.
             _ => self.error(self.line, "Unexpected character".to_owned())
         }
     }
 
+    fn number_literal(&mut self) {
+        while self.peek().is_digit(10) {
+            self.advance();
+        }
 
+        // Fractional part
+        if self.peek() == '.' && self.peek_next().is_digit(10) {
+            // consume '.'
+            self.advance();
 
+            while self.peek().is_digit(10) {
+                self.advance();
+            }
+        }
 
-
-
-
-
-    fn is_token_complete(&self) -> bool {
-        false
+        let double_value = self.current_token.parse::<f32>().unwrap();
+        self.add_token(TokenKind::Number(double_value));
     }
 
+    fn unquoted_string_literal(&mut self) {
+        while self.peek() != ' ' && self.peek() != '\r' && self.peek() != '\t' && !self.is_at_end() {
+            self.advance();
+        }
+
+        self.add_token(TokenKind::String(self.current_token.to_owned()));
+    }
+
+    fn quoted_string_literal(&mut self) {
+        while self.peek() != '"' && !self.is_at_end() {
+            if self.peek() == '\n' {
+                self.line = self.line + 1;
+            }
+
+            self.advance();
+        }
+
+        if self.is_at_end() {
+            self.error(self.line, "Unterminated string".to_owned());
+            return
+        }
+
+        // closing quote
+        self.advance();
+
+        // +1/-1 because we don't want the quote
+        let literal_length = self.current_token.len();
+        let slice = &self.current_token[1..literal_length-1];
+        self.add_token(TokenKind::String(slice.to_owned()));
+    }
+
+    fn error(&mut self, line: usize, message: String) {
+        dbg!("ERROR line: {}, {}", line, message);
+    }
+}
+
+pub struct AsciiReader<R: Read + Seek> {
+    reader: R,
+    finished: bool,
+    tokens: Vec<String>,
+    had_errors: bool,
+}
+
+impl<R: Read + Seek> AsciiReader<R> {
+    pub fn new(reader: R) -> Self {
+        // TODO:
+        // - initialize scanner
+        // - make the pass
+        // - pull from the scanner for parsing
+        Self {
+            reader: reader,
+            current_token: Vec::new(),
+            finished: false,
+            tokens: Vec::new(),
+            had_errors: false,
+
+        }
+    }
 
     // Possible events
     //     StartArray(Option<u64>),
@@ -224,23 +256,6 @@ impl<R: Read + Seek> AsciiReader<R> {
     //     Real(f64),
     //     String(String),
     //     Uid(Uid),
-    fn event_for_current_token(&self) -> Result<Option<Event>, Error> {
-
-    }
-
-    // fn advance(&mut self) {
-    //     let mut buf = [0; 1];
-    //     match self.reader.read(buf) {
-    //         Ok(n) => {
-    //             if n == 0 {
-    //                 self.finished = true;
-    //             } else {
-    //                 self.current_token.append(buf[0]);
-    //             }
-    //         },
-    //         Err(_e) =>  { /* FIXME: handle this case */ }
-    //     }
-    // }
 
     fn read_next(&mut self) -> Result<Option<Event>, Error> {
         if self.finished {
@@ -296,7 +311,6 @@ mod tests {
             String("worm".to_owned()), // key
             String("pink".to_owned()),
             EndCollection,
-
 
             String("AnimalSmells".to_owned()),
             StartDictionary(None),
