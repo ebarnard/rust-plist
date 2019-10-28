@@ -14,6 +14,9 @@ pub use self::xml_writer::XmlWriter;
 #[cfg(feature = "serde")]
 pub(crate) use xml_writer::encode_data_base64 as xml_encode_data_base64;
 
+mod ascii_reader;
+pub use self::ascii_reader::AsciiReader;
+
 use std::{
     borrow::Cow,
     io::{self, Read, Seek, SeekFrom},

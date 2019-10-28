@@ -257,6 +257,54 @@ mod tests {
     }
 
     #[test]
+    fn streaming_animals() {
+        let reader = File::open(&Path::new("./tests/data/xml-animals.plist")).unwrap();
+        let streaming_parser = XmlReader::new(reader);
+        let events: Vec<Event> = streaming_parser.map(|e| e.unwrap()).collect();
+
+        let comparison = &[
+            StartDictionary(None),
+
+            String("AnimalColors".to_owned()),
+            StartDictionary(None),
+            String("lamb".to_owned()), // key
+            String("black".to_owned()),
+            String("pig".to_owned()), // key
+            String("pink".to_owned()),
+            String("worm".to_owned()), // key
+            String("pink".to_owned()),
+            EndCollection,
+
+
+            String("AnimalSmells".to_owned()),
+            StartDictionary(None),
+            String("lamb".to_owned()), // key
+            String("lambish".to_owned()),
+            String("pig".to_owned()), // key
+            String("piggish".to_owned()),
+            String("worm".to_owned()), // key
+            String("wormy".to_owned()),
+            EndCollection,
+
+            String("AnimalSounds".to_owned()),
+            StartDictionary(None),
+            String("Lisa".to_owned()), // key
+            String("Why is the worm talking like a lamb?".to_owned()),
+            String("lamb".to_owned()), // key
+            String("baa".to_owned()),
+            String("pig".to_owned()), // key
+            String("oink".to_owned()),
+            String("worm".to_owned()), // key
+            String("baa".to_owned()),
+            EndCollection,
+
+            EndCollection,
+        ];
+
+        assert_eq!(events, comparison);
+    }
+
+    #[test]
     fn bad_data() {
         let reader = File::open("./tests/data/xml_error.plist").unwrap();
         let streaming_parser = XmlReader::new(reader);
