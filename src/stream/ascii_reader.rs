@@ -1,19 +1,18 @@
-/// Documentation:
-/// - [Apple](https://developer.apple.com/library/archive/documentation/Cocoa/Conceptual/PropertyLists/OldStylePlists/OldStylePLists.html)
-/// - [GNUStep](http://wiki.gnustep.org/index.php?title=Property_Lists)
-/// - [Binary Format](https://medium.com/@karaiskc/understanding-apples-binary-property-list-format-281e6da00dbd)
-///
+
+/// Ascii property lists are used in legacy settings and only support four
+/// datatypes: Array, Dictionary, String and Data.
+/// See [Apple
+/// Documentation](https://developer.apple.com/library/archive/documentation/Cocoa/Conceptual/PropertyLists/OldStylePlists/OldStylePLists.htf
+/// for more infos.
 
 use std::{
     io::{Read, Seek, SeekFrom},
-    str::FromStr,
 };
 use crate::{
     error::{Error, ErrorKind, FilePosition},
     stream::Event,
     Date, Integer,
 };
-
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum TokenKind {
@@ -87,6 +86,11 @@ impl<R: Read + Seek> Scanner<R> {
         }
     }
 
+    fn error(&self, kind: ErrorKind) -> Error {
+        // FIXME: Track position!
+        kind.with_byte_offset(0)
+    }
+
     fn is_at_end(&self) -> bool {
         self.current_pos >= self.total_length
     }
@@ -106,9 +110,8 @@ impl<R: Read + Seek> Scanner<R> {
         peeked
     }
 
+    /// Consume the reader and return the next char.
     fn advance(&mut self) -> Option<char> {
-        // self.source.chars().nth(self.current - 1)
-        // self.current = self.current + 1;
         let mut buf: [u8; 1] = [0; 1];
 
         match self.reader.read(&mut buf) {
@@ -125,99 +128,79 @@ impl<R: Read + Seek> Scanner<R> {
         }
     }
 
-    fn add_token(&mut self, kind: TokenKind) {
-        let token = Token::new(
-            kind,
-            self.current_token.clone(),
-            self.line
-        );
 
-        self.tokens.push(token);
-    }
-
-    fn scan_token(&mut self) {
-        let c = match self.advance() {
-            Some(c) => c,
-            None => return
-        };
-
-        match c {
-            // Single char tokens
-            '(' => self.add_token(TokenKind::LeftParen,),
-            ')' => self.add_token(TokenKind::RightParen),
-            '{' => self.add_token(TokenKind::LeftBrace),
-            '}' => self.add_token(TokenKind::RightBrace),
-            ',' => self.add_token(TokenKind::Comma),
-            ';' => self.add_token(TokenKind::SemiColon),
-            '=' => self.add_token(TokenKind::Equal),
-
-            // Eats whitespace
-            ' ' | '\r' | '\t' => { /* Do Nothing */},
-
-            '\n' => self.line = self.line + 1,
-
-            // literals
-            '0'..='9' => self.number_literal(),
-            'a'..='z' | 'A'..='Z' => self.unquoted_string_literal(),
-            '"' => self.quoted_string_literal(),
-
-            // Don't know what to do with these.
-            _ => self.error(self.line, "Unexpected character".to_owned())
-        }
-    }
-
-    fn number_literal(&mut self) {
-        while self.peek().is_digit(10) {
-            self.advance();
-        }
-
-        // Fractional part
-        if self.peek() == '.' && self.peek_next().is_digit(10) {
-            // consume '.'
-            self.advance();
-
-            while self.peek().is_digit(10) {
-                self.advance();
-            }
-        }
-
-        let double_value = self.current_token.parse::<f32>().unwrap();
-        self.add_token(TokenKind::Number(double_value));
-    }
-
-    fn unquoted_string_literal(&mut self) {
+    /// From Apple doc:
+    ///
+    /// > The quotation marks can be omitted if the string is composed strictly of alphanumeric
+    /// > characters and contains no white space (numbers are handled as
+    /// > strings in property lists). Though the property list format uses
+    /// > ASCII for strings, note that Cocoa uses Unicode. Since string
+    /// > encodings vary from region to region, this representation makes the
+    /// > format fragile. You may see strings containing unreadable sequences of
+    /// > ASCII characters; these are used to represent Unicode characters
+    ///
+    fn unquoted_string_literal(&mut self) -> Result<Option<Event>, Error> {
+        let mut acc = String::new();
         while self.peek() != ' ' && self.peek() != '\r' && self.peek() != '\t' && !self.is_at_end() {
-            self.advance();
+            // consuming the string itself
+            match self.advance() {
+                Some(c) => acc.push(c),
+                None => return Err(self.error(ErrorKind::UnclosedString))
+            };
         }
 
-        self.add_token(TokenKind::String(self.current_token.to_owned()));
+        Ok(Some(Event::String(acc)))
     }
 
-    fn quoted_string_literal(&mut self) {
+    fn quoted_string_literal(&mut self) -> Result<Option<Event>, Error> {
+        let mut acc = String::new();
+        // FIXME: Get rid of is_at_end(). peek() should return an optional
         while self.peek() != '"' && !self.is_at_end() {
             if self.peek() == '\n' {
                 self.line = self.line + 1;
             }
 
-            self.advance();
+            // consuming the string itself
+            match self.advance() {
+                Some(c) => acc.push(c),
+                None => return Err(self.error(ErrorKind::UnclosedString))
+            };
         }
 
-        if self.is_at_end() {
-            self.error(self.line, "Unterminated string".to_owned());
-            return
+        // Match the closing quote.
+        match self.advance() {
+            Some(c) => {
+                if c == '"' {
+                    Ok(Some(Event::String(acc)))
+                } else {
+                    Err(self.error(ErrorKind::UnclosedString))
+                }
+            }
+            None => Err(self.error(ErrorKind::UnclosedString))
         }
-
-        // closing quote
-        self.advance();
-
-        // +1/-1 because we don't want the quote
-        let literal_length = self.current_token.len();
-        let slice = &self.current_token[1..literal_length-1];
-        self.add_token(TokenKind::String(slice.to_owned()));
     }
 
-    fn error(&mut self, line: usize, message: String) {
-        dbg!("ERROR line: {}, {}", line, message);
+    /// Consumes the reader until it finds a valid Event
+    fn pull_next_event(&mut self) -> Result<Option<Event>, Error> {
+        while let Some(c) = self.advance() {
+           match c {
+                // Single char tokens
+                '(' => return Ok(Some(Event::StartArray(None))),
+                ')' => return Ok(Some(Event::EndCollection)),
+                '{' => return Ok(Some(Event::StartDictionary(None))),
+                '}' => return Ok(Some(Event::EndCollection)),
+                'a'..='z' | 'A'..='Z' => return self.unquoted_string_literal(),
+                '"' => return self.quoted_string_literal(),
+                '\n' => self.line = self.line + 1,
+                ','| ';'| '=' => { /* consume these without doing anything */} ,
+                ' ' | '\r' | '\t' => { /* whitespace is not significant */},
+
+                // Don't know what to do with these.
+                _ => return Err(self.error(ErrorKind::UnexpectedChar))
+            }
+        }
+
+        return Ok(None)
     }
 }
 
