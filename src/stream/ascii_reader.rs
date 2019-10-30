@@ -14,99 +14,36 @@ use crate::{
     Date, Integer,
 };
 
-#[derive(Debug, Clone, PartialEq)]
-pub enum TokenKind {
-    // Single-character tokens.
-    LeftParen,
-    RightParen,
-    LeftBrace,
-    RightBrace,
-    Comma,
-    SemiColon,
-    Quote,
-    Slash,
-    Star,
-    Equal,
-
-    // One or two character tokens.
-    LineComment,
-    BlockCommentLeft,  // ie., /*
-    BlockCommentRight, // ie., */
-
-    // Literals.
-    String(String),
-    Number(f32),
-
-    Eof,
-}
-
-#[derive(Debug, PartialEq, Clone)]
-pub struct Token {
-    pub kind: TokenKind,
-    pub lexeme: String,
-    pub line: usize,
-}
-
-impl Token {
-    pub fn new(kind: TokenKind, lexeme: String, line: usize) -> Self {
-        Token {
-            kind,
-            lexeme,
-            line,
-        }
-    }
-}
-
-struct Scanner<R: Read + Seek> {
+pub struct AsciiReader<R: Read + Seek> {
     reader: R,
-    total_length: u64,
-    tokens: Vec<Token>,
-    /// start of the current lexeme
-    current_token: String,
-    current_token_start: u64,
     current_pos: u64,
-    line: usize,
 }
 
-impl<R: Read + Seek> Scanner<R> {
+impl<R: Read + Seek> AsciiReader<R> {
     pub fn new(reader: R) -> Self {
-
-        // Ouch
-        let total_length = reader.seek(SeekFrom::End(0)).unwrap_or(0);
-        reader.seek(SeekFrom::Start(0));
-
         Self {
             reader,
-            total_length,
-            tokens: Vec::new(),
-            current_token: String::new(),
-            current_token_start: 0,
-            current_pos: 0,
-            line: 1,
+            current_pos: 0, // FIXME: Track position!
         }
     }
 
     fn error(&self, kind: ErrorKind) -> Error {
-        // FIXME: Track position!
-        kind.with_byte_offset(0)
+        kind.with_byte_offset(self.current_pos)
     }
 
-    fn is_at_end(&self) -> bool {
-        self.current_pos >= self.total_length
-    }
-
-    /// Get the char without consuming it.
-    fn peek(&self) -> char {
-        let peeked = self.advance().unwrap_or('\0');
-        self.reader.seek(SeekFrom::Current(-1));
+    /// Get a char without consuming it.
+    fn peek(&mut self) -> Option<char> {
+        // consume a char then rollback to previous position.
+        let peeked = self.advance();
+        let _ = self.reader.seek(SeekFrom::Current(-1));
         peeked
     }
 
     /// Get the next char without consuming it.
-    fn peek_next(&self) -> char {
-        self.reader.seek(SeekFrom::Current(1));
-        let peeked = self.advance().unwrap_or('\0');
-        self.reader.seek(SeekFrom::Current(-2));
+    fn peek_next(&mut self) -> Option<char> {
+        let _ = self.reader.seek(SeekFrom::Current(1));
+        let peeked = self.advance();
+        let _ = self.reader.seek(SeekFrom::Current(-2));
         peeked
     }
 
@@ -119,15 +56,14 @@ impl<R: Read + Seek> Scanner<R> {
                 if n == 0 {
                     None
                 } else {
-                    let c = buf[0] as char;
-                    self.current_token.push(c);
+                    let c =  buf[0] as char;
+                    dbg!("Consuming: {}", c);
                     Some(c)
                 }
             }
             Err(_) => None
         }
     }
-
 
     /// From Apple doc:
     ///
@@ -139,9 +75,18 @@ impl<R: Read + Seek> Scanner<R> {
     /// > format fragile. You may see strings containing unreadable sequences of
     /// > ASCII characters; these are used to represent Unicode characters
     ///
-    fn unquoted_string_literal(&mut self) -> Result<Option<Event>, Error> {
+    fn unquoted_string_literal(&mut self, first: char) -> Result<Option<Event>, Error> {
         let mut acc = String::new();
-        while self.peek() != ' ' && self.peek() != '\r' && self.peek() != '\t' && !self.is_at_end() {
+        acc.push(first);
+
+        while {
+            match self.peek() {
+                Some(c) => {
+                    c != ' ' && c != '\r' && c != '\t' && c != ';'
+                }
+                None => false
+            }
+        } {
             // consuming the string itself
             match self.advance() {
                 Some(c) => acc.push(c),
@@ -154,12 +99,13 @@ impl<R: Read + Seek> Scanner<R> {
 
     fn quoted_string_literal(&mut self) -> Result<Option<Event>, Error> {
         let mut acc = String::new();
-        // FIXME: Get rid of is_at_end(). peek() should return an optional
-        while self.peek() != '"' && !self.is_at_end() {
-            if self.peek() == '\n' {
-                self.line = self.line + 1;
+        // Can the quote char be escaped?
+        while {
+            match self.peek() {
+                Some(c) => c != '"',
+                None => false
             }
-
+        } {
             // consuming the string itself
             match self.advance() {
                 Some(c) => acc.push(c),
@@ -181,7 +127,12 @@ impl<R: Read + Seek> Scanner<R> {
     }
 
     /// Consumes the reader until it finds a valid Event
-    fn pull_next_event(&mut self) -> Result<Option<Event>, Error> {
+    /// Possible events for Ascii plists:
+    //  - StartArray(Option<u64>),
+    //  - StartDictionary(Option<u64>),
+    //  - EndCollection,
+    //  - Data(Vec<u8>),
+    fn read_next(&mut self) -> Result<Option<Event>, Error> {
         while let Some(c) = self.advance() {
            match c {
                 // Single char tokens
@@ -189,11 +140,10 @@ impl<R: Read + Seek> Scanner<R> {
                 ')' => return Ok(Some(Event::EndCollection)),
                 '{' => return Ok(Some(Event::StartDictionary(None))),
                 '}' => return Ok(Some(Event::EndCollection)),
-                'a'..='z' | 'A'..='Z' => return self.unquoted_string_literal(),
+                'a'..='z' | 'A'..='Z' => return self.unquoted_string_literal(c),
                 '"' => return self.quoted_string_literal(),
-                '\n' => self.line = self.line + 1,
                 ','| ';'| '=' => { /* consume these without doing anything */} ,
-                ' ' | '\r' | '\t' => { /* whitespace is not significant */},
+                ' ' | '\r' | '\t' | '\n' => { /* whitespace is not significant */},
 
                 // Don't know what to do with these.
                 _ => return Err(self.error(ErrorKind::UnexpectedChar))
@@ -201,55 +151,6 @@ impl<R: Read + Seek> Scanner<R> {
         }
 
         return Ok(None)
-    }
-}
-
-pub struct AsciiReader<R: Read + Seek> {
-    reader: R,
-    finished: bool,
-    tokens: Vec<String>,
-    had_errors: bool,
-}
-
-impl<R: Read + Seek> AsciiReader<R> {
-    pub fn new(reader: R) -> Self {
-        // TODO:
-        // - initialize scanner
-        // - make the pass
-        // - pull from the scanner for parsing
-        Self {
-            reader: reader,
-            current_token: Vec::new(),
-            finished: false,
-            tokens: Vec::new(),
-            had_errors: false,
-
-        }
-    }
-
-    // Possible events
-    //     StartArray(Option<u64>),
-    //     StartDictionary(Option<u64>),
-    //     EndCollection,
-
-    //     Boolean(bool),
-    //     Data(Vec<u8>),
-    //     Date(Date),
-    //     Integer(Integer),
-    //     Real(f64),
-    //     String(String),
-    //     Uid(Uid),
-
-    fn read_next(&mut self) -> Result<Option<Event>, Error> {
-        if self.finished {
-            return Ok(None)
-        } else {
-            while !self.is_token_complete() {
-                self.advance();
-            }
-
-            self.event_for_current_token()
-        }
     }
 }
 
