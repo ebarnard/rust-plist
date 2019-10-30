@@ -39,14 +39,6 @@ impl<R: Read + Seek> AsciiReader<R> {
         peeked
     }
 
-    /// Get the next char without consuming it.
-    fn peek_next(&mut self) -> Option<char> {
-        let _ = self.reader.seek(SeekFrom::Current(1));
-        let peeked = self.advance();
-        let _ = self.reader.seek(SeekFrom::Current(-2));
-        peeked
-    }
-
     /// Consume the reader and return the next char.
     fn advance(&mut self) -> Option<char> {
         let mut buf: [u8; 1] = [0; 1];
@@ -82,7 +74,7 @@ impl<R: Read + Seek> AsciiReader<R> {
         while {
             match self.peek() {
                 Some(c) => {
-                    c != ' ' && c != '\r' && c != '\t' && c != ';'
+                    c != ' ' && c != '\r' && c != '\t' && c != ';' && c != ','
                 }
                 None => false
             }
@@ -126,6 +118,41 @@ impl<R: Read + Seek> AsciiReader<R> {
         }
     }
 
+    fn line_comment(&mut self) -> Result<(), Error> {
+        // Consumes up to the end of the line.
+        // There's no error in this a line comment can reach the EOF and there's
+        // no forbidden chars in comments.
+        while {
+            match self.peek() {
+                Some(c) => c != '\n',
+                None => false
+            }
+        } {
+            let _ = self.advance();
+        }
+
+        Ok(())
+    }
+
+    fn block_comment(&mut self) -> Result<(), Error> {
+        // FIXME: Implement
+        Ok(())
+    }
+
+    fn potential_comment(&mut self) -> Result<(), Error> {
+        match self.peek() {
+            Some(c) => {
+                match c {
+                    '/' => self.line_comment(),
+                    '*' => self.block_comment(),
+                    _ => Err(self.error(ErrorKind::UnexpectedChar))
+                }
+            }
+            // EOF
+            None => Err(self.error(ErrorKind::IncompleteEvent))
+        }
+    }
+
     /// Consumes the reader until it finds a valid Event
     /// Possible events for Ascii plists:
     //  - StartArray(Option<u64>),
@@ -140,8 +167,14 @@ impl<R: Read + Seek> AsciiReader<R> {
                 ')' => return Ok(Some(Event::EndCollection)),
                 '{' => return Ok(Some(Event::StartDictionary(None))),
                 '}' => return Ok(Some(Event::EndCollection)),
-                'a'..='z' | 'A'..='Z' => return self.unquoted_string_literal(c),
+                'a'..='z' | 'A'..='Z' | '_' => return self.unquoted_string_literal(c),
                 '"' => return self.quoted_string_literal(),
+                '/' => {
+                    match self.potential_comment() {
+                        Ok(_) => { /* Comment has been consumed */}
+                        Err(e) => return Err(e)
+                    }
+                }
                 ','| ';'| '=' => { /* consume these without doing anything */} ,
                 ' ' | '\r' | '\t' | '\n' => { /* whitespace is not significant */},
 
@@ -176,6 +209,42 @@ mod tests {
 
     use super::*;
     use crate::stream::Event::{self, *};
+
+    #[test]
+    fn streaming_sample() {
+
+        let reader = File::open(&Path::new("./tests/data/ascii-sample.plist")).unwrap();
+        let streaming_parser = AsciiReader::new(reader);
+        let events: Vec<Event> = streaming_parser.map(|e| e.unwrap()).collect();
+
+        let comparison = &[
+            StartDictionary(None),
+
+            String("AnimalColors".to_owned()),
+            StartDictionary(None),
+            String("KeyName1".to_owned()),
+            String("Value1".to_owned()),
+            String("AnotherKeyName".to_owned()),
+            String("Something".to_owned()),
+            StartArray(None),
+            String("ArrayItem1".to_owned()),
+            String("ArrayItem2".to_owned()),
+            String("ArrayItem3".to_owned()),
+            EndCollection,
+            String("key4".to_owned()),
+            String("0.10".to_owned()),
+            String("KeyFive".to_owned()),
+            StartDictionary(None),
+            String("Dictionary2Key1".to_owned()),
+            String("Something".to_owned()),
+            String("AnotherKey".to_owned()),
+            String("Somethingelse".to_owned()),
+            EndCollection,
+            EndCollection,
+        ];
+
+        assert_eq!(events, comparison);
+    }
 
     #[test]
     fn streaming_animals() {
