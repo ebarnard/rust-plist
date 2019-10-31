@@ -23,7 +23,7 @@ impl<R: Read + Seek> AsciiReader<R> {
     pub fn new(reader: R) -> Self {
         Self {
             reader,
-            current_pos: 0, // FIXME: Track position!
+            current_pos: 0,
         }
     }
 
@@ -36,6 +36,7 @@ impl<R: Read + Seek> AsciiReader<R> {
         // consume a char then rollback to previous position.
         let peeked = self.advance();
         let _ = self.reader.seek(SeekFrom::Current(-1));
+        self.update_current_pos();
         peeked
     }
 
@@ -49,10 +50,18 @@ impl<R: Read + Seek> AsciiReader<R> {
                     None
                 } else {
                     let c =  buf[0];
+                    self.update_current_pos();
                     Some(c)
                 }
             }
             Err(_) => None
+        }
+    }
+
+    fn update_current_pos(&mut self) {
+        match self.reader.seek(SeekFrom::Current(0)) {
+            Ok(pos) => self.current_pos = pos,
+            Err(_e) => { /* Do nothing */}
         }
     }
 
@@ -307,7 +316,7 @@ mod tests {
 
     #[test]
     fn non_ascii_strings() {
-        let plist = "{ names = (Léa, François, Żaklina, 王芳) }".to_owned();
+        let plist = "{ names = (Léa, François, Żaklina, 王芳); }".to_owned();
         let cursor = Cursor::new(plist.as_bytes());
         let streaming_parser = AsciiReader::new(cursor);
         let events: Vec<Event> = streaming_parser.map(|e| e.unwrap()).collect();
