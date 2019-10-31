@@ -25,8 +25,6 @@ pub(crate) enum ErrorKind {
 
     // Ascii format-specific errors
     UnclosedString,
-    UnexpectedChar,
-    IncompleteEvent,
     IncompleteComment,
     InvalidUtf8AsciiStream,
 

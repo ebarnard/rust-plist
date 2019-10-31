@@ -4,14 +4,14 @@
 /// See [Apple
 /// Documentation](https://developer.apple.com/library/archive/documentation/Cocoa/Conceptual/PropertyLists/OldStylePlists/OldStylePLists.htf
 /// for more infos.
-
+/// This reader will accept certain ill-formed ascii plist without complaining.
+/// It does not check the integrity of the plist format.
 use std::{
     io::{Read, Seek, SeekFrom},
 };
 use crate::{
     error::{Error, ErrorKind},
     stream::Event,
-    Date, Integer,
 };
 
 pub struct AsciiReader<R: Read + Seek> {
@@ -51,6 +51,7 @@ impl<R: Read + Seek> AsciiReader<R> {
                 } else {
                     let c =  buf[0];
                     self.update_current_pos();
+                    dbg!(c as char);
                     Some(c)
                 }
             }
@@ -160,13 +161,16 @@ impl<R: Read + Seek> AsciiReader<R> {
         Ok(())
     }
 
-    fn potential_comment(&mut self) -> Result<(), Error> {
+    /// Returns:
+    /// - Some(string) if '/' was the first character of a string
+    /// - None if '/' was the beginning of a comment.
+    fn potential_comment(&mut self) -> Result<Option<Event>, Error> {
         match self.peek() {
             Some(c) => {
-                match c as char {
-                    '/' => self.line_comment(),
-                    '*' => self.block_comment(),
-                    _ => Err(self.error(ErrorKind::IncompleteComment))
+                match c {
+                    b'/' => self.line_comment().map(|_| None),
+                    b'*' => self.block_comment().map(|_| None),
+                    _ => self.unquoted_string_literal(c)
                 }
             }
             // EOF
@@ -191,19 +195,14 @@ impl<R: Read + Seek> AsciiReader<R> {
                 b'"' => return self.quoted_string_literal(),
                 b'/' => {
                     match self.potential_comment() {
-                        Ok(_) => { /* Comment has been consumed */}
+                        Ok(Some(event)) => return Ok(Some(event)),
+                        Ok(None) => { /* Comment has been consumed */}
                         Err(e) => return Err(e)
                     }
                 }
-                b','| b';'| b'=' => { /* consume these without doing anything */} ,
+                b','| b';'| b'=' => { /* consume these without emitting anything */} ,
                 b' ' | b'\r' | b'\t' | b'\n' => { /* whitespace is not significant */},
-                _ => {
-                    if (c as char).is_alphanumeric() {
-                        return self.unquoted_string_literal(c)
-                    } else {
-                        return Err(self.error(ErrorKind::UnexpectedChar))
-                    }
-                }
+                _ => return self.unquoted_string_literal(c)
             }
         }
 
@@ -217,12 +216,8 @@ impl<R: Read + Seek> Iterator for AsciiReader<R> {
     fn next(&mut self) -> Option<Result<Event, Error>> {
         match self.read_next() {
             Ok(Some(event)) => Some(Ok(event)),
-            Err(err) => {
-                // Mark the plist as finished
-                // self.stack.clear();
-                Some(Err(err))
-            }
             Ok(None) => None,
+            Err(err) => Some(Err(err))
         }
     }
 }
@@ -315,7 +310,7 @@ mod tests {
     }
 
     #[test]
-    fn non_ascii_strings() {
+    fn utf8_strings() {
         let plist = "{ names = (Léa, François, Żaklina, 王芳); }".to_owned();
         let cursor = Cursor::new(plist.as_bytes());
         let streaming_parser = AsciiReader::new(cursor);
@@ -335,5 +330,16 @@ mod tests {
         ];
 
         assert_eq!(events, comparison);
+    }
+
+        #[test]
+    fn netnewswire_pbxproj() {
+        let reader = File::open(&Path::new("./tests/data/netnewswire.pbxproj")).unwrap();
+        let streaming_parser = AsciiReader::new(reader);
+
+        // Ensure that we don't fail when reading the file
+        let events: Vec<Event> = streaming_parser.map(|e| e.unwrap()).collect();
+
+        assert!(!events.is_empty());
     }
 }
