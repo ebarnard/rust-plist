@@ -240,6 +240,7 @@ enum ReaderInner<R: Read + Seek> {
     Uninitialized(Option<R>),
     Xml(XmlReader<R>),
     Binary(BinaryReader<R>),
+    Ascii(AsciiReader<R>),
 }
 
 impl<R: Read + Seek> Reader<R> {
@@ -259,6 +260,19 @@ impl<R: Read + Seek> Reader<R> {
 
         Ok(&magic == b"bplist00")
     }
+
+    fn is_xml(reader: &mut R) -> Result<bool, Error> {
+        fn from_io_offset_0(err: io::Error) -> Error {
+            ErrorKind::Io(err).with_byte_offset(0)
+        }
+
+        reader.seek(SeekFrom::Start(0)).map_err(from_io_offset_0)?;
+        let mut magic = [0; 5];
+        reader.read_exact(&mut magic).map_err(from_io_offset_0)?;
+        reader.seek(SeekFrom::Start(0)).map_err(from_io_offset_0)?;
+
+        Ok(&magic == b"<?xml")
+    }
 }
 
 impl<R: Read + Seek> Iterator for Reader<R> {
@@ -268,12 +282,20 @@ impl<R: Read + Seek> Iterator for Reader<R> {
         let mut reader = match self.0 {
             ReaderInner::Xml(ref mut parser) => return parser.next(),
             ReaderInner::Binary(ref mut parser) => return parser.next(),
+            ReaderInner::Ascii(ref mut parser) => return parser.next(),
             ReaderInner::Uninitialized(ref mut reader) => reader.take().unwrap(),
         };
 
         match Reader::is_binary(&mut reader) {
             Ok(true) => self.0 = ReaderInner::Binary(BinaryReader::new(reader)),
-            Ok(false) => self.0 = ReaderInner::Xml(XmlReader::new(reader)),
+            Ok(false) => match Reader::is_xml(&mut reader) {
+                Ok(true) => self.0 = ReaderInner::Xml(XmlReader::new(reader)),
+                Ok(false) => self.0 = ReaderInner::Ascii(AsciiReader::new(reader)),
+                Err(err) => {
+                    self.0 = ReaderInner::Uninitialized(Some(reader));
+                    return Some(Err(err));
+                }
+            },
             Err(err) => {
                 self.0 = ReaderInner::Uninitialized(Some(reader));
                 return Some(Err(err));
