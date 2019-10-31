@@ -49,7 +49,6 @@ impl<R: Read + Seek> AsciiReader<R> {
                     None
                 } else {
                     let c =  buf[0] as char;
-                    dbg!("Consuming: {}", c);
                     Some(c)
                 }
             }
@@ -135,7 +134,16 @@ impl<R: Read + Seek> AsciiReader<R> {
     }
 
     fn block_comment(&mut self) -> Result<(), Error> {
-        // FIXME: Implement
+        let mut latest_consume = ' ';
+        while {
+            latest_consume != '*' || match self.advance() {
+                Some(c) => c != '/',
+                None => false
+            }
+        } {
+            latest_consume = self.advance().unwrap_or(' ');
+        }
+
         Ok(())
     }
 
@@ -145,11 +153,11 @@ impl<R: Read + Seek> AsciiReader<R> {
                 match c {
                     '/' => self.line_comment(),
                     '*' => self.block_comment(),
-                    _ => Err(self.error(ErrorKind::UnexpectedChar))
+                    _ => Err(self.error(ErrorKind::IncompleteComment))
                 }
             }
             // EOF
-            None => Err(self.error(ErrorKind::IncompleteEvent))
+            None => Err(self.error(ErrorKind::IncompleteComment))
         }
     }
 
@@ -167,7 +175,6 @@ impl<R: Read + Seek> AsciiReader<R> {
                 ')' => return Ok(Some(Event::EndCollection)),
                 '{' => return Ok(Some(Event::StartDictionary(None))),
                 '}' => return Ok(Some(Event::EndCollection)),
-                'a'..='z' | 'A'..='Z' | '_' => return self.unquoted_string_literal(c),
                 '"' => return self.quoted_string_literal(),
                 '/' => {
                     match self.potential_comment() {
@@ -179,7 +186,13 @@ impl<R: Read + Seek> AsciiReader<R> {
                 ' ' | '\r' | '\t' | '\n' => { /* whitespace is not significant */},
 
                 // Don't know what to do with these.
-                _ => return Err(self.error(ErrorKind::UnexpectedChar))
+                _ => {
+                    if c.is_alphanumeric() {
+                        return self.unquoted_string_literal(c)
+                    } else {
+                        return Err(self.error(ErrorKind::UnexpectedChar))
+                    }
+                }
             }
         }
 
@@ -212,26 +225,23 @@ mod tests {
 
     #[test]
     fn streaming_sample() {
-
         let reader = File::open(&Path::new("./tests/data/ascii-sample.plist")).unwrap();
         let streaming_parser = AsciiReader::new(reader);
         let events: Vec<Event> = streaming_parser.map(|e| e.unwrap()).collect();
 
         let comparison = &[
             StartDictionary(None),
-
-            String("AnimalColors".to_owned()),
-            StartDictionary(None),
             String("KeyName1".to_owned()),
             String("Value1".to_owned()),
             String("AnotherKeyName".to_owned()),
+            String("Value2".to_owned()),
             String("Something".to_owned()),
             StartArray(None),
             String("ArrayItem1".to_owned()),
             String("ArrayItem2".to_owned()),
             String("ArrayItem3".to_owned()),
             EndCollection,
-            String("key4".to_owned()),
+            String("Key4".to_owned()),
             String("0.10".to_owned()),
             String("KeyFive".to_owned()),
             StartDictionary(None),
