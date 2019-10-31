@@ -27,6 +27,7 @@ pub(crate) enum ErrorKind {
     UnclosedString,
     UnexpectedChar,
     IncompleteEvent,
+    IncompleteComment,
 
     // Xml format-specific errors
     UnclosedXmlElement,
