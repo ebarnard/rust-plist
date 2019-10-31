@@ -9,7 +9,7 @@ use std::{
     io::{Read, Seek, SeekFrom},
 };
 use crate::{
-    error::{Error, ErrorKind, FilePosition},
+    error::{Error, ErrorKind},
     stream::Event,
     Date, Integer,
 };
@@ -32,7 +32,7 @@ impl<R: Read + Seek> AsciiReader<R> {
     }
 
     /// Get a char without consuming it.
-    fn peek(&mut self) -> Option<char> {
+    fn peek(&mut self) -> Option<u8> {
         // consume a char then rollback to previous position.
         let peeked = self.advance();
         let _ = self.reader.seek(SeekFrom::Current(-1));
@@ -40,7 +40,7 @@ impl<R: Read + Seek> AsciiReader<R> {
     }
 
     /// Consume the reader and return the next char.
-    fn advance(&mut self) -> Option<char> {
+    fn advance(&mut self) -> Option<u8> {
         let mut buf: [u8; 1] = [0; 1];
 
         match self.reader.read(&mut buf) {
@@ -48,7 +48,7 @@ impl<R: Read + Seek> AsciiReader<R> {
                 if n == 0 {
                     None
                 } else {
-                    let c =  buf[0] as char;
+                    let c =  buf[0];
                     Some(c)
                 }
             }
@@ -66,15 +66,14 @@ impl<R: Read + Seek> AsciiReader<R> {
     /// > format fragile. You may see strings containing unreadable sequences of
     /// > ASCII characters; these are used to represent Unicode characters
     ///
-    fn unquoted_string_literal(&mut self, first: char) -> Result<Option<Event>, Error> {
-        let mut acc = String::new();
+    fn unquoted_string_literal(&mut self, first: u8) -> Result<Option<Event>, Error> {
+        let mut acc: Vec<u8> = Vec::new();
         acc.push(first);
 
         while {
             match self.peek() {
-                Some(c) => {
-                    c != ' ' && c != '\r' && c != '\t' && c != ';' && c != ','
-                }
+                Some(c) => c != b' ' && c != b')' && c != b'\r'
+                    && c != b'\t' && c != b';' && c != b',',
                 None => false
             }
         } {
@@ -85,15 +84,18 @@ impl<R: Read + Seek> AsciiReader<R> {
             };
         }
 
-        Ok(Some(Event::String(acc)))
+        let string_literal = String::from_utf8(acc)
+            .map_err(|_e| self.error(ErrorKind::InvalidUtf8AsciiStream))?;
+
+        Ok(Some(Event::String(string_literal)))
     }
 
     fn quoted_string_literal(&mut self) -> Result<Option<Event>, Error> {
-        let mut acc = String::new();
+        let mut acc: Vec<u8> = Vec::new();
         // Can the quote char be escaped?
         while {
             match self.peek() {
-                Some(c) => c != '"',
+                Some(c) => c != b'"',
                 None => false
             }
         } {
@@ -107,8 +109,10 @@ impl<R: Read + Seek> AsciiReader<R> {
         // Match the closing quote.
         match self.advance() {
             Some(c) => {
-                if c == '"' {
-                    Ok(Some(Event::String(acc)))
+                if c as char == '"' {
+                    let string_literal = String::from_utf8(acc)
+                        .map_err(|_e| self.error(ErrorKind::InvalidUtf8AsciiStream))?;
+                    Ok(Some(Event::String(string_literal)))
                 } else {
                     Err(self.error(ErrorKind::UnclosedString))
                 }
@@ -123,7 +127,7 @@ impl<R: Read + Seek> AsciiReader<R> {
         // no forbidden chars in comments.
         while {
             match self.peek() {
-                Some(c) => c != '\n',
+                Some(c) => c != b'\n',
                 None => false
             }
         } {
@@ -134,14 +138,14 @@ impl<R: Read + Seek> AsciiReader<R> {
     }
 
     fn block_comment(&mut self) -> Result<(), Error> {
-        let mut latest_consume = ' ';
+        let mut latest_consume = b' ';
         while {
-            latest_consume != '*' || match self.advance() {
-                Some(c) => c != '/',
+            latest_consume != b'*' || match self.advance() {
+                Some(c) => c != b'/',
                 None => false
             }
         } {
-            latest_consume = self.advance().unwrap_or(' ');
+            latest_consume = self.advance().unwrap_or(b' ');
         }
 
         Ok(())
@@ -150,7 +154,7 @@ impl<R: Read + Seek> AsciiReader<R> {
     fn potential_comment(&mut self) -> Result<(), Error> {
         match self.peek() {
             Some(c) => {
-                match c {
+                match c as char {
                     '/' => self.line_comment(),
                     '*' => self.block_comment(),
                     _ => Err(self.error(ErrorKind::IncompleteComment))
@@ -171,23 +175,21 @@ impl<R: Read + Seek> AsciiReader<R> {
         while let Some(c) = self.advance() {
            match c {
                 // Single char tokens
-                '(' => return Ok(Some(Event::StartArray(None))),
-                ')' => return Ok(Some(Event::EndCollection)),
-                '{' => return Ok(Some(Event::StartDictionary(None))),
-                '}' => return Ok(Some(Event::EndCollection)),
-                '"' => return self.quoted_string_literal(),
-                '/' => {
+                b'(' => return Ok(Some(Event::StartArray(None))),
+                b')' => return Ok(Some(Event::EndCollection)),
+                b'{' => return Ok(Some(Event::StartDictionary(None))),
+                b'}' => return Ok(Some(Event::EndCollection)),
+                b'"' => return self.quoted_string_literal(),
+                b'/' => {
                     match self.potential_comment() {
                         Ok(_) => { /* Comment has been consumed */}
                         Err(e) => return Err(e)
                     }
                 }
-                ','| ';'| '=' => { /* consume these without doing anything */} ,
-                ' ' | '\r' | '\t' | '\n' => { /* whitespace is not significant */},
-
-                // Don't know what to do with these.
+                b','| b';'| b'=' => { /* consume these without doing anything */} ,
+                b' ' | b'\r' | b'\t' | b'\n' => { /* whitespace is not significant */},
                 _ => {
-                    if c.is_alphanumeric() {
+                    if (c as char).is_alphanumeric() {
                         return self.unquoted_string_literal(c)
                     } else {
                         return Err(self.error(ErrorKind::UnexpectedChar))
@@ -219,7 +221,7 @@ impl<R: Read + Seek> Iterator for AsciiReader<R> {
 #[cfg(test)]
 mod tests {
     use std::{fs::File, path::Path};
-
+    use std::io::Cursor;
     use super::*;
     use crate::stream::Event::{self, *};
 
@@ -297,6 +299,29 @@ mod tests {
             String("baa".to_owned()),
             EndCollection,
 
+            EndCollection,
+        ];
+
+        assert_eq!(events, comparison);
+    }
+
+    #[test]
+    fn non_ascii_strings() {
+        let plist = "{ names = (Léa, François, Żaklina, 王芳) }".to_owned();
+        let cursor = Cursor::new(plist.as_bytes());
+        let streaming_parser = AsciiReader::new(cursor);
+        let events: Vec<Event> = streaming_parser.map(|e| e.unwrap()).collect();
+
+        let comparison = &[
+            StartDictionary(None),
+
+            String("names".to_owned()),
+            StartArray(None),
+            String("Léa".to_owned()),
+            String("François".to_owned()),
+            String("Żaklina".to_owned()),
+            String("王芳".to_owned()),
+            EndCollection,
             EndCollection,
         ];
 
