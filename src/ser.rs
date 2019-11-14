@@ -598,7 +598,6 @@ impl<'a, W: Writer> ser::SerializeStructVariant for Compound<'a, W> {
 
 /// Serializes the given data structure as a binary encoded plist file.
 pub fn to_writer<W: Write, T: ser::Serialize>(writer: W, value: &T) -> Result<(), Error> {
-    use std::ops::Drop;
     let mut ser = Serializer::new(VecWriter::new());
     value.serialize(&mut ser)?;
 

@@ -1,6 +1,6 @@
 use humantime;
 use std::fmt;
-use std::time::{Duration, SystemTime, SystemTimeError, UNIX_EPOCH};
+use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 /// A UTC timestamp used for serialization to and from the plist date type.
 ///
@@ -26,7 +26,6 @@ impl Date {
     pub(crate) fn from_seconds_since_plist_epoch(timestamp: f64) -> Result<Date, ()> {
         // `timestamp` is the number of seconds since the plist epoch of 1/1/2001 00:00:00.
         // `PLIST_EPOCH_UNIX_TIMESTAMP` is the unix timestamp of the plist epoch.
-        const PLIST_EPOCH_UNIX_TIMESTAMP: u64 = 978_307_200;
         let plist_epoch = UNIX_EPOCH + Duration::from_secs(Date::PLIST_EPOCH_UNIX_TIMESTAMP);
 
         if !timestamp.is_finite() {

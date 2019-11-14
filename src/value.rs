@@ -54,7 +54,7 @@ impl Value {
         self.to_writer_xml_inner(&mut writer)
     }
 
-    fn to_writer_xml_inner(&self, writer: &mut Writer) -> Result<(), Error> {
+    fn to_writer_xml_inner(&self, writer: &mut dyn Writer) -> Result<(), Error> {
         let events = self.clone().into_events();
         for event in events {
             writer.write(&event)?;

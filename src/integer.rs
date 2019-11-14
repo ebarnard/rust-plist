@@ -50,7 +50,7 @@ impl FromStr for Integer {
             // NetBSD dialect adds the `0x` numeric objects,
             // which are always unsigned.
             // See the `PROP_NUMBER(3)` man page
-            let s = s.trim_left_matches("0x");
+            let s = s.trim_start_matches("0x");
 
             u64::from_str_radix(s, 16).map(Into::into)
         } else {

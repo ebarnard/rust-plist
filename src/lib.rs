@@ -104,11 +104,11 @@ impl ::std::error::Error for Error {
             Error::UnexpectedEof => "unexpected eof",
             Error::Io(ref err) => err.description(),
             Error::Serde(ref err) => &err,
-            Error::InvalidDate(ref err) => "date is neither before nor after plist epoch?",
+            Error::InvalidDate(ref _err) => "date is neither before nor after plist epoch?",
         }
     }
 
-    fn cause(&self) -> Option<&::std::error::Error> {
+    fn cause(&self) -> Option<&dyn (::std::error::Error)> {
         match *self {
             Error::Io(ref err) => Some(err),
             Error::InvalidDate(ref err) => Some(err),
