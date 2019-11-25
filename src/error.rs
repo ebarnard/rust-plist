@@ -27,6 +27,7 @@ pub(crate) enum ErrorKind {
     UnclosedString,
     IncompleteComment,
     InvalidUtf8AsciiStream,
+    InvalidInteger,
 
     // Xml format-specific errors
     UnclosedXmlElement,
