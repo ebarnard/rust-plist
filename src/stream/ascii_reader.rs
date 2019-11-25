@@ -4,6 +4,7 @@
 /// See [Apple
 /// Documentation](https://developer.apple.com/library/archive/documentation/Cocoa/Conceptual/PropertyLists/OldStylePlists/OldStylePLists.htf
 /// for more infos.
+/// However this reader also support Integers as first class datatype.
 /// This reader will accept certain ill-formed ascii plist without complaining.
 /// It does not check the integrity of the plist format.
 use std::{
@@ -12,6 +13,7 @@ use std::{
 use crate::{
     error::{Error, ErrorKind},
     stream::Event,
+    Integer,
 };
 
 pub struct AsciiReader<R: Read + Seek> {
@@ -51,7 +53,6 @@ impl<R: Read + Seek> AsciiReader<R> {
                 } else {
                     let c =  buf[0];
                     self.update_current_pos();
-                    dbg!(c as char);
                     Some(c)
                 }
             }
@@ -76,6 +77,7 @@ impl<R: Read + Seek> AsciiReader<R> {
     /// > format fragile. You may see strings containing unreadable sequences of
     /// > ASCII characters; these are used to represent Unicode characters
     ///
+    /// This function will naively try to convert the string to Integer.
     fn unquoted_string_literal(&mut self, first: u8) -> Result<Option<Event>, Error> {
         let mut acc: Vec<u8> = Vec::new();
         acc.push(first);
@@ -94,10 +96,14 @@ impl<R: Read + Seek> AsciiReader<R> {
             };
         }
 
-        let string_literal = String::from_utf8(acc)
+        let string_literal = std::str::from_utf8(&acc)
             .map_err(|_e| self.error(ErrorKind::InvalidUtf8AsciiStream))?;
 
-        Ok(Some(Event::String(string_literal)))
+        // Not ideal but does the trick for now
+        match Integer::from_str(string_literal) {
+            Ok(i) => Ok(Some(Event::Integer(i))),
+            Err(_) => Ok(Some(Event::String(string_literal.to_owned())))
+        }
     }
 
     fn quoted_string_literal(&mut self) -> Result<Option<Event>, Error> {
@@ -180,10 +186,10 @@ impl<R: Read + Seek> AsciiReader<R> {
 
     /// Consumes the reader until it finds a valid Event
     /// Possible events for Ascii plists:
-    //  - StartArray(Option<u64>),
-    //  - StartDictionary(Option<u64>),
-    //  - EndCollection,
-    //  - Data(Vec<u8>),
+    ///  - StartArray(Option<u64>),
+    ///  - StartDictionary(Option<u64>),
+    ///  - EndCollection,
+    ///  - Data(Vec<u8>),
     fn read_next(&mut self) -> Result<Option<Event>, Error> {
         while let Some(c) = self.advance() {
            match c {
@@ -228,6 +234,7 @@ mod tests {
     use std::io::Cursor;
     use super::*;
     use crate::stream::Event::{self, *};
+    use crate::Integer;
 
     #[test]
     fn streaming_sample() {
@@ -326,6 +333,25 @@ mod tests {
             String("Żaklina".to_owned()),
             String("王芳".to_owned()),
             EndCollection,
+            EndCollection,
+        ];
+
+        assert_eq!(events, comparison);
+    }
+
+    #[test]
+    fn integers_and_strings() {
+        let plist = "{ name = James, age = 42 }".to_owned();
+        let cursor = Cursor::new(plist.as_bytes());
+        let streaming_parser = AsciiReader::new(cursor);
+        let events: Vec<Event> = streaming_parser.map(|e| e.unwrap()).collect();
+
+        let comparison = &[
+            StartDictionary(None),
+            String("name".to_owned()),
+            String("James".to_owned()),
+            String("age".to_owned()),
+            Integer(42.into()),
             EndCollection,
         ];
 
