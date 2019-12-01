@@ -98,13 +98,13 @@ impl<R: Read> AsciiReader<R> {
             };
         }
 
-        let string_literal = std::str::from_utf8(&acc)
+        let string_literal = String::from_utf8(acc)
             .map_err(|_e| self.error(ErrorKind::InvalidUtf8AsciiStream))?;
 
         // Not ideal but does the trick for now
-        match Integer::from_str(string_literal) {
+        match Integer::from_str(&string_literal) {
             Ok(i) => Ok(Some(Event::Integer(i))),
-            Err(_) => Ok(Some(Event::String(string_literal.to_owned()))),
+            Err(_) => Ok(Some(Event::String(string_literal))),
         }
     }
 
