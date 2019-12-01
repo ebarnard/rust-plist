@@ -1,4 +1,3 @@
-
 /// Ascii property lists are used in legacy settings and only support four
 /// datatypes: Array, Dictionary, String and Data.
 /// See [Apple
@@ -7,64 +6,63 @@
 /// However this reader also support Integers as first class datatype.
 /// This reader will accept certain ill-formed ascii plist without complaining.
 /// It does not check the integrity of the plist format.
-use std::{
-    io::{Read, Seek, SeekFrom},
-};
+
 use crate::{
     error::{Error, ErrorKind},
     stream::Event,
     Integer,
 };
+use std::io::Read;
 
-pub struct AsciiReader<R: Read + Seek> {
+pub struct AsciiReader<R: Read> {
     reader: R,
     current_pos: u64,
+
+    /// lookahead char to avoid backtracking.
+    peeked_char: Option<u8>,
 }
 
-impl<R: Read + Seek> AsciiReader<R> {
+impl<R: Read> AsciiReader<R> {
     pub fn new(reader: R) -> Self {
-        Self {
+        let mut ascii_reader = Self {
             reader,
             current_pos: 0,
-        }
+            peeked_char: None,
+        };
+
+        // We manually boot the process to set the peeked char
+        ascii_reader.peeked_char = ascii_reader.read_one();
+        return ascii_reader
     }
 
     fn error(&self, kind: ErrorKind) -> Error {
         kind.with_byte_offset(self.current_pos)
     }
 
-    /// Get a char without consuming it.
-    fn peek(&mut self) -> Option<u8> {
-        // consume a char then rollback to previous position.
-        let peeked = self.advance();
-        let _ = self.reader.seek(SeekFrom::Current(-1));
-        self.update_current_pos();
-        peeked
-    }
-
-    /// Consume the reader and return the next char.
-    fn advance(&mut self) -> Option<u8> {
+    fn read_one(&mut self) -> Option<u8> {
         let mut buf: [u8; 1] = [0; 1];
-
         match self.reader.read(&mut buf) {
             Ok(n) => {
                 if n == 0 {
                     None
                 } else {
-                    let c =  buf[0];
-                    self.update_current_pos();
-                    Some(c)
+                    Some(buf[0])
                 }
             }
-            Err(_) => None
+            Err(_) => None,
         }
     }
 
-    fn update_current_pos(&mut self) {
-        match self.reader.seek(SeekFrom::Current(0)) {
-            Ok(pos) => self.current_pos = pos,
-            Err(_e) => { /* Do nothing */}
+    /// Consume the reader and return the next char.
+    fn advance(&mut self) -> Option<u8> {
+        let cur_char =  self.peeked_char;
+        self.peeked_char = self.read_one();
+
+        if cur_char.is_some() {
+            self.current_pos += 1;
         }
+
+        return cur_char;
     }
 
     /// From Apple doc:
@@ -83,16 +81,17 @@ impl<R: Read + Seek> AsciiReader<R> {
         acc.push(first);
 
         while {
-            match self.peek() {
-                Some(c) => c != b' ' && c != b')' && c != b'\r'
-                    && c != b'\t' && c != b';' && c != b',',
-                None => false
+            match self.peeked_char {
+                Some(c) => {
+                    c != b' ' && c != b')' && c != b'\r' && c != b'\t' && c != b';' && c != b','
+                }
+                None => false,
             }
         } {
             // consuming the string itself
             match self.advance() {
                 Some(c) => acc.push(c),
-                None => return Err(self.error(ErrorKind::UnclosedString))
+                None => return Err(self.error(ErrorKind::UnclosedString)),
             };
         }
 
@@ -102,7 +101,7 @@ impl<R: Read + Seek> AsciiReader<R> {
         // Not ideal but does the trick for now
         match Integer::from_str(string_literal) {
             Ok(i) => Ok(Some(Event::Integer(i))),
-            Err(_) => Ok(Some(Event::String(string_literal.to_owned())))
+            Err(_) => Ok(Some(Event::String(string_literal.to_owned()))),
         }
     }
 
@@ -110,15 +109,15 @@ impl<R: Read + Seek> AsciiReader<R> {
         let mut acc: Vec<u8> = Vec::new();
         // Can the quote char be escaped?
         while {
-            match self.peek() {
+            match self.peeked_char {
                 Some(c) => c != b'"',
-                None => false
+                None => false,
             }
         } {
             // consuming the string itself
             match self.advance() {
                 Some(c) => acc.push(c),
-                None => return Err(self.error(ErrorKind::UnclosedString))
+                None => return Err(self.error(ErrorKind::UnclosedString)),
             };
         }
 
@@ -133,7 +132,7 @@ impl<R: Read + Seek> AsciiReader<R> {
                     Err(self.error(ErrorKind::UnclosedString))
                 }
             }
-            None => Err(self.error(ErrorKind::UnclosedString))
+            None => Err(self.error(ErrorKind::UnclosedString)),
         }
     }
 
@@ -142,9 +141,9 @@ impl<R: Read + Seek> AsciiReader<R> {
         // There's no error in this a line comment can reach the EOF and there's
         // no forbidden chars in comments.
         while {
-            match self.peek() {
+            match self.peeked_char {
                 Some(c) => c != b'\n',
-                None => false
+                None => false,
             }
         } {
             let _ = self.advance();
@@ -156,10 +155,11 @@ impl<R: Read + Seek> AsciiReader<R> {
     fn block_comment(&mut self) -> Result<(), Error> {
         let mut latest_consume = b' ';
         while {
-            latest_consume != b'*' || match self.advance() {
-                Some(c) => c != b'/',
-                None => false
-            }
+            latest_consume != b'*'
+                || match self.advance() {
+                    Some(c) => c != b'/',
+                    None => false,
+                }
         } {
             latest_consume = self.advance().unwrap_or(b' ');
         }
@@ -171,16 +171,14 @@ impl<R: Read + Seek> AsciiReader<R> {
     /// - Some(string) if '/' was the first character of a string
     /// - None if '/' was the beginning of a comment.
     fn potential_comment(&mut self) -> Result<Option<Event>, Error> {
-        match self.peek() {
-            Some(c) => {
-                match c {
-                    b'/' => self.line_comment().map(|_| None),
-                    b'*' => self.block_comment().map(|_| None),
-                    _ => self.unquoted_string_literal(c)
-                }
-            }
+        match self.peeked_char {
+            Some(c) => match c {
+                b'/' => self.line_comment().map(|_| None),
+                b'*' => self.block_comment().map(|_| None),
+                _ => self.unquoted_string_literal(c),
+            },
             // EOF
-            None => Err(self.error(ErrorKind::IncompleteComment))
+            None => Err(self.error(ErrorKind::IncompleteComment)),
         }
     }
 
@@ -192,7 +190,7 @@ impl<R: Read + Seek> AsciiReader<R> {
     ///  - Data(Vec<u8>),
     fn read_next(&mut self) -> Result<Option<Event>, Error> {
         while let Some(c) = self.advance() {
-           match c {
+            match c {
                 // Single char tokens
                 b'(' => return Ok(Some(Event::StartArray(None))),
                 b')' => return Ok(Some(Event::EndCollection)),
@@ -202,39 +200,48 @@ impl<R: Read + Seek> AsciiReader<R> {
                 b'/' => {
                     match self.potential_comment() {
                         Ok(Some(event)) => return Ok(Some(event)),
-                        Ok(None) => { /* Comment has been consumed */}
-                        Err(e) => return Err(e)
+                        Ok(None) => { /* Comment has been consumed */ }
+                        Err(e) => return Err(e),
                     }
                 }
-                b','| b';'| b'=' => { /* consume these without emitting anything */} ,
-                b' ' | b'\r' | b'\t' | b'\n' => { /* whitespace is not significant */},
-                _ => return self.unquoted_string_literal(c)
+                b',' | b';' | b'=' => { /* consume these without emitting anything */ }
+                b' ' | b'\r' | b'\t' | b'\n' => { /* whitespace is not significant */ }
+                _ => return self.unquoted_string_literal(c),
             }
         }
 
-        return Ok(None)
+        return Ok(None);
     }
 }
 
-impl<R: Read + Seek> Iterator for AsciiReader<R> {
+impl<R: Read> Iterator for AsciiReader<R> {
     type Item = Result<Event, Error>;
 
     fn next(&mut self) -> Option<Result<Event, Error>> {
         match self.read_next() {
             Ok(Some(event)) => Some(Ok(event)),
             Ok(None) => None,
-            Err(err) => Some(Err(err))
+            Err(err) => Some(Err(err)),
         }
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use std::{fs::File, path::Path};
-    use std::io::Cursor;
     use super::*;
     use crate::stream::Event::{self, *};
-    use crate::Integer;
+    use std::io::Cursor;
+    use std::{fs::File, path::Path};
+
+
+    #[test]
+    fn empty_test() {
+        let plist = "".to_owned();
+        let cursor = Cursor::new(plist.as_bytes());
+        let streaming_parser = AsciiReader::new(cursor);
+        let events: Vec<Event> = streaming_parser.map(|e| e.unwrap()).collect();
+        assert_eq!(events, &[]);
+    }
 
     #[test]
     fn streaming_sample() {
@@ -277,7 +284,6 @@ mod tests {
 
         let comparison = &[
             StartDictionary(None),
-
             String("AnimalColors".to_owned()),
             StartDictionary(None),
             String("lamb".to_owned()), // key
@@ -287,7 +293,6 @@ mod tests {
             String("worm".to_owned()), // key
             String("pink".to_owned()),
             EndCollection,
-
             String("AnimalSmells".to_owned()),
             StartDictionary(None),
             String("lamb".to_owned()), // key
@@ -297,7 +302,6 @@ mod tests {
             String("worm".to_owned()), // key
             String("wormy".to_owned()),
             EndCollection,
-
             String("AnimalSounds".to_owned()),
             StartDictionary(None),
             String("Lisa".to_owned()), // key
@@ -309,7 +313,6 @@ mod tests {
             String("worm".to_owned()), // key
             String("baa".to_owned()),
             EndCollection,
-
             EndCollection,
         ];
 
@@ -325,7 +328,6 @@ mod tests {
 
         let comparison = &[
             StartDictionary(None),
-
             String("names".to_owned()),
             StartArray(None),
             String("Léa".to_owned()),
@@ -358,7 +360,7 @@ mod tests {
         assert_eq!(events, comparison);
     }
 
-        #[test]
+    #[test]
     fn netnewswire_pbxproj() {
         let reader = File::open(&Path::new("./tests/data/netnewswire.pbxproj")).unwrap();
         let streaming_parser = AsciiReader::new(reader);
