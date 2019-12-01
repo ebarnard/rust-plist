@@ -24,45 +24,48 @@ pub struct AsciiReader<R: Read> {
 
 impl<R: Read> AsciiReader<R> {
     pub fn new(reader: R) -> Self {
-        let mut ascii_reader = Self {
+        Self {
             reader,
             current_pos: 0,
             peeked_char: None,
-        };
-
-        // We manually boot the process to set the peeked char
-        ascii_reader.peeked_char = ascii_reader.read_one();
-        return ascii_reader
+        }
     }
 
     fn error(&self, kind: ErrorKind) -> Error {
         kind.with_byte_offset(self.current_pos)
     }
 
-    fn read_one(&mut self) -> Option<u8> {
+    fn read_one(&mut self) -> Result<Option<u8>, Error> {
         let mut buf: [u8; 1] = [0; 1];
-        match self.reader.read(&mut buf) {
-            Ok(n) => {
-                if n == 0 {
-                    None
+        match self.reader.read_exact(&mut buf) {
+            Ok(()) => Ok(Some(buf[0])),
+            Err(err) => {
+                if err.kind() == std::io::ErrorKind::UnexpectedEof {
+                    Ok(None)
                 } else {
-                    Some(buf[0])
+                    Err(self.error(ErrorKind::IoReadError))
                 }
             }
-            Err(_) => None,
         }
     }
 
     /// Consume the reader and return the next char.
-    fn advance(&mut self) -> Option<u8> {
-        let cur_char =  self.peeked_char;
-        self.peeked_char = self.read_one();
+    fn advance(&mut self) -> Result<Option<u8>, Error> {
+        let mut cur_char =  self.peeked_char;
+        self.peeked_char = self.read_one()?;
+
+        // We need to read two chars to boot the process and fill the peeked
+        // char.
+        if self.current_pos == 0 {
+            cur_char = self.peeked_char;
+            self.peeked_char = self.read_one()?;
+        }
 
         if cur_char.is_some() {
             self.current_pos += 1;
         }
 
-        return cur_char;
+        return Ok(cur_char);
     }
 
     /// From Apple doc:
@@ -89,7 +92,7 @@ impl<R: Read> AsciiReader<R> {
             }
         } {
             // consuming the string itself
-            match self.advance() {
+            match self.advance()? {
                 Some(c) => acc.push(c),
                 None => return Err(self.error(ErrorKind::UnclosedString)),
             };
@@ -115,14 +118,14 @@ impl<R: Read> AsciiReader<R> {
             }
         } {
             // consuming the string itself
-            match self.advance() {
+            match self.advance()? {
                 Some(c) => acc.push(c),
                 None => return Err(self.error(ErrorKind::UnclosedString)),
             };
         }
 
         // Match the closing quote.
-        match self.advance() {
+        match self.advance()? {
             Some(c) => {
                 if c as char == '"' {
                     let string_literal = String::from_utf8(acc)
@@ -146,7 +149,7 @@ impl<R: Read> AsciiReader<R> {
                 None => false,
             }
         } {
-            let _ = self.advance();
+            let _ = self.advance()?;
         }
 
         Ok(())
@@ -156,12 +159,12 @@ impl<R: Read> AsciiReader<R> {
         let mut latest_consume = b' ';
         while {
             latest_consume != b'*'
-                || match self.advance() {
+                || match self.advance()? {
                     Some(c) => c != b'/',
                     None => false,
                 }
         } {
-            latest_consume = self.advance().unwrap_or(b' ');
+            latest_consume = self.advance()?.unwrap_or(b' ');
         }
 
         Ok(())
@@ -189,7 +192,7 @@ impl<R: Read> AsciiReader<R> {
     ///  - EndCollection,
     ///  - Data(Vec<u8>),
     fn read_next(&mut self) -> Result<Option<Event>, Error> {
-        while let Some(c) = self.advance() {
+        while let Some(c) = self.advance()? {
             match c {
                 // Single char tokens
                 b'(' => return Ok(Some(Event::StartArray(None))),
