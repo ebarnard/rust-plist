@@ -110,16 +110,21 @@ impl<R: Read> AsciiReader<R> {
 
     fn quoted_string_literal(&mut self) -> Result<Option<Event>, Error> {
         let mut acc: Vec<u8> = Vec::new();
-        // Can the quote char be escaped?
+        let mut cur_char = b'"';
+
         while {
             match self.peeked_char {
-                Some(c) => c != b'"',
+                // do not stop if the quote is escaped
+                Some(c) => c != b'"' || cur_char == b'\\',
                 None => false,
             }
         } {
             // consuming the string itself
             match self.advance()? {
-                Some(c) => acc.push(c),
+                Some(c) => {
+                    cur_char = c;
+                    acc.push(c)
+                }
                 None => return Err(self.error(ErrorKind::UnclosedString)),
             };
         }
@@ -338,6 +343,23 @@ mod tests {
             String("Żaklina".to_owned()),
             String("王芳".to_owned()),
             EndCollection,
+            EndCollection,
+        ];
+
+        assert_eq!(events, comparison);
+    }
+
+    #[test]
+    fn escaped_quotes_in_strings() {
+        let plist = r#"{ key = "va\"lue" }"#;
+        let cursor = Cursor::new(plist.as_bytes());
+        let streaming_parser = AsciiReader::new(cursor);
+        let events: Vec<Event> = streaming_parser.map(|e| e.unwrap()).collect();
+
+        let comparison = &[
+            StartDictionary(None),
+            String("key".to_owned()),
+            String(r#"va\"lue"#.to_owned()),
             EndCollection,
         ];
 
