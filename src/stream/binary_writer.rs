@@ -335,7 +335,7 @@ impl<W: Write> BinaryWriter<W> {
         trailer[6] = offset_size;
         trailer[7] = ref_size;
         trailer[8..16].copy_from_slice(&(self.num_objects as u64).to_be_bytes());
-        trailer[24..32].copy_from_slice(&offset_table_offset.to_be_bytes());
+        trailer[24..32].copy_from_slice(&(offset_table_offset as u64).to_be_bytes());
         self.writer.write_exact(&trailer)?;
 
         self.writer
