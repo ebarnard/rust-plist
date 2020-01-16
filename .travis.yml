@@ -9,6 +9,14 @@ rust:
   - beta
   - stable
   - 1.32.0
+matrix:
+  include:
+    - os: linux
+      rust: stable-i686-unknown-linux-gnu
+      addons:
+        apt:
+          packages:
+            - gcc-multilib
 script:
   - cargo check --no-default-features
   - cargo check --no-default-features --features enable_unstable_features_that_may_break_with_minor_version_bumps
