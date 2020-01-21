@@ -1,11 +1,11 @@
 [package]
 name = "plist"
-version = "0.5.2"
+version = "0.5.3"
 authors = ["Ed Barnard <eabarnard@gmail.com>"]
 description = "A rusty plist parser. Supports Serde serialization."
 license = "MIT"
 repository = "https://github.com/ebarnard/rust-plist/"
-documentation = "https://docs.rs/plist/0.5.2/plist/"
+documentation = "https://docs.rs/plist/0.5.3/plist/"
 keywords = ["plist", "parser"]
 categories = ["config", "encoding", "parser-implementations"]
 edition = "2018"
