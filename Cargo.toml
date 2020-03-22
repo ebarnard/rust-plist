@@ -15,7 +15,7 @@ default = ["serde"]
 enable_unstable_features_that_may_break_with_minor_version_bumps = []
 
 [dependencies]
-base64 = "0.10.1"
+base64 = "0.12.0"
 humantime = "2.0.0"
 indexmap = "1.0.2"
 line-wrap = "0.1.1"
