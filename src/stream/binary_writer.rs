@@ -454,10 +454,10 @@ impl<W: Write> BinaryWriter<W> {
 
         match value {
             Value::Boolean(true) => {
-                self.writer.write_exact(&[0x08])?;
+                self.writer.write_exact(&[0x09])?;
             }
             Value::Boolean(false) => {
-                self.writer.write_exact(&[0x09])?;
+                self.writer.write_exact(&[0x08])?;
             }
             Value::Data(v) => {
                 write_plist_value_ty_and_size(&mut self.writer, 0x40, v.len())?;
