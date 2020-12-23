@@ -3,7 +3,7 @@ use std::{
     io::{self, Read},
     str::FromStr,
 };
-use xml_rs::{
+use xml::{
     common::{is_whitespace_str, Position},
     reader::{
         Error as XmlReaderError, ErrorKind as XmlReaderErrorKind, EventReader, ParserConfig,
@@ -190,7 +190,7 @@ impl<R: Read> Iterator for XmlReader<R> {
     }
 }
 
-fn convert_xml_pos(pos: xml_rs::common::TextPosition) -> FilePosition {
+fn convert_xml_pos(pos: xml::common::TextPosition) -> FilePosition {
     // TODO: pos.row and pos.column counts from 0. what do we want to do?
     FilePosition::LineColumn(pos.row, pos.column)
 }

@@ -1,7 +1,7 @@
 use base64;
 use line_wrap;
 use std::{borrow::Cow, io::Write};
-use xml_rs::{
+use xml::{
     name::Name,
     namespace::Namespace,
     writer::{EmitterConfig, Error as XmlWriterError, EventWriter, XmlEvent},
@@ -88,6 +88,7 @@ impl<W: Write> XmlWriter<W> {
         Ok(())
     }
 
+    #[allow(dead_code)]
     pub fn into_inner(self) -> W {
         self.xml_writer.into_inner()
     }
