@@ -70,6 +70,16 @@ impl Dictionary {
         self.map.remove(key)
     }
 
+    /// Scan through each key-value pair in the map and keep those where the
+    /// closure `keep` returns `true`.
+    #[inline]
+    pub fn retain<F>(&mut self, keep: F)
+    where
+        F: FnMut(&String, &mut Value) -> bool,
+    {
+        self.map.retain(keep)
+    }
+
     /// Gets the given key's corresponding entry in the dictionary for in-place manipulation.
     // Entry functionality is unstable until I can figure out how to use either Cow<str> or
     // T: AsRef<str> + Into<String>
