@@ -44,10 +44,17 @@ impl de::Error for Error {
     }
 }
 
+#[allow(dead_code)]
 enum OptionMode {
     Root,
     StructField,
     Explicit,
+}
+
+impl Default for OptionMode {
+    fn default() -> Self {
+        Self::Root
+    }
 }
 
 /// A structure that deserializes plist event streams into Rust values.
@@ -153,12 +160,12 @@ where
                 if self.events.peek().is_none() {
                     visitor.visit_none::<Error>()
                 } else {
-                    self.with_option_mode(OptionMode::Explicit, |this| visitor.visit_some(this))
+                    self.with_option_mode(OptionMode::default(), |this| visitor.visit_some(this))
                 }
             }
             OptionMode::StructField => {
                 // None struct values are ignored so if we're here the value must be Some.
-                self.with_option_mode(OptionMode::Explicit, |this| Ok(visitor.visit_some(this)?))
+                self.with_option_mode(OptionMode::default(), |this| Ok(visitor.visit_some(this)?))
             }
             OptionMode::Explicit => {
                 expect!(self.events.next(), EventKind::StartDictionary);
@@ -315,7 +322,7 @@ where
 
         self.remaining = self.remaining.map(|r| r.saturating_sub(1));
         self.de
-            .with_option_mode(OptionMode::Explicit, |this| seed.deserialize(this))
+            .with_option_mode(OptionMode::default(), |this| seed.deserialize(this))
             .map(Some)
     }
 
@@ -340,7 +347,7 @@ where
 
         self.remaining = self.remaining.map(|r| r.saturating_sub(1));
         self.de
-            .with_option_mode(OptionMode::Explicit, |this| seed.deserialize(this))
+            .with_option_mode(OptionMode::default(), |this| seed.deserialize(this))
             .map(Some)
     }
 
@@ -351,7 +358,7 @@ where
         let option_mode = if self.is_struct {
             OptionMode::StructField
         } else {
-            OptionMode::Explicit
+            OptionMode::default()
         };
         self.de
             .with_option_mode(option_mode, |this| Ok(seed.deserialize(this)?))

@@ -22,11 +22,18 @@ impl ser::Error for Error {
     }
 }
 
+#[allow(dead_code)]
 enum OptionMode {
     Root,
     StructField(&'static str),
     StructFieldNameWritten,
     Explicit,
+}
+
+impl Default for OptionMode {
+    fn default() -> Self {
+        Self::Root
+    }
 }
 
 /// A structure that serializes Rust values plist event streams.
@@ -203,11 +210,11 @@ impl<'a, W: Writer> ser::Serializer for &'a mut Serializer<W> {
 
     fn serialize_some<T: ?Sized + ser::Serialize>(self, value: &T) -> Result<(), Error> {
         match self.option_mode {
-            OptionMode::Root => self.serialize_with_option_mode(OptionMode::Explicit, value)?,
+            OptionMode::Root => self.serialize_with_option_mode(OptionMode::default(), value)?,
             OptionMode::StructField(field_name) => {
                 self.option_mode = OptionMode::StructFieldNameWritten;
                 self.write_string(field_name)?;
-                self.serialize_with_option_mode(OptionMode::Explicit, value)?;
+                self.serialize_with_option_mode(OptionMode::default(), value)?;
             }
             OptionMode::StructFieldNameWritten => unreachable!(),
             OptionMode::Explicit => {
@@ -656,8 +663,7 @@ impl<'a, W: Writer> ser::SerializeSeq for Compound<'a, W> {
     type Error = Error;
 
     fn serialize_element<T: ?Sized + ser::Serialize>(&mut self, value: &T) -> Result<(), Error> {
-        self.ser
-            .serialize_with_option_mode(OptionMode::Explicit, value)
+        self.ser.serialize_with_option_mode(OptionMode::default(), value)
     }
 
     fn end(self) -> Result<Self::Ok, Self::Error> {
@@ -670,8 +676,7 @@ impl<'a, W: Writer> ser::SerializeTuple for Compound<'a, W> {
     type Error = Error;
 
     fn serialize_element<T: ?Sized + ser::Serialize>(&mut self, value: &T) -> Result<(), Error> {
-        self.ser
-            .serialize_with_option_mode(OptionMode::Explicit, value)
+        self.ser.serialize_with_option_mode(OptionMode::default(), value)
     }
 
     fn end(self) -> Result<(), Error> {
@@ -684,8 +689,7 @@ impl<'a, W: Writer> ser::SerializeTupleStruct for Compound<'a, W> {
     type Error = Error;
 
     fn serialize_field<T: ?Sized + ser::Serialize>(&mut self, value: &T) -> Result<(), Error> {
-        self.ser
-            .serialize_with_option_mode(OptionMode::Explicit, value)
+        self.ser.serialize_with_option_mode(OptionMode::default(), value)
     }
 
     fn end(self) -> Result<(), Error> {
@@ -698,8 +702,7 @@ impl<'a, W: Writer> ser::SerializeTupleVariant for Compound<'a, W> {
     type Error = Error;
 
     fn serialize_field<T: ?Sized + ser::Serialize>(&mut self, value: &T) -> Result<(), Error> {
-        self.ser
-            .serialize_with_option_mode(OptionMode::Explicit, value)
+        self.ser.serialize_with_option_mode(OptionMode::default(), value)
     }
 
     fn end(self) -> Result<Self::Ok, Self::Error> {
@@ -713,13 +716,11 @@ impl<'a, W: Writer> ser::SerializeMap for Compound<'a, W> {
     type Error = Error;
 
     fn serialize_key<T: ?Sized + ser::Serialize>(&mut self, key: &T) -> Result<(), Error> {
-        self.ser
-            .serialize_with_option_mode(OptionMode::Explicit, key)
+        self.ser.serialize_with_option_mode(OptionMode::default(), key)
     }
 
     fn serialize_value<T: ?Sized + ser::Serialize>(&mut self, value: &T) -> Result<(), Error> {
-        self.ser
-            .serialize_with_option_mode(OptionMode::Explicit, value)
+        self.ser.serialize_with_option_mode(OptionMode::default(), value)
     }
 
     fn end(self) -> Result<Self::Ok, Self::Error> {
