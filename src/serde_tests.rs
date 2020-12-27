@@ -510,3 +510,60 @@ fn option_array() {
 
     assert_roundtrip(obj, Some(comparison));
 }
+
+#[test]
+fn enum_variant_types() {
+    #[derive(Debug, Deserialize, Eq, PartialEq, Serialize)]
+    enum Foo {
+        Unit,
+        Newtype(u32),
+        Tuple(u32, String),
+        Struct { v: u32, s: String },
+    }
+
+    let expected = &[
+        Event::StartDictionary(Some(1)),
+        Event::String("Unit".into()),
+        Event::String("".into()),
+        Event::EndCollection,
+    ];
+    assert_roundtrip(Foo::Unit, Some(expected));
+
+    let expected = &[
+        Event::StartDictionary(Some(1)),
+        Event::String("Newtype".into()),
+        Event::Integer(42.into()),
+        Event::EndCollection,
+    ];
+    assert_roundtrip(Foo::Newtype(42), Some(expected));
+
+    let expected = &[
+        Event::StartDictionary(Some(1)),
+        Event::String("Tuple".into()),
+        Event::StartArray(Some(2)),
+        Event::Integer(42.into()),
+        Event::String("bar".into()),
+        Event::EndCollection,
+        Event::EndCollection,
+    ];
+    assert_roundtrip(Foo::Tuple(42, "bar".into()), Some(expected));
+
+    let expected = &[
+        Event::StartDictionary(Some(1)),
+        Event::String("Struct".into()),
+        Event::StartDictionary(None),
+        Event::String("v".into()),
+        Event::Integer(42.into()),
+        Event::String("s".into()),
+        Event::String("bar".into()),
+        Event::EndCollection,
+        Event::EndCollection,
+    ];
+    assert_roundtrip(
+        Foo::Struct {
+            v: 42,
+            s: "bar".into(),
+        },
+        Some(expected),
+    );
+}
