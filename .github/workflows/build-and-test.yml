@@ -1,0 +1,64 @@
+on: [push, pull_request]
+
+name: Build and Test
+
+jobs:
+  # This is a hack so we don't have to gate PRs on each element of the build matrix.
+  build-and-test-succeeded:
+    name: Build and Test Succeeded
+    needs: build-and-test
+    runs-on: ubuntu-18.04
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
+  build-and-test:
+    name: Build and Test
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        include:
+          - os: ubuntu-18.04
+            target: x86_64-unknown-linux-gnu
+            channel: 1.34.0
+          - os: ubuntu-18.04
+            target: x86_64-unknown-linux-gnu
+            channel: stable
+          - os: ubuntu-18.04
+            target: x86_64-unknown-linux-gnu
+            channel: beta
+          - os: ubuntu-18.04
+            target: x86_64-unknown-linux-gnu
+            channel: nightly
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
+
+      - name: Install Rust Toolchain
+        uses: actions-rs/toolchain@v1
+        with:
+          default: true
+          toolchain: ${{ matrix.channel }}-${{ matrix.target }}
+
+      - name: Build and Test (Debug, No Default Features)
+        uses: actions-rs/cargo@v1
+        with:
+          command: test
+          args: --no-default-features --target ${{ matrix.target }}
+
+      - name: Build and Test (Debug, enable_unstable_features_that_may_break_with_minor_version_bumps)
+        uses: actions-rs/cargo@v1
+        with:
+          command: test
+          args: --no-default-features --features enable_unstable_features_that_may_break_with_minor_version_bumps --target ${{ matrix.target }}
+
+      - name: Build and Test (Debug, serde)
+        uses: actions-rs/cargo@v1
+        with:
+          command: test
+          args: --no-default-features --features serde --target ${{ matrix.target }}
+
+      - name: Build and Test (Release, All Features)
+        uses: actions-rs/cargo@v1
+        with:
+          command: test
+          args: --release --all-features --target ${{ matrix.target }}
