@@ -207,13 +207,19 @@ where
 
     fn deserialize_enum<V>(
         self,
-        _enum: &'static str,
-        _variants: &'static [&'static str],
+        name: &'static str,
+        variants: &'static [&'static str],
         visitor: V,
     ) -> Result<V::Value, Error>
     where
         V: de::Visitor<'de>,
     {
+        // `plist` since v1.1 serialises unit enum variants as plain strings.
+        if let Some(Ok(Event::String(s))) = self.events.peek() {
+            return de::IntoDeserializer::into_deserializer(s.as_str())
+                .deserialize_enum(name, variants, visitor);
+        }
+
         expect!(self.events.next(), EventKind::StartDictionary);
         let ret = visitor.visit_enum(&mut *self)?;
         expect!(self.events.next(), EventKind::EndCollection);

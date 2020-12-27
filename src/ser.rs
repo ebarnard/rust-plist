@@ -234,10 +234,8 @@ impl<'a, W: Writer> ser::Serializer for &'a mut Serializer<W> {
         _variant_index: u32,
         variant: &'static str,
     ) -> Result<(), Error> {
-        self.write_start_dictionary(Some(1))?;
-        self.write_string(variant)?;
-        self.serialize_unit()?;
-        self.write_end_collection()
+        // `plist` since v1.1 serialises unit enum variants as plain strings.
+        self.write_string(variant)
     }
 
     fn serialize_newtype_struct<T: ?Sized + ser::Serialize>(

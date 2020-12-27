@@ -1,4 +1,7 @@
-use serde::{de::DeserializeOwned, ser::Serialize};
+use serde::{
+    de::{Deserialize, DeserializeOwned},
+    ser::Serialize,
+};
 use std::{collections::BTreeMap, fmt::Debug};
 
 use crate::{
@@ -133,12 +136,7 @@ struct DogInner {
 fn cow() {
     let cow = Animal::Cow;
 
-    let comparison = &[
-        Event::StartDictionary(Some(1)),
-        Event::String("Cow".to_owned()),
-        Event::String("".to_owned()),
-        Event::EndCollection,
-    ];
+    let comparison = &[Event::String("Cow".to_owned())];
 
     assert_roundtrip(cow, Some(comparison));
 }
@@ -521,12 +519,7 @@ fn enum_variant_types() {
         Struct { v: u32, s: String },
     }
 
-    let expected = &[
-        Event::StartDictionary(Some(1)),
-        Event::String("Unit".into()),
-        Event::String("".into()),
-        Event::EndCollection,
-    ];
+    let expected = &[Event::String("Unit".into())];
     assert_roundtrip(Foo::Unit, Some(expected));
 
     let expected = &[
@@ -566,4 +559,27 @@ fn enum_variant_types() {
         },
         Some(expected),
     );
+}
+
+#[test]
+fn deserialise_old_enum_unit_variant_encoding() {
+    #[derive(Debug, Deserialize, Eq, PartialEq, Serialize)]
+    enum Foo {
+        Bar,
+        Baz,
+    }
+
+    // `plist` before v1.1 serialised unit enum variants as if they were newtype variants
+    // containing an empty string.
+    let events = &[
+        Event::StartDictionary(Some(1)),
+        Event::String("Baz".into()),
+        Event::String("".into()),
+        Event::EndCollection,
+    ];
+
+    let mut de = new_deserializer(events.to_vec());
+    let obj = Foo::deserialize(&mut de).unwrap();
+
+    assert_eq!(obj, Foo::Baz);
 }
