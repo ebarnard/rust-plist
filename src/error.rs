@@ -23,6 +23,12 @@ pub(crate) enum ErrorKind {
         found: EventKind,
     },
 
+    // Ascii format-specific errors
+    UnclosedString,
+    IncompleteComment,
+    InvalidUtf8AsciiStream,
+    IoReadError,
+
     // Xml format-specific errors
     UnclosedXmlElement,
     UnpairedXmlClosingTag,
