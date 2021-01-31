@@ -171,16 +171,14 @@ impl<R: Read + Seek> Iterator for Reader<R> {
             ReaderInner::Uninitialized(ref mut reader) => reader.take().unwrap(),
         };
 
-        let event_reader = match Reader::is_binary(&mut reader) {
-            Ok(true) => ReaderInner::Binary(BinaryReader::new(reader)),
-            Ok(false) => ReaderInner::Xml(XmlReader::new(reader)),
+        match Reader::is_binary(&mut reader) {
+            Ok(true) => self.0 = ReaderInner::Binary(BinaryReader::new(reader)),
+            Ok(false) => self.0 = ReaderInner::Xml(XmlReader::new(reader)),
             Err(err) => {
-                ::std::mem::replace(&mut self.0, ReaderInner::Uninitialized(Some(reader)));
+                self.0 = ReaderInner::Uninitialized(Some(reader));
                 return Some(Err(err));
             }
-        };
-
-        ::std::mem::replace(&mut self.0, event_reader);
+        }
 
         self.next()
     }
