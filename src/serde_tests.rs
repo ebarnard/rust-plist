@@ -1,6 +1,6 @@
 use serde::{
-    de::{Deserialize, DeserializeOwned},
-    ser::Serialize,
+    de::{self, Deserialize, DeserializeOwned},
+    ser::{self, Serialize},
 };
 use std::{collections::BTreeMap, fmt::Debug};
 
@@ -582,4 +582,84 @@ fn deserialise_old_enum_unit_variant_encoding() {
     let obj = Foo::deserialize(&mut de).unwrap();
 
     assert_eq!(obj, Foo::Baz);
+}
+
+#[test]
+fn flattened_optional_fields() {
+    fn deserialize_some<'de, D, T>(de: D) -> Result<Option<T>, D::Error>
+    where
+        D: de::Deserializer<'de>,
+        T: Deserialize<'de>,
+    {
+        T::deserialize(de).map(Some)
+    }
+
+    fn serialize_some<S, T>(value: &Option<T>, ser: S) -> Result<S::Ok, S::Error>
+    where
+        S: ser::Serializer,
+        T: Serialize,
+    {
+        value
+            .as_ref()
+            .expect(
+                r#"`serialize_some` must be used with `skip_serializing_if = "Option::is_none"`"#,
+            )
+            .serialize(ser)
+    }
+
+    #[derive(Debug, Deserialize, PartialEq, Serialize)]
+    struct Foo {
+        #[serde(
+            default,
+            deserialize_with = "deserialize_some",
+            serialize_with = "serialize_some",
+            skip_serializing_if = "Option::is_none"
+        )]
+        a: Option<bool>,
+        #[serde(
+            default,
+            deserialize_with = "deserialize_some",
+            serialize_with = "serialize_some",
+            skip_serializing_if = "Option::is_none"
+        )]
+        b: Option<i32>,
+        #[serde(flatten)]
+        flattened: Bar,
+    }
+
+    #[derive(Debug, Deserialize, PartialEq, Serialize)]
+    struct Bar {
+        #[serde(
+            default,
+            deserialize_with = "deserialize_some",
+            serialize_with = "serialize_some",
+            skip_serializing_if = "Option::is_none"
+        )]
+        c: Option<String>,
+        #[serde(
+            default,
+            deserialize_with = "deserialize_some",
+            serialize_with = "serialize_some",
+            skip_serializing_if = "Option::is_none"
+        )]
+        d: Option<f64>,
+    }
+
+    let expected = &[
+        Event::StartDictionary(None),
+        Event::String("b".into()),
+        Event::Integer((-12).into()),
+        Event::String("d".into()),
+        Event::Real(2.4),
+        Event::EndCollection,
+    ];
+    let obj = Foo {
+        a: None,
+        b: Some(-12),
+        flattened: Bar {
+            c: None,
+            d: Some(2.4),
+        },
+    };
+    assert_roundtrip(obj, Some(expected));
 }
