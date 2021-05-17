@@ -58,34 +58,34 @@ pub enum Event {
 }
 
 /// An `Event` stream returned by `Value::into_events`.
-pub struct IntoEvents {
-    stack: Vec<StackItem>,
+pub struct IntoEvents<'a> {
+    stack: Vec<StackItem<'a>>,
 }
 
-enum StackItem {
-    Root(Value),
-    Array(vec::IntoIter<Value>),
-    Dict(dictionary::IntoIter),
-    DictValue(Value),
+enum StackItem<'a> {
+    Root(&'a Value),
+    Array(std::slice::Iter<'a, Value>),
+    Dict(dictionary::Iter<'a>),
+    DictValue(&'a Value),
 }
 
-impl IntoEvents {
-    pub(crate) fn new(value: Value) -> IntoEvents {
+impl<'a> IntoEvents<'a> {
+    pub(crate) fn new(value: &'a Value) -> IntoEvents<'a> {
         IntoEvents {
             stack: vec![StackItem::Root(value)],
         }
     }
 }
 
-impl Iterator for IntoEvents {
+impl<'a> Iterator for IntoEvents<'a> {
     type Item = Event;
 
     fn next(&mut self) -> Option<Event> {
-        fn handle_value(value: Value, stack: &mut Vec<StackItem>) -> Event {
+        fn handle_value<'c, 'b: 'c>(value: &'b Value, stack: &'c mut Vec<StackItem<'b>>) -> Event {
             match value {
                 Value::Array(array) => {
                     let len = array.len();
-                    let iter = array.into_iter();
+                    let iter = array.iter();
                     stack.push(StackItem::Array(iter));
                     Event::StartArray(Some(len as u64))
                 }
@@ -95,13 +95,13 @@ impl Iterator for IntoEvents {
                     stack.push(StackItem::Dict(iter));
                     Event::StartDictionary(Some(len as u64))
                 }
-                Value::Boolean(value) => Event::Boolean(value),
-                Value::Data(value) => Event::Data(value),
-                Value::Date(value) => Event::Date(value),
-                Value::Real(value) => Event::Real(value),
-                Value::Integer(value) => Event::Integer(value),
-                Value::String(value) => Event::String(value),
-                Value::Uid(value) => Event::Uid(value),
+                Value::Boolean(value) => Event::Boolean(*value),
+                Value::Data(value) => Event::Data(value.clone()),
+                Value::Date(value) => Event::Date(*value),
+                Value::Real(value) => Event::Real(*value),
+                Value::Integer(value) => Event::Integer(*value),
+                Value::String(value) => Event::String(value.clone()),
+                Value::Uid(value) => Event::Uid(*value),
                 Value::__Nonexhaustive => unreachable!(),
             }
         }
@@ -124,7 +124,7 @@ impl Iterator for IntoEvents {
                     // The next event to be returned must be the dictionary value.
                     self.stack.push(StackItem::DictValue(value));
                     // Return the key event now.
-                    Event::String(key)
+                    Event::String(key.clone())
                 } else {
                     Event::EndCollection
                 }

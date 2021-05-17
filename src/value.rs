@@ -74,7 +74,7 @@ impl Value {
     }
 
     fn to_writer_inner(&self, writer: &mut dyn Writer) -> Result<(), Error> {
-        let events = self.clone().into_events();
+        let events = self.into_events();
         for event in events {
             writer.write(&event)?;
         }
@@ -103,13 +103,13 @@ impl Value {
 
     /// Converts a `Value` into an `Event` iterator.
     #[cfg(feature = "enable_unstable_features_that_may_break_with_minor_version_bumps")]
-    pub fn into_events(self) -> IntoEvents {
+    pub fn into_events(&self) -> IntoEvents {
         IntoEvents::new(self)
     }
 
     /// Converts a `Value` into an `Event` iterator.
     #[cfg(not(feature = "enable_unstable_features_that_may_break_with_minor_version_bumps"))]
-    pub(crate) fn into_events(self) -> IntoEvents {
+    pub(crate) fn into_events(&self) -> IntoEvents {
         IntoEvents::new(self)
     }
 
