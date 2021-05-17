@@ -86,7 +86,7 @@ impl Value {
     #[cfg(feature = "enable_unstable_features_that_may_break_with_minor_version_bumps")]
     pub fn from_events<T>(events: T) -> Result<Value, Error>
     where
-        T: IntoIterator<Item = Result<Event, Error>>,
+        T: IntoIterator<Item = Result<Event<'static>, Error>>,
     {
         Builder::new(events.into_iter()).build()
     }
@@ -96,7 +96,7 @@ impl Value {
     #[cfg(not(feature = "enable_unstable_features_that_may_break_with_minor_version_bumps"))]
     pub(crate) fn from_events<T>(events: T) -> Result<Value, Error>
     where
-        T: IntoIterator<Item = Result<Event, Error>>,
+        T: IntoIterator<Item = Result<Event<'static>, Error>>,
     {
         Builder::new(events.into_iter()).build()
     }
@@ -446,10 +446,10 @@ impl<'a> From<&'a str> for Value {
 
 struct Builder<T> {
     stream: T,
-    token: Option<Event>,
+    token: Option<Event<'static>>,
 }
 
-impl<T: Iterator<Item = Result<Event, Error>>> Builder<T> {
+impl<T: Iterator<Item = Result<Event<'static>, Error>>> Builder<T> {
     fn new(stream: T) -> Builder<T> {
         Builder {
             stream,
@@ -477,11 +477,11 @@ impl<T: Iterator<Item = Result<Event, Error>>> Builder<T> {
             Some(Event::StartDictionary(len)) => Ok(Value::Dictionary(self.build_dict(len)?)),
 
             Some(Event::Boolean(b)) => Ok(Value::Boolean(b)),
-            Some(Event::Data(d)) => Ok(Value::Data(d)),
+            Some(Event::Data(d)) => Ok(Value::Data(d.into_owned())),
             Some(Event::Date(d)) => Ok(Value::Date(d)),
             Some(Event::Integer(i)) => Ok(Value::Integer(i)),
             Some(Event::Real(f)) => Ok(Value::Real(f)),
-            Some(Event::String(s)) => Ok(Value::String(s)),
+            Some(Event::String(s)) => Ok(Value::String(s.into_owned())),
             Some(Event::Uid(u)) => Ok(Value::Uid(u)),
 
             Some(event @ Event::EndCollection) => Err(error::unexpected_event_type(
@@ -520,7 +520,7 @@ impl<T: Iterator<Item = Result<Event, Error>>> Builder<T> {
                 Some(Event::EndCollection) => return Ok(dict),
                 Some(Event::String(s)) => {
                     self.bump()?;
-                    dict.insert(s, self.build_value()?);
+                    dict.insert(s.into_owned(), self.build_value()?);
                 }
                 Some(event) => {
                     return Err(error::unexpected_event_type(

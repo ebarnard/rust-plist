@@ -75,7 +75,7 @@ impl<R: Read> XmlReader<R> {
         }
     }
 
-    fn read_next(&mut self) -> Result<Option<Event>, Error> {
+    fn read_next(&mut self) -> Result<Option<Event<'static>>, Error> {
         loop {
             match self.next_event() {
                 Ok(XmlEvent::StartDocument { .. }) => {}
@@ -87,7 +87,7 @@ impl<R: Read> XmlReader<R> {
                         "plist" => (),
                         "array" => return Ok(Some(Event::StartArray(None))),
                         "dict" => return Ok(Some(Event::StartDictionary(None))),
-                        "key" => return Ok(Some(Event::String(self.read_content()?))),
+                        "key" => return Ok(Some(Event::String(self.read_content()?.into()))),
                         "true" => return Ok(Some(Event::Boolean(true))),
                         "false" => return Ok(Some(Event::Boolean(false))),
                         "data" => {
@@ -96,7 +96,7 @@ impl<R: Read> XmlReader<R> {
                             s.retain(|c| !c.is_ascii_whitespace());
                             let data = base64::decode(&s)
                                 .map_err(|_| self.with_pos(ErrorKind::InvalidDataString))?;
-                            return Ok(Some(Event::Data(data)));
+                            return Ok(Some(Event::Data(data.into())));
                         }
                         "date" => {
                             let s = self.read_content()?;
@@ -120,7 +120,7 @@ impl<R: Read> XmlReader<R> {
                                 Err(_) => return Err(self.with_pos(ErrorKind::InvalidRealString)),
                             }
                         }
-                        "string" => return Ok(Some(Event::String(self.read_content()?))),
+                        "string" => return Ok(Some(Event::String(self.read_content()?.into()))),
                         _ => return Err(self.with_pos(ErrorKind::UnknownXmlElement)),
                     }
                 }
@@ -169,9 +169,9 @@ impl<R: Read> XmlReader<R> {
 }
 
 impl<R: Read> Iterator for XmlReader<R> {
-    type Item = Result<Event, Error>;
+    type Item = Result<Event<'static>, Error>;
 
-    fn next(&mut self) -> Option<Result<Event, Error>> {
+    fn next(&mut self) -> Option<Result<Event<'static>, Error>> {
         if self.finished {
             None
         } else {

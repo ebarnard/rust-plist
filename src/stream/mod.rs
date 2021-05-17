@@ -13,6 +13,7 @@ mod xml_writer;
 pub use self::xml_writer::XmlWriter;
 
 use std::{
+    borrow::Cow,
     io::{self, Read, Seek, SeekFrom},
     vec,
 };
@@ -38,7 +39,7 @@ use crate::{
 /// EndDictionary
 /// ```
 #[derive(Clone, Debug, PartialEq)]
-pub enum Event {
+pub enum Event<'a> {
     // While the length of an array or dict cannot be feasably greater than max(usize) this better
     // conveys the concept of an effectively unbounded event stream.
     StartArray(Option<u64>),
@@ -46,11 +47,11 @@ pub enum Event {
     EndCollection,
 
     Boolean(bool),
-    Data(Vec<u8>),
+    Data(Cow<'a, [u8]>),
     Date(Date),
     Integer(Integer),
     Real(f64),
-    String(String),
+    String(Cow<'a, str>),
     Uid(Uid),
 
     #[doc(hidden)]
@@ -78,10 +79,13 @@ impl<'a> IntoEvents<'a> {
 }
 
 impl<'a> Iterator for IntoEvents<'a> {
-    type Item = Event;
+    type Item = Event<'a>;
 
-    fn next(&mut self) -> Option<Event> {
-        fn handle_value<'c, 'b: 'c>(value: &'b Value, stack: &'c mut Vec<StackItem<'b>>) -> Event {
+    fn next(&mut self) -> Option<Event<'a>> {
+        fn handle_value<'c, 'b: 'c>(
+            value: &'b Value,
+            stack: &'c mut Vec<StackItem<'b>>,
+        ) -> Event<'b> {
             match value {
                 Value::Array(array) => {
                     let len = array.len();
@@ -96,11 +100,11 @@ impl<'a> Iterator for IntoEvents<'a> {
                     Event::StartDictionary(Some(len as u64))
                 }
                 Value::Boolean(value) => Event::Boolean(*value),
-                Value::Data(value) => Event::Data(value.clone()),
+                Value::Data(value) => Event::Data(Cow::Borrowed(&value)),
                 Value::Date(value) => Event::Date(*value),
                 Value::Real(value) => Event::Real(*value),
                 Value::Integer(value) => Event::Integer(*value),
-                Value::String(value) => Event::String(value.clone()),
+                Value::String(value) => Event::String(Cow::Borrowed(value.as_str())),
                 Value::Uid(value) => Event::Uid(*value),
                 Value::__Nonexhaustive => unreachable!(),
             }
@@ -124,7 +128,7 @@ impl<'a> Iterator for IntoEvents<'a> {
                     // The next event to be returned must be the dictionary value.
                     self.stack.push(StackItem::DictValue(value));
                     // Return the key event now.
-                    Event::String(key.clone())
+                    Event::String(Cow::Borrowed(key))
                 } else {
                     Event::EndCollection
                 }
@@ -162,9 +166,9 @@ impl<R: Read + Seek> Reader<R> {
 }
 
 impl<R: Read + Seek> Iterator for Reader<R> {
-    type Item = Result<Event, Error>;
+    type Item = Result<Event<'static>, Error>;
 
-    fn next(&mut self) -> Option<Result<Event, Error>> {
+    fn next(&mut self) -> Option<Result<Event<'static>, Error>> {
         let mut reader = match self.0 {
             ReaderInner::Xml(ref mut parser) => return parser.next(),
             ReaderInner::Binary(ref mut parser) => return parser.next(),
