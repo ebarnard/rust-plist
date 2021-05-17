@@ -454,7 +454,7 @@ mod tests {
             String("IsTrue".into()),
             Boolean(true),
             String("Data".into()),
-            Data(vec![0, 0, 0, 190, 0, 0, 0, 3, 0, 0, 0, 30, 0, 0, 0]),
+            Data(vec![0, 0, 0, 190, 0, 0, 0, 3, 0, 0, 0, 30, 0, 0, 0].into()),
             EndCollection,
         ];
 
@@ -467,7 +467,7 @@ mod tests {
         let streaming_parser = BinaryReader::new(reader);
         let mut events: Vec<Event> = streaming_parser.map(|e| e.unwrap()).collect();
 
-        assert_eq!(events[2], Event::String("\u{2605} or better".to_owned()));
+        assert_eq!(events[2], Event::String("\u{2605} or better".into()));
 
         let poem = if let Event::String(ref mut poem) = events[4] {
             poem
@@ -475,7 +475,7 @@ mod tests {
             panic!("not a string")
         };
         assert_eq!(poem.len(), 643);
-        assert_eq!(poem.pop().unwrap(), '\u{2605}');
+        assert_eq!(poem.to_mut().pop().unwrap(), '\u{2605}');
     }
 
     #[test]

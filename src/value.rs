@@ -586,16 +586,16 @@ mod tests {
         // Input
         let events = vec![
             StartDictionary(None),
-            String("Author".to_owned()),
-            String("William Shakespeare".to_owned()),
-            String("Lines".to_owned()),
+            String("Author".into()),
+            String("William Shakespeare".into()),
+            String("Lines".into()),
             StartArray(None),
-            String("It is a tale told by an idiot,".to_owned()),
-            String("Full of sound and fury, signifying nothing.".to_owned()),
+            String("It is a tale told by an idiot,".into()),
+            String("Full of sound and fury, signifying nothing.".into()),
             EndCollection,
-            String("Birthdate".to_owned()),
+            String("Birthdate".into()),
             Integer(1564.into()),
-            String("Height".to_owned()),
+            String("Height".into()),
             Real(1.60),
             EndCollection,
         ];
