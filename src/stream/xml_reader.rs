@@ -13,7 +13,7 @@ use xml_rs::{
 
 use crate::{
     error::{Error, ErrorKind, FilePosition},
-    stream::Event,
+    stream::{Event, OwnedEvent},
     Date, Integer,
 };
 
@@ -75,7 +75,7 @@ impl<R: Read> XmlReader<R> {
         }
     }
 
-    fn read_next(&mut self) -> Result<Option<Event<'static>>, Error> {
+    fn read_next(&mut self) -> Result<Option<OwnedEvent>, Error> {
         loop {
             match self.next_event() {
                 Ok(XmlEvent::StartDocument { .. }) => {}
@@ -169,9 +169,9 @@ impl<R: Read> XmlReader<R> {
 }
 
 impl<R: Read> Iterator for XmlReader<R> {
-    type Item = Result<Event<'static>, Error>;
+    type Item = Result<OwnedEvent, Error>;
 
-    fn next(&mut self) -> Option<Result<Event<'static>, Error>> {
+    fn next(&mut self) -> Option<Result<OwnedEvent, Error>> {
         if self.finished {
             None
         } else {

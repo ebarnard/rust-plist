@@ -38,6 +38,15 @@ use crate::{
 /// Integer(28)      // Value
 /// EndDictionary
 /// ```
+///
+/// ## Lifetimes
+///
+/// This type has a lifetime parameter; during serialization, data is borrowed
+/// from a [`Value`], and the lifetime of the event is the lifetime of the
+/// [`Value`] being serialized.
+///
+/// During deserialization, data is always copied anyway, and this lifetime
+/// is always `'static`.
 #[derive(Clone, Debug, PartialEq)]
 pub enum Event<'a> {
     // While the length of an array or dict cannot be feasably greater than max(usize) this better
@@ -58,8 +67,14 @@ pub enum Event<'a> {
     __Nonexhaustive,
 }
 
+/// An owned [`Event`].
+///
+/// During deserialization, events are always owned; this type alias helps
+/// keep that code a bit clearer.
+pub type OwnedEvent = Event<'static>;
+
 /// An `Event` stream returned by `Value::into_events`.
-pub struct IntoEvents<'a> {
+pub struct Events<'a> {
     stack: Vec<StackItem<'a>>,
 }
 
@@ -70,15 +85,15 @@ enum StackItem<'a> {
     DictValue(&'a Value),
 }
 
-impl<'a> IntoEvents<'a> {
-    pub(crate) fn new(value: &'a Value) -> IntoEvents<'a> {
-        IntoEvents {
+impl<'a> Events<'a> {
+    pub(crate) fn new(value: &'a Value) -> Events<'a> {
+        Events {
             stack: vec![StackItem::Root(value)],
         }
     }
 }
 
-impl<'a> Iterator for IntoEvents<'a> {
+impl<'a> Iterator for Events<'a> {
     type Item = Event<'a>;
 
     fn next(&mut self) -> Option<Event<'a>> {
@@ -166,9 +181,9 @@ impl<R: Read + Seek> Reader<R> {
 }
 
 impl<R: Read + Seek> Iterator for Reader<R> {
-    type Item = Result<Event<'static>, Error>;
+    type Item = Result<OwnedEvent, Error>;
 
-    fn next(&mut self) -> Option<Result<Event<'static>, Error>> {
+    fn next(&mut self) -> Option<Result<OwnedEvent, Error>> {
         let mut reader = match self.0 {
             ReaderInner::Xml(ref mut parser) => return parser.next(),
             ReaderInner::Binary(ref mut parser) => return parser.next(),

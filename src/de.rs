@@ -10,7 +10,7 @@ use std::{
 
 use crate::{
     error::{self, Error, ErrorKind, EventKind},
-    stream::{self, Event},
+    stream::{self, Event, OwnedEvent},
     u64_to_usize,
 };
 
@@ -53,7 +53,7 @@ enum OptionMode {
 /// A structure that deserializes plist event streams into Rust values.
 pub struct Deserializer<I>
 where
-    I: IntoIterator<Item = Result<Event<'static>, Error>>,
+    I: IntoIterator<Item = Result<OwnedEvent, Error>>,
 {
     events: Peekable<<I as IntoIterator>::IntoIter>,
     option_mode: OptionMode,
@@ -61,7 +61,7 @@ where
 
 impl<I> Deserializer<I>
 where
-    I: IntoIterator<Item = Result<Event<'static>, Error>>,
+    I: IntoIterator<Item = Result<OwnedEvent, Error>>,
 {
     pub fn new(iter: I) -> Deserializer<I> {
         Deserializer {
@@ -84,7 +84,7 @@ where
 
 impl<'de, 'a, I> de::Deserializer<'de> for &'a mut Deserializer<I>
 where
-    I: IntoIterator<Item = Result<Event<'static>, Error>>,
+    I: IntoIterator<Item = Result<OwnedEvent, Error>>,
 {
     type Error = Error;
 
@@ -229,7 +229,7 @@ where
 
 impl<'de, 'a, I> de::EnumAccess<'de> for &'a mut Deserializer<I>
 where
-    I: IntoIterator<Item = Result<Event<'static>, Error>>,
+    I: IntoIterator<Item = Result<OwnedEvent, Error>>,
 {
     type Error = Error;
     type Variant = Self;
@@ -244,7 +244,7 @@ where
 
 impl<'de, 'a, I> de::VariantAccess<'de> for &'a mut Deserializer<I>
 where
-    I: IntoIterator<Item = Result<Event<'static>, Error>>,
+    I: IntoIterator<Item = Result<OwnedEvent, Error>>,
 {
     type Error = Error;
 
@@ -281,7 +281,7 @@ where
 
 struct MapAndSeqAccess<'a, I>
 where
-    I: 'a + IntoIterator<Item = Result<Event<'static>, Error>>,
+    I: 'a + IntoIterator<Item = Result<OwnedEvent, Error>>,
 {
     de: &'a mut Deserializer<I>,
     is_struct: bool,
@@ -290,7 +290,7 @@ where
 
 impl<'a, I> MapAndSeqAccess<'a, I>
 where
-    I: 'a + IntoIterator<Item = Result<Event<'static>, Error>>,
+    I: 'a + IntoIterator<Item = Result<OwnedEvent, Error>>,
 {
     fn new(
         de: &'a mut Deserializer<I>,
@@ -307,7 +307,7 @@ where
 
 impl<'de, 'a, I> de::SeqAccess<'de> for MapAndSeqAccess<'a, I>
 where
-    I: 'a + IntoIterator<Item = Result<Event<'static>, Error>>,
+    I: 'a + IntoIterator<Item = Result<OwnedEvent, Error>>,
 {
     type Error = Error;
 
@@ -332,7 +332,7 @@ where
 
 impl<'de, 'a, I> de::MapAccess<'de> for MapAndSeqAccess<'a, I>
 where
-    I: 'a + IntoIterator<Item = Result<Event<'static>, Error>>,
+    I: 'a + IntoIterator<Item = Result<OwnedEvent, Error>>,
 {
     type Error = Error;
 

@@ -5,12 +5,12 @@ use serde::{
 use std::{collections::BTreeMap, fmt::Debug};
 
 use crate::{
-    stream::{private::Sealed, Event, Writer},
+    stream::{private::Sealed, Event, OwnedEvent, Writer},
     Date, Deserializer, Error, Integer, Serializer, Uid,
 };
 
 struct VecWriter {
-    events: Vec<Event<'static>>,
+    events: Vec<OwnedEvent>,
 }
 
 impl VecWriter {
@@ -18,7 +18,7 @@ impl VecWriter {
         VecWriter { events: Vec::new() }
     }
 
-    pub fn into_inner(self) -> Vec<Event<'static>> {
+    pub fn into_inner(self) -> Vec<OwnedEvent> {
         self.events
     }
 }
@@ -81,7 +81,7 @@ fn new_serializer() -> Serializer<VecWriter> {
     Serializer::new(VecWriter::new())
 }
 
-fn new_deserializer(events: Vec<Event<'static>>) -> Deserializer<Vec<Result<Event, Error>>> {
+fn new_deserializer(events: Vec<OwnedEvent>) -> Deserializer<Vec<Result<OwnedEvent, Error>>> {
     let result_events = events.into_iter().map(Ok).collect();
     Deserializer::new(result_events)
 }

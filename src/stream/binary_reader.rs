@@ -6,7 +6,7 @@ use std::{
 use crate::{
     date::{Date, InfiniteOrNanDate},
     error::{Error, ErrorKind},
-    stream::Event,
+    stream::{Event, OwnedEvent},
     u64_to_usize, Uid,
 };
 
@@ -208,7 +208,7 @@ impl<R: Read + Seek> BinaryReader<R> {
         item
     }
 
-    fn read_next(&mut self) -> Result<Option<Event<'static>>, Error> {
+    fn read_next(&mut self) -> Result<Option<OwnedEvent>, Error> {
         let object_ref = if self.ref_size == 0 {
             // Initialise here rather than in new
             self.read_trailer()?;
@@ -392,9 +392,9 @@ impl<R: Read + Seek> BinaryReader<R> {
 }
 
 impl<R: Read + Seek> Iterator for BinaryReader<R> {
-    type Item = Result<Event<'static>, Error>;
+    type Item = Result<OwnedEvent, Error>;
 
-    fn next(&mut self) -> Option<Result<Event<'static>, Error>> {
+    fn next(&mut self) -> Option<Result<OwnedEvent, Error>> {
         match self.read_next() {
             Ok(Some(event)) => Some(Ok(event)),
             Err(err) => {
