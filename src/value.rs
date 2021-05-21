@@ -6,7 +6,7 @@ use std::{
 
 use crate::{
     error::{self, Error, ErrorKind, EventKind},
-    stream::{BinaryWriter, Event, IntoEvents, Reader, Writer, XmlReader, XmlWriter},
+    stream::{BinaryWriter, Event, Events, OwnedEvent, Reader, Writer, XmlReader, XmlWriter},
     u64_to_usize, Date, Dictionary, Integer, Uid,
 };
 
@@ -74,7 +74,7 @@ impl Value {
     }
 
     fn to_writer_inner(&self, writer: &mut dyn Writer) -> Result<(), Error> {
-        let events = self.clone().into_events();
+        let events = self.events();
         for event in events {
             writer.write(&event)?;
         }
@@ -86,7 +86,7 @@ impl Value {
     #[cfg(feature = "enable_unstable_features_that_may_break_with_minor_version_bumps")]
     pub fn from_events<T>(events: T) -> Result<Value, Error>
     where
-        T: IntoIterator<Item = Result<Event, Error>>,
+        T: IntoIterator<Item = Result<OwnedEvent, Error>>,
     {
         Builder::new(events.into_iter()).build()
     }
@@ -96,21 +96,29 @@ impl Value {
     #[cfg(not(feature = "enable_unstable_features_that_may_break_with_minor_version_bumps"))]
     pub(crate) fn from_events<T>(events: T) -> Result<Value, Error>
     where
-        T: IntoIterator<Item = Result<Event, Error>>,
+        T: IntoIterator<Item = Result<OwnedEvent, Error>>,
     {
         Builder::new(events.into_iter()).build()
     }
 
     /// Converts a `Value` into an `Event` iterator.
     #[cfg(feature = "enable_unstable_features_that_may_break_with_minor_version_bumps")]
-    pub fn into_events(self) -> IntoEvents {
-        IntoEvents::new(self)
+    #[doc(hidden)]
+    #[deprecated(since = "1.2.0", note = "use Value::events instead")]
+    pub fn into_events(&self) -> Events {
+        self.events()
     }
 
-    /// Converts a `Value` into an `Event` iterator.
+    /// Creates an `Event` iterator for this `Value`.
     #[cfg(not(feature = "enable_unstable_features_that_may_break_with_minor_version_bumps"))]
-    pub(crate) fn into_events(self) -> IntoEvents {
-        IntoEvents::new(self)
+    pub(crate) fn events(&self) -> Events {
+        Events::new(self)
+    }
+
+    /// Creates an `Event` iterator for this `Value`.
+    #[cfg(feature = "enable_unstable_features_that_may_break_with_minor_version_bumps")]
+    pub fn events(&self) -> Events {
+        Events::new(self)
     }
 
     /// If the `Value` is a Array, returns the underlying `Vec`.
@@ -446,10 +454,10 @@ impl<'a> From<&'a str> for Value {
 
 struct Builder<T> {
     stream: T,
-    token: Option<Event>,
+    token: Option<OwnedEvent>,
 }
 
-impl<T: Iterator<Item = Result<Event, Error>>> Builder<T> {
+impl<T: Iterator<Item = Result<OwnedEvent, Error>>> Builder<T> {
     fn new(stream: T) -> Builder<T> {
         Builder {
             stream,
@@ -477,11 +485,11 @@ impl<T: Iterator<Item = Result<Event, Error>>> Builder<T> {
             Some(Event::StartDictionary(len)) => Ok(Value::Dictionary(self.build_dict(len)?)),
 
             Some(Event::Boolean(b)) => Ok(Value::Boolean(b)),
-            Some(Event::Data(d)) => Ok(Value::Data(d)),
+            Some(Event::Data(d)) => Ok(Value::Data(d.into_owned())),
             Some(Event::Date(d)) => Ok(Value::Date(d)),
             Some(Event::Integer(i)) => Ok(Value::Integer(i)),
             Some(Event::Real(f)) => Ok(Value::Real(f)),
-            Some(Event::String(s)) => Ok(Value::String(s)),
+            Some(Event::String(s)) => Ok(Value::String(s.into_owned())),
             Some(Event::Uid(u)) => Ok(Value::Uid(u)),
 
             Some(event @ Event::EndCollection) => Err(error::unexpected_event_type(
@@ -520,7 +528,7 @@ impl<T: Iterator<Item = Result<Event, Error>>> Builder<T> {
                 Some(Event::EndCollection) => return Ok(dict),
                 Some(Event::String(s)) => {
                     self.bump()?;
-                    dict.insert(s, self.build_value()?);
+                    dict.insert(s.into_owned(), self.build_value()?);
                 }
                 Some(event) => {
                     return Err(error::unexpected_event_type(
@@ -586,16 +594,16 @@ mod tests {
         // Input
         let events = vec![
             StartDictionary(None),
-            String("Author".to_owned()),
-            String("William Shakespeare".to_owned()),
-            String("Lines".to_owned()),
+            String("Author".into()),
+            String("William Shakespeare".into()),
+            String("Lines".into()),
             StartArray(None),
-            String("It is a tale told by an idiot,".to_owned()),
-            String("Full of sound and fury, signifying nothing.".to_owned()),
+            String("It is a tale told by an idiot,".into()),
+            String("Full of sound and fury, signifying nothing.".into()),
             EndCollection,
-            String("Birthdate".to_owned()),
+            String("Birthdate".into()),
             Integer(1564.into()),
-            String("Height".to_owned()),
+            String("Height".into()),
             Real(1.60),
             EndCollection,
         ];
