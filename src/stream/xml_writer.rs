@@ -9,7 +9,7 @@ use xml_rs::{
 
 use crate::{
     error::{self, Error, ErrorKind, EventKind},
-    stream::{WriteOptions, Writer},
+    stream::{Writer, XmlWriteOptions},
     Date, Integer, Uid,
 };
 
@@ -35,14 +35,14 @@ pub struct XmlWriter<W: Write> {
 
 impl<W: Write> XmlWriter<W> {
     pub fn new(writer: W) -> XmlWriter<W> {
-        let opts = WriteOptions::default();
+        let opts = XmlWriteOptions::default();
         XmlWriter::new_with_options(writer, &opts)
     }
 
-    pub fn new_with_options(writer: W, opts: &WriteOptions) -> XmlWriter<W> {
+    pub fn new_with_options(writer: W, opts: &XmlWriteOptions) -> XmlWriter<W> {
         let config = EmitterConfig::new()
             .line_separator("\n")
-            .indent_string(opts.indent_str)
+            .indent_string(opts.indent_str.clone())
             .perform_indent(true)
             .write_document_declaration(false)
             .normalize_empty_elements(true)

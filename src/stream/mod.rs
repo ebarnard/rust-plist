@@ -87,24 +87,27 @@ enum StackItem<'a> {
 
 /// Options for customizing serialization of XML plists.
 #[derive(Clone, Debug)]
-pub struct WriteOptions {
-    indent_str: &'static str,
+pub struct XmlWriteOptions {
+    indent_str: Cow<'static, str>,
 }
 
-impl WriteOptions {
+impl XmlWriteOptions {
     /// Specify the sequence of characters used for indentation.
     ///
+    /// This may be either an `&'static str` or an owned `String`.
+    ///
     /// The default is `\t`.
-    #[cfg(feature = "enable_unstable_features_that_may_break_with_minor_version_bumps")]
-    pub fn indent_string(mut self, indent_str: &'static str) -> Self {
-        self.indent_str = indent_str;
+    pub fn indent_string(mut self, indent_str: impl Into<Cow<'static, str>>) -> Self {
+        self.indent_str = indent_str.into();
         self
     }
 }
 
-impl Default for WriteOptions {
+impl Default for XmlWriteOptions {
     fn default() -> Self {
-        WriteOptions { indent_str: "\t" }
+        XmlWriteOptions {
+            indent_str: Cow::Borrowed("\t"),
+        }
     }
 }
 

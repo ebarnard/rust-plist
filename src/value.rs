@@ -7,7 +7,8 @@ use std::{
 use crate::{
     error::{self, Error, ErrorKind, EventKind},
     stream::{
-        BinaryWriter, Event, Events, OwnedEvent, Reader, WriteOptions, Writer, XmlReader, XmlWriter,
+        BinaryWriter, Event, Events, OwnedEvent, Reader, Writer, XmlReader, XmlWriteOptions,
+        XmlWriter,
     },
     u64_to_usize, Date, Dictionary, Integer, Uid,
 };
@@ -71,10 +72,10 @@ impl Value {
 
     /// Serializes a `Value` to a byte stream as an XML encoded plist.
     pub fn to_writer_xml<W: Write>(&self, writer: W) -> Result<(), Error> {
-        self.to_writer_xml_with_options(writer, WriteOptions::default())
+        self.to_writer_xml_with_options(writer, &XmlWriteOptions::default())
     }
 
-    /// Serializes a `Value` to a stream, using custom [`WriteOptions`].
+    /// Serializes a `Value` to a stream, using custom [`XmlWriteOptions`].
     ///
     /// If you need to serialize to a file, you must acquire an appropriate
     /// `Write` handle yourself.
@@ -84,33 +85,21 @@ impl Value {
     /// ```no_run
     /// use std::io::{BufWriter, Write};
     /// use std::fs::File;
-    /// use plist::{Dictionary, Value};
-    /// use plist::stream::{WriteOptions, XmlWriter};
+    /// use plist::{Dictionary, Value, XmlWriteOptions};
     ///
     /// let value: Value = Dictionary::new().into();
     /// // .. add some keys & values
     /// let mut file = File::create("com.example.myPlist.plist").unwrap();
-    /// let options = WriteOptions::default().indent_string("  ");
-    /// value.to_writer_xml_with_options(BufWriter::new(&mut file), options).unwrap();
+    /// let options = XmlWriteOptions::default().indent_string("  ");
+    /// value.to_writer_xml_with_options(BufWriter::new(&mut file), &options).unwrap();
     /// file.sync_all().unwrap();
     /// ```
-    #[cfg(feature = "enable_unstable_features_that_may_break_with_minor_version_bumps")]
     pub fn to_writer_xml_with_options<W: Write>(
         &self,
         writer: W,
-        options: WriteOptions,
+        options: &XmlWriteOptions,
     ) -> Result<(), Error> {
-        let mut writer = XmlWriter::new_with_options(writer, &options);
-        self.to_writer_inner(&mut writer)
-    }
-
-    #[cfg(not(feature = "enable_unstable_features_that_may_break_with_minor_version_bumps"))]
-    pub(crate) fn to_writer_xml_with_options<W: Write>(
-        &self,
-        writer: W,
-        options: WriteOptions,
-    ) -> Result<(), Error> {
-        let mut writer = XmlWriter::new_with_options(writer, &options);
+        let mut writer = XmlWriter::new_with_options(writer, options);
         self.to_writer_inner(&mut writer)
     }
 
