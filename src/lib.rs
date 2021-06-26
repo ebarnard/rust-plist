@@ -89,6 +89,7 @@ pub use date::Date;
 pub use dictionary::Dictionary;
 pub use error::Error;
 pub use integer::Integer;
+pub use stream::XmlWriteOptions;
 pub use uid::Uid;
 pub use value::Value;
 
