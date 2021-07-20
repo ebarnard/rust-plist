@@ -48,7 +48,8 @@ impl<W: Write> XmlWriter<W> {
             .normalize_empty_elements(true)
             .cdata_to_characters(true)
             .keep_element_names_stack(false)
-            .autopad_comments(true);
+            .autopad_comments(true)
+            .pad_self_closing(false);
 
         XmlWriter {
             xml_writer: EventWriter::new_with_config(writer, config),
@@ -377,9 +378,9 @@ mod tests {
 \t<key>SmallestNumber</key>
 \t<integer>-9223372036854775808</integer>
 \t<key>IsTrue</key>
-\t<true />
+\t<true/>
 \t<key>IsNotFalse</key>
-\t<false />
+\t<false/>
 </dict>
 </plist>";
 
