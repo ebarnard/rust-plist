@@ -112,7 +112,9 @@ pub use self::{de::Deserializer, ser::Serializer};
 #[cfg(feature = "serde")]
 pub use self::{
     de::{from_bytes, from_file, from_reader, from_reader_xml},
-    ser::{to_file_binary, to_file_xml, to_writer_binary, to_writer_xml},
+    ser::{
+        to_file_binary, to_file_xml, to_writer_binary, to_writer_xml, to_writer_xml_with_options,
+    },
 };
 
 #[cfg(all(test, feature = "serde"))]
