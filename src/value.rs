@@ -1,3 +1,4 @@
+use serde::{de, de::Deserializer, de::MapAccess, de::SeqAccess, de::Visitor, ser};
 use std::{
     fs::File,
     io::{BufReader, BufWriter, Read, Seek, Write},
@@ -311,6 +312,133 @@ impl Value {
             Value::String(ref v) => Some(v),
             _ => None,
         }
+    }
+
+    /// If the `Value` is a Uid, returns the underlying `Uid`.
+    ///
+    /// Returns `None` otherwise.
+    ///
+    /// This method consumes the `Value`. If this is not desired, please use
+    /// `as_uid` method.
+    pub fn into_uid(self) -> Option<Uid> {
+        match self {
+            Value::Uid(u) => Some(u),
+            _ => None,
+        }
+    }
+
+    /// If the `Value` is a Uid, returns the associated `Uid`.
+    ///
+    /// Returns `None` otherwise.
+    pub fn as_uid(&self) -> Option<&Uid> {
+        match *self {
+            Value::Uid(ref u) => Some(u),
+            _ => None,
+        }
+    }
+}
+
+impl ser::Serialize for Value {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        match *self {
+            Value::Array(ref v) => v.serialize(serializer),
+            Value::Dictionary(ref m) => m.serialize(serializer),
+            Value::Boolean(b) => serializer.serialize_bool(b),
+            Value::Data(ref v) => serializer.serialize_bytes(v),
+            Value::Date(d) => d.serialize(serializer),
+            Value::Real(n) => serializer.serialize_f64(n),
+            Value::Integer(n) => n.serialize(serializer),
+            Value::String(ref s) => serializer.serialize_str(s),
+            Value::Uid(ref u) => u.serialize(serializer),
+            _ => Err(ser::Error::custom(
+                "unable to serialize unsupported plist data type",
+            )),
+        }
+    }
+}
+
+impl<'de> de::Deserialize<'de> for Value {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        struct ValueVisitor;
+
+        impl<'de> Visitor<'de> for ValueVisitor {
+            type Value = Value;
+
+            fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
+                formatter.write_str("any supported plist value")
+            }
+
+            fn visit_bool<E>(self, value: bool) -> Result<Value, E> {
+                Ok(Value::Boolean(value))
+            }
+
+            fn visit_byte_buf<E>(self, v: Vec<u8>) -> Result<Value, E> {
+                Ok(Value::Data(v))
+            }
+
+            fn visit_bytes<E>(self, v: &[u8]) -> Result<Value, E> {
+                Ok(Value::Data(v.to_vec()))
+            }
+
+            fn visit_i64<E>(self, value: i64) -> Result<Value, E> {
+                Ok(Value::Integer(value.into()))
+            }
+
+            fn visit_u64<E>(self, value: u64) -> Result<Value, E> {
+                Ok(Value::Integer(value.into()))
+            }
+
+            fn visit_f64<E>(self, value: f64) -> Result<Value, E> {
+                Ok(Value::Real(value))
+            }
+
+            fn visit_map<V>(self, mut visitor: V) -> Result<Value, V::Error>
+            where
+                V: MapAccess<'de>,
+            {
+                let mut values = Dictionary::new();
+                while let Some((k, v)) = visitor.next_entry()? {
+                    values.insert(k, v);
+                }
+                Ok(Value::Dictionary(values))
+            }
+
+            fn visit_newtype_struct<D>(self, _deserializer: D) -> Result<Value, D::Error>
+            where
+                D: Deserializer<'de>,
+            {
+                panic!("visit_newtype_struct");
+            }
+
+            fn visit_str<E>(self, value: &str) -> Result<Value, E> {
+                Ok(Value::String(value.to_owned()))
+            }
+
+            fn visit_string<E>(self, value: String) -> Result<Value, E> {
+                Ok(Value::String(value))
+            }
+
+            fn visit_seq<V>(self, mut visitor: V) -> Result<Value, V::Error>
+            where
+                V: SeqAccess<'de>,
+            {
+                let mut vec = Vec::new();
+
+                while let Some(elem) = visitor.next_element()? {
+                    vec.push(elem);
+                }
+
+                Ok(Value::Array(vec))
+            }
+        }
+
+        deserializer.deserialize_any(ValueVisitor)
     }
 }
 
