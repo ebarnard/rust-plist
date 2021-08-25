@@ -409,13 +409,6 @@ impl<'de> de::Deserialize<'de> for Value {
                 Ok(Value::Dictionary(values))
             }
 
-            fn visit_newtype_struct<D>(self, _deserializer: D) -> Result<Value, D::Error>
-            where
-                D: Deserializer<'de>,
-            {
-                panic!("visit_newtype_struct");
-            }
-
             fn visit_str<E>(self, value: &str) -> Result<Value, E> {
                 Ok(Value::String(value.to_owned()))
             }

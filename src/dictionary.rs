@@ -749,9 +749,9 @@ mod tests {
         check_common_plist(&dict);
     }
 
-    // Shared checks used by deserialize_dictionary_xml() and
-    // deserialize_dictionary_binary() which load files with different formats
-    // but the same data.
+    // Shared checks used by the tests deserialize_dictionary_xml() and
+    // deserialize_dictionary_binary(), which load files with different formats
+    // but the same data elements.
     fn check_common_plist(dict: &Dictionary) {
         // Array elements
 
@@ -789,8 +789,18 @@ mod tests {
 
         // Date
 
-        // TODO: Birthdate is being deserialized as a Value::String; but it should be a Value::Date.
-        //assert_eq!(dict.get("Birthdate").unwrap().as_date().unwrap().to_rfc3339(), "1981-05-16T11:32:06Z");
+        // TODO: Dates are being deserialized as a Value::String rather than as
+        // Value::Date.  This should be fixed, but for now, just verify we get
+        // the expected string value.
+
+        // assert_eq!(
+        //     dict.get("Birthdate")
+        //         .unwrap()
+        //         .as_date()
+        //         .unwrap()
+        //         .to_rfc3339(),
+        //     "1981-05-16T11:32:06Z"
+        // );
         assert_eq!(
             dict.get("Birthdate").unwrap().as_string().unwrap(),
             "1981-05-16T11:32:06Z"
@@ -849,8 +859,9 @@ mod tests {
             "NSKeyedArchiver"
         );
 
-        // TODO: All UID values are being deserialized as Value::Integer rather than Value::Uid.
-        // This needs to be fixed, but for now just testing the integer values.
+        // TODO: All UID values are being deserialized as Value::Integer rather
+        // than Value::Uid.  This needs to be fixed, but for now we just verify
+        // we are getting the expected integer values.
 
         let objects = dict.get("$objects").unwrap().as_array().unwrap();
         assert_eq!(objects.len(), 5);
