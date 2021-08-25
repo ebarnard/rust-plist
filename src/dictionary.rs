@@ -936,6 +936,44 @@ mod tests {
     }
 
     #[test]
+    fn dictionary_deserialize_dictionary_in_struct() {
+        // Example from <https://github.com/ebarnard/rust-plist/issues/54>
+        #[derive(Deserialize)]
+        struct LayerinfoData {
+            color: Option<String>,
+            lib: Option<Dictionary>,
+        }
+
+        let lib_dict: LayerinfoData = crate::from_bytes(r#"
+        <?xml version="1.0" encoding="UTF-8"?>
+    <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+    <plist version="1.0">
+      <dict>
+        <key>color</key>
+        <string>1,0.75,0,0.7</string>
+        <key>lib</key>
+        <dict>
+          <key>com.typemytype.robofont.segmentType</key>
+          <string>curve</string>
+        </dict>
+      </dict>
+    </plist>
+    "#.as_bytes()).unwrap();
+
+        assert_eq!(lib_dict.color.unwrap(), "1,0.75,0,0.7");
+        assert_eq!(
+            lib_dict
+                .lib
+                .unwrap()
+                .get("com.typemytype.robofont.segmentType")
+                .unwrap()
+                .as_string()
+                .unwrap(),
+            "curve"
+        );
+    }
+
+    #[test]
     fn dictionary_serialize_xml() {
         // Dictionary to be embedded in dict, below.
         let mut inner_dict = Dictionary::new();
@@ -987,7 +1025,7 @@ mod tests {
 \t\t<data>\n\t\tChQeKA==\n\t\t</data>
 \t\t<key>ThirdKey</key>
 \t\t<real>1.234</real>
-<key>FourthKey</key>
+\t\t<key>FourthKey</key>
 \t\t<date>1981-05-16T11:32:06Z</date>
 \t</dict>
 \t<key>AnInteger</key>
