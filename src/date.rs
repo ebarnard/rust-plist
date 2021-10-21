@@ -1,8 +1,8 @@
-use chrono::{DateTime, FixedOffset, SecondsFormat, Utc};
 use std::{
     fmt,
     time::{Duration, SystemTime, UNIX_EPOCH},
 };
+use time::{format_description::well_known::Rfc3339, OffsetDateTime, UtcOffset};
 
 /// A UTC timestamp used for serialization to and from the plist date type.
 ///
@@ -20,15 +20,17 @@ impl Date {
     const PLIST_EPOCH_UNIX_TIMESTAMP: Duration = Duration::from_secs(978_307_200);
 
     pub(crate) fn from_rfc3339(date: &str) -> Result<Self, ()> {
-        let offset: DateTime<FixedOffset> = DateTime::parse_from_rfc3339(date).map_err(|_| ())?;
+        let offset: OffsetDateTime = OffsetDateTime::parse(date, &Rfc3339)
+            .map_err(|_| ())?
+            .to_offset(UtcOffset::UTC);
         Ok(Date {
-            inner: offset.with_timezone(&Utc).into(),
+            inner: offset.into(),
         })
     }
 
     pub(crate) fn to_rfc3339(&self) -> String {
-        let datetime: DateTime<Utc> = self.inner.into();
-        datetime.to_rfc3339_opts(SecondsFormat::Secs, true)
+        let datetime: OffsetDateTime = self.inner.into();
+        datetime.format(&Rfc3339).unwrap()
     }
 
     pub(crate) fn from_seconds_since_plist_epoch(
