@@ -51,10 +51,12 @@ impl Date {
         let dur_since_plist_epoch = Duration::new(seconds, subsec_nanos);
 
         let inner = if is_negative {
-            plist_epoch - dur_since_plist_epoch
+            plist_epoch.checked_sub(dur_since_plist_epoch)
         } else {
-            plist_epoch + dur_since_plist_epoch
+            plist_epoch.checked_add(dur_since_plist_epoch)
         };
+
+        let inner = inner.ok_or(InfiniteOrNanDate)?;
 
         Ok(Date { inner })
     }
