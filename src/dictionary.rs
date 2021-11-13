@@ -230,13 +230,13 @@ impl Debug for Dictionary {
     }
 }
 
-impl FromIterator<(String, Value)> for Dictionary {
-    fn from_iter<T>(iter: T) -> Self
-    where
-        T: IntoIterator<Item = (String, Value)>,
-    {
+impl<K: Into<String>, V: Into<Value>> FromIterator<(K, V)> for Dictionary {
+    fn from_iter<I: IntoIterator<Item = (K, V)>>(iter: I) -> Self {
         Dictionary {
-            map: FromIterator::from_iter(iter),
+            map: iter
+                .into_iter()
+                .map(|(k, v)| (k.into(), v.into()))
+                .collect(),
         }
     }
 }
@@ -721,4 +721,28 @@ pub mod serde_impls {
             deserializer.deserialize_map(Visitor)
         }
     }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::Dictionary;
+    use std::collections::HashMap;
+
+
+    #[test]
+    fn from_hash_map_to_dict() {
+        
+        let dogs = HashMap::from([
+            ("Doge", "Shiba Inu"),
+            ("Cheems", "Shiba Inu"),
+            ("Walter", "Bull Terrier"),
+            ("Perro", "Golden Retriever"),
+        ]);
+        let dict: Dictionary = dogs.into_iter().collect();
+        assert_eq!(dict.get("Doge").and_then(|v| v.as_string()), Some("Shiba Inu"));
+        assert_eq!(dict.get("Cheems").and_then(|v| v.as_string()), Some("Shiba Inu"));
+        assert_eq!(dict.get("Walter").and_then(|v| v.as_string()), Some("Bull Terrier"));
+        assert_eq!(dict.get("Perro").and_then(|v| v.as_string()), Some("Golden Retriever"));
+    }
+
 }
