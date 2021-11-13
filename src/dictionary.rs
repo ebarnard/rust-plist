@@ -728,10 +728,8 @@ mod tests {
     use super::Dictionary;
     use std::collections::HashMap;
 
-
     #[test]
     fn from_hash_map_to_dict() {
-        
         let dogs = HashMap::from([
             ("Doge", "Shiba Inu"),
             ("Cheems", "Shiba Inu"),
@@ -739,10 +737,21 @@ mod tests {
             ("Perro", "Golden Retriever"),
         ]);
         let dict: Dictionary = dogs.into_iter().collect();
-        assert_eq!(dict.get("Doge").and_then(|v| v.as_string()), Some("Shiba Inu"));
-        assert_eq!(dict.get("Cheems").and_then(|v| v.as_string()), Some("Shiba Inu"));
-        assert_eq!(dict.get("Walter").and_then(|v| v.as_string()), Some("Bull Terrier"));
-        assert_eq!(dict.get("Perro").and_then(|v| v.as_string()), Some("Golden Retriever"));
+        assert_eq!(
+            dict.get("Doge").and_then(|v| v.as_string()),
+            Some("Shiba Inu")
+        );
+        assert_eq!(
+            dict.get("Cheems").and_then(|v| v.as_string()),
+            Some("Shiba Inu")
+        );
+        assert_eq!(
+            dict.get("Walter").and_then(|v| v.as_string()),
+            Some("Bull Terrier")
+        );
+        assert_eq!(
+            dict.get("Perro").and_then(|v| v.as_string()),
+            Some("Golden Retriever")
+        );
     }
-
 }
