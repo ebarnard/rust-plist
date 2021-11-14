@@ -15,6 +15,7 @@ use crate::{
 
 /// Represents any plist value.
 #[derive(Clone, Debug, PartialEq)]
+#[non_exhaustive]
 pub enum Value {
     Array(Vec<Value>),
     Dictionary(Dictionary),
@@ -25,8 +26,6 @@ pub enum Value {
     Integer(Integer),
     String(String),
     Uid(Uid),
-    #[doc(hidden)]
-    __Nonexhaustive,
 }
 
 impl Value {
@@ -358,9 +357,6 @@ pub mod serde_impls {
                 Value::Integer(n) => n.serialize(serializer),
                 Value::String(ref s) => serializer.serialize_str(s),
                 Value::Uid(ref u) => u.serialize(serializer),
-                _ => Err(ser::Error::custom(
-                    "unable to serialize unsupported plist data type",
-                )),
             }
         }
     }
@@ -653,8 +649,6 @@ impl<T: Iterator<Item = Result<OwnedEvent, Error>>> Builder<T> {
                 EventKind::ValueOrStartCollection,
                 &event,
             )),
-
-            Some(Event::__Nonexhaustive) => unreachable!(),
 
             None => Err(ErrorKind::UnexpectedEndOfEventStream.without_position()),
         }
