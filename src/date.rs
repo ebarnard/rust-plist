@@ -125,6 +125,13 @@ pub mod serde_impls {
             formatter.write_str("a plist date newtype")
         }
 
+        fn visit_str<E>(self, v: &str) -> Result<Self::Value, E>
+        where
+            E: Error,
+        {
+            DateStrVisitor.visit_str(v)
+        }
+
         fn visit_newtype_struct<D>(self, deserializer: D) -> Result<Self::Value, D::Error>
         where
             D: Deserializer<'de>,

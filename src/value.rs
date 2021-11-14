@@ -338,9 +338,18 @@ impl Value {
 
 #[cfg(feature = "serde")]
 pub mod serde_impls {
-    use serde::{de, de::MapAccess, de::SeqAccess, de::Visitor, ser};
+    use serde::{
+        de,
+        de::{EnumAccess, MapAccess, SeqAccess, VariantAccess, Visitor},
+        ser,
+    };
 
-    use crate::{Dictionary, Value};
+    use crate::{
+        date::serde_impls::DATE_NEWTYPE_STRUCT_NAME, uid::serde_impls::UID_NEWTYPE_STRUCT_NAME,
+        Dictionary, Value,
+    };
+
+    pub const VALUE_NEWTYPE_STRUCT_NAME: &str = "PLIST-VALUE";
 
     impl ser::Serialize for Value {
         fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
@@ -399,12 +408,12 @@ pub mod serde_impls {
                     Ok(Value::Real(value))
                 }
 
-                fn visit_map<V>(self, mut visitor: V) -> Result<Value, V::Error>
+                fn visit_map<V>(self, mut map: V) -> Result<Value, V::Error>
                 where
                     V: MapAccess<'de>,
                 {
                     let mut values = Dictionary::new();
-                    while let Some((k, v)) = visitor.next_entry()? {
+                    while let Some((k, v)) = map.next_entry()? {
                         values.insert(k, v);
                     }
                     Ok(Value::Dictionary(values))
@@ -418,21 +427,38 @@ pub mod serde_impls {
                     Ok(Value::String(value))
                 }
 
-                fn visit_seq<V>(self, mut visitor: V) -> Result<Value, V::Error>
+                fn visit_seq<A>(self, mut seq: A) -> Result<Value, A::Error>
                 where
-                    V: SeqAccess<'de>,
+                    A: SeqAccess<'de>,
                 {
-                    let mut vec = Vec::new();
-
-                    while let Some(elem) = visitor.next_element()? {
+                    let mut vec = Vec::with_capacity(seq.size_hint().unwrap_or(0));
+                    while let Some(elem) = seq.next_element()? {
                         vec.push(elem);
                     }
-
                     Ok(Value::Array(vec))
+                }
+
+                fn visit_enum<A>(self, data: A) -> Result<Value, A::Error>
+                where
+                    A: EnumAccess<'de>,
+                {
+                    let (name, variant) = data.variant::<String>()?;
+                    match &*name {
+                        DATE_NEWTYPE_STRUCT_NAME => Ok(Value::Date(variant.newtype_variant()?)),
+                        UID_NEWTYPE_STRUCT_NAME => Ok(Value::Uid(variant.newtype_variant()?)),
+                        _ => Err(de::Error::unknown_variant(
+                            &name,
+                            &[DATE_NEWTYPE_STRUCT_NAME, UID_NEWTYPE_STRUCT_NAME],
+                        )),
+                    }
                 }
             }
 
-            deserializer.deserialize_any(ValueVisitor)
+            // Serde serialisers are encouraged to treat newtype structs as insignificant
+            // wrappers around the data they contain. That means not parsing anything other
+            // than the contained value. Therefore, this should not prevent using `Value`
+            // with other `Serializer`s.
+            deserializer.deserialize_newtype_struct(VALUE_NEWTYPE_STRUCT_NAME, ValueVisitor)
         }
     }
 }

@@ -2,8 +2,7 @@ use serde::{
     de::{Deserialize, DeserializeOwned},
     ser::Serialize,
 };
-use std::{collections::BTreeMap, fmt::Debug};
-use std::{fs::File, io::Cursor, path::Path};
+use std::{collections::BTreeMap, fmt::Debug, fs::File, io::Cursor, path::Path};
 
 use crate::{
     stream::{private::Sealed, Event, OwnedEvent, Writer},
@@ -650,21 +649,9 @@ fn check_common_plist(dict: &Dictionary) {
 
     // Date
 
-    // TODO: Dates are being deserialized as a Value::String rather than as
-    // Value::Date.  This should be fixed, but for now, just verify we get
-    // the expected string value.
-
-    // assert_eq!(
-    //     dict.get("Birthdate")
-    //         .unwrap()
-    //         .as_date()
-    //         .unwrap()
-    //         .to_rfc3339(),
-    //     "1981-05-16T11:32:06Z"
-    // );
     assert_eq!(
-        dict.get("Birthdate").unwrap().as_string().unwrap(),
-        "1981-05-16T11:32:06Z"
+        dict.get("Birthdate").unwrap().as_date().unwrap(),
+        Date::from_rfc3339("1981-05-16T11:32:06Z").unwrap()
     );
 
     // Real
@@ -720,10 +707,6 @@ fn deserialize_dictionary_binary_nskeyedarchiver() {
         "NSKeyedArchiver"
     );
 
-    // TODO: All UID values are being deserialized as Value::Integer rather
-    // than Value::Uid.  This needs to be fixed, but for now we just verify
-    // we are getting the expected integer values.
-
     let objects = dict.get("$objects").unwrap().as_array().unwrap();
     assert_eq!(objects.len(), 5);
 
@@ -731,12 +714,8 @@ fn deserialize_dictionary_binary_nskeyedarchiver() {
 
     let objects_1 = objects[1].as_dictionary().unwrap();
     assert_eq!(
-        objects_1
-            .get("$class")
-            .unwrap()
-            .as_unsigned_integer()
-            .unwrap(),
-        4
+        *objects_1.get("$class").unwrap().as_uid().unwrap(),
+        Uid::new(4)
     );
     assert_eq!(
         objects_1
@@ -747,22 +726,14 @@ fn deserialize_dictionary_binary_nskeyedarchiver() {
         42
     );
     assert_eq!(
-        objects_1
-            .get("NSRangeData")
-            .unwrap()
-            .as_unsigned_integer()
-            .unwrap(),
-        2
+        *objects_1.get("NSRangeData").unwrap().as_uid().unwrap(),
+        Uid::new(2)
     );
 
     let objects_2 = objects[2].as_dictionary().unwrap();
     assert_eq!(
-        objects_2
-            .get("$class")
-            .unwrap()
-            .as_unsigned_integer()
-            .unwrap(),
-        3
+        *objects_2.get("$class").unwrap().as_uid().unwrap(),
+        Uid::new(3)
     );
     let objects_2_nsdata = objects_2.get("NS.data").unwrap().as_data().unwrap();
     assert_eq!(objects_2_nsdata.len(), 103);
@@ -796,11 +767,8 @@ fn deserialize_dictionary_binary_nskeyedarchiver() {
 
     let top = dict.get("$top").unwrap().as_dictionary().unwrap();
     assert_eq!(
-        top.get("foundItems")
-            .unwrap()
-            .as_unsigned_integer()
-            .unwrap(),
-        1
+        *top.get("foundItems").unwrap().as_uid().unwrap(),
+        Uid::new(1)
     );
 
     let version = dict.get("$version").unwrap().as_unsigned_integer().unwrap();
