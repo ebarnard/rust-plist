@@ -19,7 +19,7 @@ base64 = "0.13.0"
 time = { version = "0.3.3", features = ["parsing", "formatting"] }
 indexmap = "1.0.2"
 line-wrap = "0.1.1"
-xml_rs = { package = "xml-rs", version = "0.8.0" }
+xml_rs = { package = "xml-rs", version = "0.8.2" }
 serde = { version = "1.0.2", optional = true }
 
 [dev-dependencies]

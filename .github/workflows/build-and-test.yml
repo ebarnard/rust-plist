@@ -62,3 +62,10 @@ jobs:
         with:
           command: test
           args: --release --all-features --target ${{ matrix.target }}
+
+      - name: Build and Test (Minimal Versions, All Features)
+        if: ${{ matrix.channel == 'nightly' }}
+        uses: actions-rs/cargo@v1
+        with:
+          command: test
+          args: --all-features -Z minimal-versions --target ${{ matrix.target }}
