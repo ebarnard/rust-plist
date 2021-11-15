@@ -214,7 +214,7 @@ where
         V: de::Visitor<'de>,
     {
         if name == VALUE_NEWTYPE_STRUCT_NAME {
-            self.enter_plist_value(|this| this.deserialize_any(visitor))
+            self.enter_plist_value(|this| visitor.visit_newtype_struct(this))
         } else {
             visitor.visit_newtype_struct(self)
         }

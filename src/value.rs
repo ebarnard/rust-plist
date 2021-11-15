@@ -427,6 +427,13 @@ pub mod serde_impls {
                     Ok(Value::String(value))
                 }
 
+                fn visit_newtype_struct<T>(self, deserializer: T) -> Result<Value, T::Error>
+                where
+                    T: de::Deserializer<'de>,
+                {
+                    deserializer.deserialize_any(self)
+                }
+
                 fn visit_seq<A>(self, mut seq: A) -> Result<Value, A::Error>
                 where
                     A: SeqAccess<'de>,

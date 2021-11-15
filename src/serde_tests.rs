@@ -879,3 +879,9 @@ fn dictionary_serialize_xml() {
 
     assert_eq!(xml, comparison);
 }
+
+#[test]
+fn serde_yaml_to_value() {
+    let value: Value = serde_yaml::from_str("true").unwrap();
+    assert_eq!(value, Value::Boolean(true));
+}
