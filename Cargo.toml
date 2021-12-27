@@ -12,6 +12,7 @@ edition = "2018"
 
 [features]
 default = ["serde"]
+quick-xml = ["quick_xml"]
 enable_unstable_features_that_may_break_with_minor_version_bumps = []
 
 [dependencies]
@@ -20,6 +21,7 @@ time = { version = "0.3.3", features = ["parsing", "formatting"] }
 indexmap = "1.0.2"
 line-wrap = "0.1.1"
 xml_rs = { package = "xml-rs", version = "0.8.2" }
+quick_xml = { package = "quick-xml", version = "0.22.0", optional = true }
 serde = { version = "1.0.2", optional = true }
 
 [dev-dependencies]

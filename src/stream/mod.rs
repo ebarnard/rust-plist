@@ -6,8 +6,15 @@ pub use self::binary_reader::BinaryReader;
 mod binary_writer;
 pub use self::binary_writer::BinaryWriter;
 
+#[cfg(not(feature = "quick-xml"))]
 mod xml_reader;
+#[cfg(not(feature = "quick-xml"))]
 pub use self::xml_reader::XmlReader;
+
+#[cfg(feature = "quick-xml")]
+mod quick_xml_reader;
+#[cfg(feature = "quick-xml")]
+pub use self::quick_xml_reader::XmlReader;
 
 mod xml_writer;
 pub use self::xml_writer::XmlWriter;
