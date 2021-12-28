@@ -169,6 +169,20 @@ impl<R: Read> XmlReader<R> {
                     match name.local_name() {
                         b"true" => return Ok(Some(Event::Boolean(true))),
                         b"false" => return Ok(Some(Event::Boolean(false))),
+
+                        b"array" | b"dict" => {
+                            let owned_name = name.local_name().to_owned().into_boxed_slice();
+                            // Open and immediately close a collection element
+                            self.element_stack.push(owned_name.clone());
+                            self.closed_element = Some(owned_name);
+
+                            match name.local_name() {
+                                b"array" => return Ok(Some(Event::StartArray(None))),
+                                b"dict" => return Ok(Some(Event::StartDictionary(None))),
+                                _ => unreachable!(),
+                            }
+                        },
+
                         _ => return Err(self.with_pos(ErrorKind::UnknownXmlElement)),
                     }
                 }
