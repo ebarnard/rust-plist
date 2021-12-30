@@ -204,7 +204,9 @@ impl<R: Read> ReaderState<R> {
                     // Check the corrent element is being closed
                     match self.element_stack.pop() {
                         Some(open_name) if name.local_name() == open_name.as_ref() => {}
-                        Some(_open_name) => return Err(self.with_pos(ErrorKind::UnclosedXmlElement)),
+                        Some(_open_name) => {
+                            return Err(self.with_pos(ErrorKind::UnclosedXmlElement))
+                        }
                         None => return Err(self.with_pos(ErrorKind::UnpairedXmlClosingTag)),
                     }
 
@@ -215,7 +217,9 @@ impl<R: Read> ReaderState<R> {
                 }
                 XmlEvent::Eof if self.element_stack.is_empty() => return Ok(None),
                 XmlEvent::Eof => return Err(self.with_pos(ErrorKind::UnclosedXmlElement)),
-                XmlEvent::Text(_) => return Err(self.with_pos(ErrorKind::UnexpectedXmlCharactersExpectedElement)),
+                XmlEvent::Text(_) => {
+                    return Err(self.with_pos(ErrorKind::UnexpectedXmlCharactersExpectedElement))
+                }
                 XmlEvent::PI(_)
                 | XmlEvent::Decl(_)
                 | XmlEvent::DocType(_)
