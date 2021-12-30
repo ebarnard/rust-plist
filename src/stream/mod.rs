@@ -16,8 +16,15 @@ mod quick_xml_reader;
 #[cfg(feature = "quick-xml")]
 pub use self::quick_xml_reader::XmlReader;
 
+#[cfg(not(feature = "quick-xml"))]
 mod xml_writer;
+#[cfg(not(feature = "quick-xml"))]
 pub use self::xml_writer::XmlWriter;
+
+#[cfg(feature = "quick-xml")]
+mod quick_xml_writer;
+#[cfg(feature = "quick-xml")]
+pub use self::quick_xml_writer::XmlWriter;
 
 use std::{
     borrow::Cow,
@@ -93,7 +100,13 @@ enum StackItem<'a> {
 /// Options for customizing serialization of XML plists.
 #[derive(Clone, Debug)]
 pub struct XmlWriteOptions {
+    #[cfg(not(feature = "quick-xml"))]
     indent_str: Cow<'static, str>,
+
+    #[cfg(feature = "quick-xml")]
+    indent_char: u8,
+    #[cfg(feature = "quick-xml")]
+    indent_amount: usize,
 }
 
 impl XmlWriteOptions {
@@ -102,16 +115,57 @@ impl XmlWriteOptions {
     /// This may be either an `&'static str` or an owned `String`.
     ///
     /// The default is `\t`.
+    ///
+    /// With feature `quick-xml` the indent string has to consist of a single repeating ascii
+    /// character. This is a backwards compatibility function, prefer using
+    /// `XmlWriteOptions::with_indent`.
+    #[cfg(not(feature = "quick-xml"))]
     pub fn indent_string(mut self, indent_str: impl Into<Cow<'static, str>>) -> Self {
         self.indent_str = indent_str.into();
+        self
+    }
+    #[cfg(feature = "quick-xml")]
+    pub fn indent_string(self, indent_str: impl Into<Cow<'static, str>>) -> Self {
+        let indent_str = indent_str.into();
+        let indent_str = indent_str.as_ref();
+
+        if indent_str.is_empty() {
+            return self.with_indent(0, 0);
+        }
+
+        assert!(
+            indent_str.chars().all(|chr| chr.is_ascii()),
+            "indent str must be ascii"
+        );
+        let indent_str = indent_str.as_bytes();
+        assert!(
+            indent_str.iter().all(|chr| chr == &indent_str[0]),
+            "indent str must consist of a single repeating character"
+        );
+
+        self.with_indent(indent_str[0], indent_str.len())
+    }
+
+    #[cfg(feature = "quick-xml")]
+    pub fn with_indent(mut self, indent_char: u8, indent_amount: usize) -> Self {
+        self.indent_char = indent_char;
+        self.indent_amount = indent_amount;
         self
     }
 }
 
 impl Default for XmlWriteOptions {
+    #[cfg(not(feature = "quick-xml"))]
     fn default() -> Self {
         XmlWriteOptions {
             indent_str: Cow::Borrowed("\t"),
+        }
+    }
+    #[cfg(feature = "quick-xml")]
+    fn default() -> Self {
+        XmlWriteOptions {
+            indent_char: b'\t',
+            indent_amount: 1,
         }
     }
 }
