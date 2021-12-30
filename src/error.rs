@@ -58,7 +58,7 @@ pub(crate) enum ErrorKind {
     Serde(String),
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone, Copy)]
 pub(crate) enum FilePosition {
     LineColumn(u64, u64),
     Offset(u64),
