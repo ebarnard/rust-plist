@@ -81,7 +81,9 @@ fn new_serializer() -> Serializer<VecWriter> {
     Serializer::new(VecWriter::new())
 }
 
-fn new_deserializer(events: Vec<OwnedEvent>) -> Deserializer<Vec<Result<OwnedEvent, Error>>> {
+fn new_deserializer<'event>(
+    events: Vec<Event<'event>>,
+) -> Deserializer<'event, Vec<Result<Event<'event>, Error>>> {
     let result_events = events.into_iter().map(Ok).collect();
     Deserializer::new(result_events)
 }
