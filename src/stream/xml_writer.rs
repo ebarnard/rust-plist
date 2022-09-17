@@ -35,6 +35,7 @@ pub struct XmlWriter<W: Write> {
 }
 
 impl<W: Write> XmlWriter<W> {
+    #[cfg(fearure = "enable_unstable_features_that_may_break_with_minor_version_bumps")]
     pub fn new(writer: W) -> XmlWriter<W> {
         let opts = XmlWriteOptions::default();
         XmlWriter::new_with_options(writer, &opts)
@@ -60,6 +61,11 @@ impl<W: Write> XmlWriter<W> {
             expecting_key: false,
             empty_namespace: Namespace::empty(),
         }
+    }
+
+    #[cfg(feature="enable_unstable_features_that_may_break_with_minor_version_bumps")]
+    pub fn into_inner(self) -> W {
+        self.xml_writer.into_inner()
     }
 
     fn write_element_and_value(&mut self, name: &str, value: &str) -> Result<(), Error> {
@@ -94,10 +100,6 @@ impl<W: Write> XmlWriter<W> {
             .write(XmlEvent::Characters(value))
             .map_err(from_xml_error)?;
         Ok(())
-    }
-
-    pub fn into_inner(self) -> W {
-        self.xml_writer.into_inner()
     }
 
     fn write_event<F: FnOnce(&mut Self) -> Result<(), Error>>(

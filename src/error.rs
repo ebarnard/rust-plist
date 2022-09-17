@@ -19,7 +19,9 @@ pub(crate) enum ErrorKind {
     UnexpectedEof,
     UnexpectedEndOfEventStream,
     UnexpectedEventType {
+        #[allow(dead_code)]
         expected: EventKind,
+        #[allow(dead_code)]
         found: EventKind,
     },
 
@@ -55,6 +57,7 @@ pub(crate) enum ErrorKind {
     UnknownObjectType(u8),
 
     Io(io::Error),
+    #[cfg(feature = "serde")]
     Serde(String),
 }
 
