@@ -342,7 +342,7 @@ struct TypeWithDate {
 
 #[test]
 fn type_with_date() {
-    let date = Date::from_rfc3339("1920-01-01T00:10:00Z").unwrap();
+    let date = Date::from_xml_format("1920-01-01T00:10:00Z").unwrap();
 
     let obj = TypeWithDate {
         a: Some(28),
@@ -651,7 +651,7 @@ fn check_common_plist(dict: &Dictionary) {
 
     assert_eq!(
         dict.get("Birthdate").unwrap().as_date().unwrap(),
-        Date::from_rfc3339("1981-05-16T11:32:06Z").unwrap()
+        Date::from_xml_format("1981-05-16T11:32:06Z").unwrap()
     );
 
     // Real
@@ -825,7 +825,7 @@ fn dictionary_serialize_xml() {
     inner_dict.insert("ThirdKey".to_owned(), Value::Real(1.234));
     inner_dict.insert(
         "FourthKey".to_owned(),
-        Value::Date(Date::from_rfc3339("1981-05-16T11:32:06Z").unwrap()),
+        Value::Date(Date::from_xml_format("1981-05-16T11:32:06Z").unwrap()),
     );
 
     // Top-level dictionary.

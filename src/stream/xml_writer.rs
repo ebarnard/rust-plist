@@ -206,7 +206,7 @@ impl<W: Write> Writer for XmlWriter<W> {
 
     fn write_date(&mut self, value: Date) -> Result<(), Error> {
         self.write_value_event(EventKind::Date, |this| {
-            this.write_element_and_value("date", &value.to_rfc3339())
+            this.write_element_and_value("date", &value.to_xml_format())
         })
     }
 
@@ -321,7 +321,7 @@ mod tests {
             Event::String("Data".into()),
             Event::Data(vec![0, 0, 0, 190, 0, 0, 0, 3, 0, 0, 0, 30, 0, 0, 0].into()),
             Event::String("Birthdate".into()),
-            Event::Date(super::Date::from_rfc3339("1981-05-16T11:32:06Z").unwrap()),
+            Event::Date(super::Date::from_xml_format("1981-05-16T11:32:06Z").unwrap()),
             Event::String("Comment".into()),
             Event::String("2 < 3".into()), // make sure characters are escaped
             Event::String("BiggestNumber".into()),

@@ -1,6 +1,6 @@
 use std::{error, fmt, io};
 
-use crate::stream::Event;
+use crate::{stream::Event, InvalidXmlDate};
 
 /// This type represents all possible errors that can occur when working with plist data.
 #[derive(Debug)]
@@ -149,6 +149,12 @@ impl fmt::Display for FilePosition {
     }
 }
 
+impl From<InvalidXmlDate> for Error {
+    fn from(error: InvalidXmlDate) -> Self {
+        ErrorKind::from(error).without_position()
+    }
+}
+
 impl ErrorKind {
     pub fn with_byte_offset(self, offset: u64) -> Error {
         self.with_position(FilePosition::Offset(offset))
@@ -170,6 +176,12 @@ impl ErrorKind {
                 file_position: None,
             }),
         }
+    }
+}
+
+impl From<InvalidXmlDate> for ErrorKind {
+    fn from(_: InvalidXmlDate) -> Self {
+        ErrorKind::InvalidDateString
     }
 }
 

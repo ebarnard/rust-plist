@@ -85,7 +85,7 @@ mod integer;
 mod uid;
 mod value;
 
-pub use date::Date;
+pub use date::{Date, InvalidXmlDate};
 pub use dictionary::Dictionary;
 pub use error::Error;
 pub use integer::Integer;

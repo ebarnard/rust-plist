@@ -134,10 +134,10 @@ where
             Event::Data(v) => visitor.visit_byte_buf(v.into_owned()),
             Event::Date(v) if self.in_plist_value => {
                 visitor.visit_enum(MapAccessDeserializer::new(MapDeserializer::new(
-                    IntoIter::new([(DATE_NEWTYPE_STRUCT_NAME, v.to_rfc3339())]),
+                    IntoIter::new([(DATE_NEWTYPE_STRUCT_NAME, v.to_xml_format())]),
                 )))
             }
-            Event::Date(v) => visitor.visit_string(v.to_rfc3339()),
+            Event::Date(v) => visitor.visit_string(v.to_xml_format()),
             Event::Integer(v) => {
                 if let Some(v) = v.as_unsigned() {
                     visitor.visit_u64(v)

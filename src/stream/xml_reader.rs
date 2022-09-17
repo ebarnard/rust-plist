@@ -100,8 +100,8 @@ impl<R: Read> XmlReader<R> {
                         }
                         "date" => {
                             let s = self.read_content()?;
-                            let date = Date::from_rfc3339(&s)
-                                .map_err(|()| self.with_pos(ErrorKind::InvalidDateString))?;
+                            let date =
+                                Date::from_xml_format(&s).map_err(|e| self.with_pos(e.into()))?;
                             return Ok(Some(Event::Date(date)));
                         }
                         "integer" => {
@@ -245,7 +245,7 @@ mod tests {
             String("Data".into()),
             Data(vec![0, 0, 0, 190, 0, 0, 0, 3, 0, 0, 0, 30, 0, 0, 0].into()),
             String("Birthdate".into()),
-            Date(super::Date::from_rfc3339("1981-05-16T11:32:06Z").unwrap()),
+            Date(super::Date::from_xml_format("1981-05-16T11:32:06Z").unwrap()),
             String("Blank".into()),
             String("".into()),
             String("BiggestNumber".into()),
