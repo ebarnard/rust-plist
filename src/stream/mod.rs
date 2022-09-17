@@ -87,6 +87,7 @@ enum StackItem<'a> {
 #[derive(Clone, Debug)]
 pub struct XmlWriteOptions {
     indent_str: Cow<'static, str>,
+    root_element: bool,
 }
 
 impl XmlWriteOptions {
@@ -99,12 +100,30 @@ impl XmlWriteOptions {
         self.indent_str = indent_str.into();
         self
     }
+
+    /// Selects whether to write the XML prologue, plist document type and root element.
+    ///
+    /// In other words the following:
+    /// ```xml
+    /// <?xml version="1.0" encoding="UTF-8"?>
+    /// <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+    /// <plist version="1.0">
+    /// ...
+    /// </plist>
+    /// ```
+    ///
+    /// The default is `true`.
+    pub fn root_element(mut self, write_root: bool) -> Self {
+        self.root_element = write_root;
+        self
+    }
 }
 
 impl Default for XmlWriteOptions {
     fn default() -> Self {
         XmlWriteOptions {
             indent_str: Cow::Borrowed("\t"),
+            root_element: true,
         }
     }
 }

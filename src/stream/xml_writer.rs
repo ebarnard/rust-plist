@@ -26,9 +26,10 @@ enum Element {
 
 pub struct XmlWriter<W: Write> {
     xml_writer: EventWriter<W>,
+    write_root_element: bool,
+    started_plist: bool,
     stack: Vec<Element>,
     expecting_key: bool,
-    written_prologue: bool,
     // Not very nice
     empty_namespace: Namespace,
 }
@@ -53,9 +54,10 @@ impl<W: Write> XmlWriter<W> {
 
         XmlWriter {
             xml_writer: EventWriter::new_with_config(writer, config),
+            write_root_element: opts.root_element,
+            started_plist: false,
             stack: Vec::new(),
             expecting_key: false,
-            written_prologue: false,
             empty_namespace: Namespace::empty(),
         }
     }
@@ -102,25 +104,30 @@ impl<W: Write> XmlWriter<W> {
         &mut self,
         f: F,
     ) -> Result<(), Error> {
-        if !self.written_prologue {
-            self.xml_writer
-                .inner_mut()
-                .write_all(XML_PROLOGUE.as_bytes())
-                .map_err(error::from_io_without_position)?;
+        if !self.started_plist {
+            if self.write_root_element {
+                self.xml_writer
+                    .inner_mut()
+                    .write_all(XML_PROLOGUE.as_bytes())
+                    .map_err(error::from_io_without_position)?;
+            }
 
-            self.written_prologue = true;
+            self.started_plist = true;
         }
 
         f(self)?;
 
         // If there are no more open tags then write the </plist> element
         if self.stack.is_empty() {
-            // We didn't tell the xml_writer about the <plist> tag so we'll skip telling it
-            // about the </plist> tag as well.
-            self.xml_writer
-                .inner_mut()
-                .write_all(b"\n</plist>")
-                .map_err(error::from_io_without_position)?;
+            if self.write_root_element {
+                // We didn't tell the xml_writer about the <plist> tag so we'll skip telling it
+                // about the </plist> tag as well.
+                self.xml_writer
+                    .inner_mut()
+                    .write_all(b"\n</plist>")
+                    .map_err(error::from_io_without_position)?;
+            }
+
             self.xml_writer
                 .inner_mut()
                 .flush()
@@ -398,6 +405,25 @@ mod tests {
 </plist>";
 
         let actual = events_to_xml(plist, XmlWriteOptions::default().indent_string("."));
+
+        assert_eq!(actual, expected);
+    }
+
+    #[test]
+    fn no_root() {
+        let plist = &[
+            Event::StartArray(None),
+            Event::String("It is a tale told by an idiot,".into()),
+            Event::String("Full of sound and fury, signifying nothing.".into()),
+            Event::EndCollection,
+        ];
+
+        let expected = "<array>
+\t<string>It is a tale told by an idiot,</string>
+\t<string>Full of sound and fury, signifying nothing.</string>
+</array>";
+
+        let actual = events_to_xml(plist, XmlWriteOptions::default().root_element(false));
 
         assert_eq!(actual, expected);
     }
