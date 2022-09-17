@@ -726,17 +726,18 @@ pub mod serde_impls {
 #[cfg(test)]
 mod tests {
     use super::Dictionary;
-    use std::array::IntoIter;
 
     #[test]
     fn from_hash_map_to_dict() {
-        let dict: Dictionary = IntoIter::new([
+        let dict: Dictionary = [
             ("Doge", "Shiba Inu"),
             ("Cheems", "Shiba Inu"),
             ("Walter", "Bull Terrier"),
             ("Perro", "Golden Retriever"),
-        ])
+        ]
+        .into_iter()
         .collect();
+
         assert_eq!(
             dict.get("Doge").and_then(|v| v.as_string()),
             Some("Shiba Inu")

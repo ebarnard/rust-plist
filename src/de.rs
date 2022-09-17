@@ -4,7 +4,6 @@ use serde::de::{
     IntoDeserializer,
 };
 use std::{
-    array::IntoIter,
     fmt::Display,
     fs::File,
     io::{BufReader, Cursor, Read, Seek},
@@ -134,7 +133,7 @@ where
             Event::Data(v) => visitor.visit_byte_buf(v.into_owned()),
             Event::Date(v) if self.in_plist_value => {
                 visitor.visit_enum(MapAccessDeserializer::new(MapDeserializer::new(
-                    IntoIter::new([(DATE_NEWTYPE_STRUCT_NAME, v.to_xml_format())]),
+                    [(DATE_NEWTYPE_STRUCT_NAME, v.to_xml_format())].into_iter(),
                 )))
             }
             Event::Date(v) => visitor.visit_string(v.to_xml_format()),
@@ -150,7 +149,7 @@ where
             Event::Real(v) => visitor.visit_f64(v),
             Event::String(v) => visitor.visit_string(v.into_owned()),
             Event::Uid(v) if self.in_plist_value => visitor.visit_enum(MapAccessDeserializer::new(
-                MapDeserializer::new(IntoIter::new([(UID_NEWTYPE_STRUCT_NAME, v.get())])),
+                MapDeserializer::new([(UID_NEWTYPE_STRUCT_NAME, v.get())].into_iter()),
             )),
             Event::Uid(v) => visitor.visit_u64(v.get()),
         }
