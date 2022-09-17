@@ -335,17 +335,7 @@ mod tests {
             Event::EndCollection,
         ];
 
-        let mut cursor = Cursor::new(Vec::new());
-
-        {
-            let mut plist_w = XmlWriter::new(&mut cursor);
-
-            for item in plist {
-                plist_w.write(item).unwrap();
-            }
-        }
-
-        let comparison = "<?xml version=\"1.0\" encoding=\"UTF-8\"?>
+        let expected = "<?xml version=\"1.0\" encoding=\"UTF-8\"?>
 <!DOCTYPE plist PUBLIC \"-//Apple//DTD PLIST 1.0//EN\" \"http://www.apple.com/DTDs/PropertyList-1.0.dtd\">
 <plist version=\"1.0\">
 <dict>
@@ -384,8 +374,43 @@ mod tests {
 </dict>
 </plist>";
 
-        let s = String::from_utf8(cursor.into_inner()).unwrap();
+        let actual = events_to_xml(plist, XmlWriteOptions::default());
 
-        assert_eq!(s, comparison);
+        assert_eq!(actual, expected);
+    }
+
+    #[test]
+    fn custom_indent_string() {
+        let plist = &[
+            Event::StartArray(None),
+            Event::String("It is a tale told by an idiot,".into()),
+            Event::String("Full of sound and fury, signifying nothing.".into()),
+            Event::EndCollection,
+        ];
+
+        let expected = "<?xml version=\"1.0\" encoding=\"UTF-8\"?>
+<!DOCTYPE plist PUBLIC \"-//Apple//DTD PLIST 1.0//EN\" \"http://www.apple.com/DTDs/PropertyList-1.0.dtd\">
+<plist version=\"1.0\">
+<array>
+.<string>It is a tale told by an idiot,</string>
+.<string>Full of sound and fury, signifying nothing.</string>
+</array>
+</plist>";
+
+        let actual = events_to_xml(plist, XmlWriteOptions::default().indent_string("."));
+
+        assert_eq!(actual, expected);
+    }
+
+    fn events_to_xml<'a>(
+        events: impl IntoIterator<Item = &'a Event<'a>>,
+        options: XmlWriteOptions,
+    ) -> String {
+        let mut cursor = Cursor::new(Vec::new());
+        let mut writer = XmlWriter::new_with_options(&mut cursor, &options);
+        for event in events {
+            writer.write(event).unwrap();
+        }
+        String::from_utf8(cursor.into_inner()).unwrap()
     }
 }
