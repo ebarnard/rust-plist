@@ -1,6 +1,8 @@
 use std::{error, fmt, io};
 
-use crate::{stream::Event, InvalidXmlDate};
+#[cfg(feature = "serde")]
+use crate::stream::Event;
+use crate::{InvalidXmlDate, Value};
 
 /// This type represents all possible errors that can occur when working with plist data.
 #[derive(Debug)]
@@ -19,8 +21,14 @@ pub(crate) enum ErrorKind {
     UnexpectedEof,
     UnexpectedEndOfEventStream,
     UnexpectedEventType {
+        // Used by the `Debug` implementation.
         #[allow(dead_code)]
         expected: EventKind,
+        #[allow(dead_code)]
+        found: EventKind,
+    },
+    ExpectedEndOfEventStream {
+        // Used by the `Debug` implementation.
         #[allow(dead_code)]
         found: EventKind,
     },
@@ -174,6 +182,7 @@ impl From<InvalidXmlDate> for ErrorKind {
 }
 
 impl EventKind {
+    #[cfg(feature = "serde")]
     pub fn of_event(event: &Event) -> EventKind {
         match event {
             Event::StartArray(_) => EventKind::StartArray,
@@ -186,6 +195,20 @@ impl EventKind {
             Event::Real(_) => EventKind::Real,
             Event::String(_) => EventKind::String,
             Event::Uid(_) => EventKind::Uid,
+        }
+    }
+
+    pub fn of_value(event: &Value) -> EventKind {
+        match event {
+            Value::Array(_) => EventKind::StartArray,
+            Value::Dictionary(_) => EventKind::StartDictionary,
+            Value::Boolean(_) => EventKind::Boolean,
+            Value::Data(_) => EventKind::Data,
+            Value::Date(_) => EventKind::Date,
+            Value::Integer(_) => EventKind::Integer,
+            Value::Real(_) => EventKind::Real,
+            Value::String(_) => EventKind::String,
+            Value::Uid(_) => EventKind::Uid,
         }
     }
 }
@@ -214,6 +237,7 @@ pub(crate) fn from_io_without_position(err: io::Error) -> Error {
     ErrorKind::Io(err).without_position()
 }
 
+#[cfg(feature = "serde")]
 pub(crate) fn unexpected_event_type(expected: EventKind, found: &Event) -> Error {
     let found = EventKind::of_event(found);
     ErrorKind::UnexpectedEventType { expected, found }.without_position()
