@@ -91,25 +91,36 @@ fn new_deserializer<'event>(
     Deserializer::new(result_events)
 }
 
-fn assert_roundtrip<T>(obj: T, comparison: Option<&[Event]>)
+fn assert_roundtrip<T>(obj: T, expected_events: &[Event], roundtrip_value: bool)
 where
     T: Debug + DeserializeOwned + PartialEq + Serialize,
 {
     let mut se = new_serializer();
-
     obj.serialize(&mut se).unwrap();
-
     let events = se.into_inner().into_inner();
 
-    if let Some(comparison) = comparison {
-        assert_eq!(&events[..], comparison);
+    let value = if roundtrip_value {
+        to_value(&obj).expect("failed to convert object into value")
+    } else {
+        Value::Boolean(false)
+    };
+
+    assert_eq!(&events[..], &expected_events[..]);
+
+    if roundtrip_value {
+        let expected_value = Value::from_events(expected_events.iter().cloned().map(Ok))
+            .expect("failed to convert expected events into value");
+        assert_eq!(value, expected_value);
     }
 
     let mut de = new_deserializer(events);
+    let obj_events_roundtrip = T::deserialize(&mut de).unwrap();
+    assert_eq!(obj_events_roundtrip, obj);
 
-    let new_obj = T::deserialize(&mut de).unwrap();
-
-    assert_eq!(new_obj, obj);
+    if roundtrip_value {
+        let obj_value_roundtrip: T = from_value(&value).unwrap();
+        assert_eq!(obj_value_roundtrip, obj);
+    }
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
@@ -144,7 +155,7 @@ fn cow() {
 
     let comparison = &[Event::String("Cow".into())];
 
-    assert_roundtrip(cow, Some(comparison));
+    assert_roundtrip(cow, comparison, true);
 }
 
 #[test]
@@ -185,7 +196,7 @@ fn dog() {
         Event::EndCollection,
     ];
 
-    assert_roundtrip(dog, Some(comparison));
+    assert_roundtrip(dog, comparison, true);
 }
 
 #[test]
@@ -217,7 +228,7 @@ fn frog() {
         Event::EndCollection,
     ];
 
-    assert_roundtrip(frog, Some(comparison));
+    assert_roundtrip(frog, comparison, true);
 }
 
 #[test]
@@ -252,7 +263,7 @@ fn cat_with_firmware() {
         Event::EndCollection,
     ];
 
-    assert_roundtrip(cat, Some(comparison));
+    assert_roundtrip(cat, comparison, true);
 }
 
 #[test]
@@ -275,7 +286,7 @@ fn cat_without_firmware() {
         Event::EndCollection,
     ];
 
-    assert_roundtrip(cat, Some(comparison));
+    assert_roundtrip(cat, comparison, true);
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
@@ -296,7 +307,7 @@ fn newtype_struct() {
         Event::EndCollection,
     ];
 
-    assert_roundtrip(newtype, Some(comparison));
+    assert_roundtrip(newtype, comparison, true);
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
@@ -340,7 +351,7 @@ fn type_with_options() {
         Event::EndCollection,
     ];
 
-    assert_roundtrip(obj, Some(comparison));
+    assert_roundtrip(obj, comparison, true);
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
@@ -367,7 +378,7 @@ fn type_with_date() {
         Event::EndCollection,
     ];
 
-    assert_roundtrip(obj, Some(comparison));
+    assert_roundtrip(obj, comparison, true);
 }
 
 #[test]
@@ -376,7 +387,7 @@ fn option_some() {
 
     let comparison = &[Event::Integer(12.into())];
 
-    assert_roundtrip(obj, Some(comparison));
+    assert_roundtrip(obj, comparison, true);
 }
 
 #[test]
@@ -385,7 +396,8 @@ fn option_none() {
 
     let comparison = &[];
 
-    assert_roundtrip(obj, Some(comparison));
+    // Written as nothing so can't be represented by a `Value`.
+    assert_roundtrip(obj, comparison, false);
 }
 
 #[test]
@@ -399,7 +411,7 @@ fn option_some_some() {
         Event::EndCollection,
     ];
 
-    assert_roundtrip(obj, Some(comparison));
+    assert_roundtrip(obj, comparison, true);
 }
 
 #[test]
@@ -413,7 +425,7 @@ fn option_some_none() {
         Event::EndCollection,
     ];
 
-    assert_roundtrip(obj, Some(comparison));
+    assert_roundtrip(obj, comparison, true);
 }
 
 #[test]
@@ -449,7 +461,7 @@ fn option_dictionary_values() {
         Event::EndCollection,
     ];
 
-    assert_roundtrip(obj, Some(comparison));
+    assert_roundtrip(obj, comparison, true);
 }
 
 #[test]
@@ -485,7 +497,9 @@ fn option_dictionary_keys() {
         Event::EndCollection,
     ];
 
-    assert_roundtrip(obj, Some(comparison));
+    // This example uses non-string dictionary keys which can only be represented by binary plists
+    // and not by a `Value`.
+    assert_roundtrip(obj, comparison, false);
 }
 
 #[test]
@@ -515,7 +529,7 @@ fn option_array() {
         Event::EndCollection,
     ];
 
-    assert_roundtrip(obj, Some(comparison));
+    assert_roundtrip(obj, comparison, true);
 }
 
 #[test]
@@ -529,7 +543,7 @@ fn enum_variant_types() {
     }
 
     let expected = &[Event::String("Unit".into())];
-    assert_roundtrip(Foo::Unit, Some(expected));
+    assert_roundtrip(Foo::Unit, expected, true);
 
     let expected = &[
         Event::StartDictionary(Some(1)),
@@ -537,7 +551,7 @@ fn enum_variant_types() {
         Event::Integer(42.into()),
         Event::EndCollection,
     ];
-    assert_roundtrip(Foo::Newtype(42), Some(expected));
+    assert_roundtrip(Foo::Newtype(42), expected, true);
 
     let expected = &[
         Event::StartDictionary(Some(1)),
@@ -548,7 +562,7 @@ fn enum_variant_types() {
         Event::EndCollection,
         Event::EndCollection,
     ];
-    assert_roundtrip(Foo::Tuple(42, "bar".into()), Some(expected));
+    assert_roundtrip(Foo::Tuple(42, "bar".into()), expected, true);
 
     let expected = &[
         Event::StartDictionary(Some(1)),
@@ -566,7 +580,8 @@ fn enum_variant_types() {
             v: 42,
             s: "bar".into(),
         },
-        Some(expected),
+        expected,
+        true,
     );
 }
 
