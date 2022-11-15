@@ -1,11 +1,8 @@
-use base64;
-use line_wrap;
-use std::{borrow::Cow, io::Write};
-use xml_rs::{
-    name::Name,
-    namespace::Namespace,
-    writer::{EmitterConfig, Error as XmlWriterError, EventWriter, XmlEvent},
+use quick_xml::{
+    events::{BytesEnd, BytesStart, BytesText, Event as XmlEvent},
+    Error as XmlWriterError, Writer as EventWriter,
 };
+use std::io::Write;
 
 use crate::{
     error::{self, Error, ErrorKind, EventKind},
@@ -13,7 +10,7 @@ use crate::{
     Date, Integer, Uid,
 };
 
-static XML_PROLOGUE: &str = r#"<?xml version="1.0" encoding="UTF-8"?>
+static XML_PROLOGUE: &[u8] = br#"<?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 "#;
@@ -30,8 +27,12 @@ pub struct XmlWriter<W: Write> {
     started_plist: bool,
     stack: Vec<Element>,
     expecting_key: bool,
-    // Not very nice
-    empty_namespace: Namespace,
+    pending_collection: Option<PendingCollection>,
+}
+
+enum PendingCollection {
+    Array,
+    Dictionary,
 }
 
 impl<W: Write> XmlWriter<W> {
@@ -42,28 +43,23 @@ impl<W: Write> XmlWriter<W> {
     }
 
     pub fn new_with_options(writer: W, opts: &XmlWriteOptions) -> XmlWriter<W> {
-        let config = EmitterConfig::new()
-            .line_separator("\n")
-            .indent_string(opts.indent_str.clone())
-            .perform_indent(true)
-            .write_document_declaration(false)
-            .normalize_empty_elements(true)
-            .cdata_to_characters(true)
-            .keep_element_names_stack(false)
-            .autopad_comments(true)
-            .pad_self_closing(false);
+        let xml_writer = if opts.indent_amount == 0 {
+            EventWriter::new(writer)
+        } else {
+            EventWriter::new_with_indent(writer, opts.indent_char, opts.indent_amount)
+        };
 
         XmlWriter {
-            xml_writer: EventWriter::new_with_config(writer, config),
+            xml_writer,
             write_root_element: opts.root_element,
             started_plist: false,
             stack: Vec::new(),
             expecting_key: false,
-            empty_namespace: Namespace::empty(),
+            pending_collection: None,
         }
     }
 
-    #[cfg(feature="enable_unstable_features_that_may_break_with_minor_version_bumps")]
+    #[cfg(feature = "enable_unstable_features_that_may_break_with_minor_version_bumps")]
     pub fn into_inner(self) -> W {
         self.xml_writer.into_inner()
     }
@@ -77,28 +73,19 @@ impl<W: Write> XmlWriter<W> {
 
     fn start_element(&mut self, name: &str) -> Result<(), Error> {
         self.xml_writer
-            .write(XmlEvent::StartElement {
-                name: Name::local(name),
-                attributes: Cow::Borrowed(&[]),
-                namespace: Cow::Borrowed(&self.empty_namespace),
-            })
-            .map_err(from_xml_error)?;
+            .write_event(XmlEvent::Start(BytesStart::borrowed_name(name.as_bytes())))?;
         Ok(())
     }
 
     fn end_element(&mut self, name: &str) -> Result<(), Error> {
         self.xml_writer
-            .write(XmlEvent::EndElement {
-                name: Some(Name::local(name)),
-            })
-            .map_err(from_xml_error)?;
+            .write_event(XmlEvent::End(BytesEnd::borrowed(name.as_bytes())))?;
         Ok(())
     }
 
     fn write_value(&mut self, value: &str) -> Result<(), Error> {
         self.xml_writer
-            .write(XmlEvent::Characters(value))
-            .map_err(from_xml_error)?;
+            .write_event(XmlEvent::Text(BytesText::from_plain_str(value)))?;
         Ok(())
     }
 
@@ -109,8 +96,8 @@ impl<W: Write> XmlWriter<W> {
         if !self.started_plist {
             if self.write_root_element {
                 self.xml_writer
-                    .inner_mut()
-                    .write_all(XML_PROLOGUE.as_bytes())
+                    .inner()
+                    .write_all(XML_PROLOGUE)
                     .map_err(error::from_io_without_position)?;
             }
 
@@ -125,13 +112,13 @@ impl<W: Write> XmlWriter<W> {
                 // We didn't tell the xml_writer about the <plist> tag so we'll skip telling it
                 // about the </plist> tag as well.
                 self.xml_writer
-                    .inner_mut()
+                    .inner()
                     .write_all(b"\n</plist>")
                     .map_err(error::from_io_without_position)?;
             }
 
             self.xml_writer
-                .inner_mut()
+                .inner()
                 .flush()
                 .map_err(error::from_io_without_position)?;
         }
@@ -144,6 +131,7 @@ impl<W: Write> XmlWriter<W> {
         event_kind: EventKind,
         f: F,
     ) -> Result<(), Error> {
+        self.handle_pending_collection()?;
         self.write_event(|this| {
             if this.expecting_key {
                 return Err(ErrorKind::UnexpectedEventType {
@@ -157,28 +145,65 @@ impl<W: Write> XmlWriter<W> {
             Ok(())
         })
     }
+
+    fn handle_pending_collection(&mut self) -> Result<(), Error> {
+        if let Some(PendingCollection::Array) = self.pending_collection {
+            self.pending_collection = None;
+            let res = self.write_value_event(EventKind::StartArray, |this| {
+                this.start_element("array")?;
+                this.stack.push(Element::Array);
+                Ok(())
+            });
+            res
+        } else if let Some(PendingCollection::Dictionary) = self.pending_collection {
+            self.pending_collection = None;
+            let res = self.write_value_event(EventKind::StartDictionary, |this| {
+                this.start_element("dict")?;
+                this.stack.push(Element::Dictionary);
+                this.expecting_key = true;
+                Ok(())
+            });
+            res
+        } else {
+            Ok(())
+        }
+    }
 }
 
 impl<W: Write> Writer for XmlWriter<W> {
     fn write_start_array(&mut self, _len: Option<u64>) -> Result<(), Error> {
-        self.write_value_event(EventKind::StartArray, |this| {
-            this.start_element("array")?;
-            this.stack.push(Element::Array);
-            Ok(())
-        })
+        self.handle_pending_collection()?;
+        self.pending_collection = Some(PendingCollection::Array);
+        Ok(())
     }
 
     fn write_start_dictionary(&mut self, _len: Option<u64>) -> Result<(), Error> {
-        self.write_value_event(EventKind::StartDictionary, |this| {
-            this.start_element("dict")?;
-            this.stack.push(Element::Dictionary);
-            Ok(())
-        })
+        self.handle_pending_collection()?;
+        self.pending_collection = Some(PendingCollection::Dictionary);
+        Ok(())
     }
 
     fn write_end_collection(&mut self) -> Result<(), Error> {
         self.write_event(|this| {
-            match (this.stack.pop(), this.expecting_key) {
+            match this.pending_collection.take() {
+                Some(PendingCollection::Array) => {
+                    this.xml_writer
+                        .write_event(XmlEvent::Empty(BytesStart::borrowed_name(b"array")))?;
+                    this.expecting_key = this.stack.last() == Some(&Element::Dictionary);
+                    return Ok(());
+                }
+                Some(PendingCollection::Dictionary) => {
+                    this.xml_writer
+                        .write_event(XmlEvent::Empty(BytesStart::borrowed_name(b"dict")))?;
+                    this.expecting_key = this.stack.last() == Some(&Element::Dictionary);
+                    return Ok(());
+                }
+                _ => {}
+            };
+            match (
+                this.stack.pop(),
+                this.expecting_key,
+            ) {
                 (Some(Element::Dictionary), true) => {
                     this.end_element("dict")?;
                 }
@@ -200,9 +225,10 @@ impl<W: Write> Writer for XmlWriter<W> {
 
     fn write_boolean(&mut self, value: bool) -> Result<(), Error> {
         self.write_value_event(EventKind::Boolean, |this| {
-            let value_str = if value { "true" } else { "false" };
-            this.start_element(value_str)?;
-            this.end_element(value_str)
+            let value = if value { "true" } else { "false" }.as_bytes();
+            Ok(this
+                .xml_writer
+                .write_event(XmlEvent::Empty(BytesStart::borrowed_name(value)))?)
         })
     }
 
@@ -232,6 +258,7 @@ impl<W: Write> Writer for XmlWriter<W> {
     }
 
     fn write_string(&mut self, value: &str) -> Result<(), Error> {
+        self.handle_pending_collection()?;
         self.write_event(|this| {
             if this.expecting_key {
                 this.write_element_and_value("key", &*value)?;
@@ -249,13 +276,12 @@ impl<W: Write> Writer for XmlWriter<W> {
     }
 }
 
-pub(crate) fn from_xml_error(err: XmlWriterError) -> Error {
-    match err {
-        XmlWriterError::Io(err) => ErrorKind::Io(err).without_position(),
-        XmlWriterError::DocumentStartAlreadyEmitted
-        | XmlWriterError::LastElementNameNotAvailable
-        | XmlWriterError::EndElementNameIsNotEqualToLastStartElementName
-        | XmlWriterError::EndElementNameIsNotSpecified => unreachable!(),
+impl From<XmlWriterError> for Error {
+    fn from(err: XmlWriterError) -> Self {
+        match err {
+            XmlWriterError::Io(err) => ErrorKind::Io(err).without_position(),
+            _ => unreachable!(),
+        }
     }
 }
 
@@ -406,7 +432,7 @@ mod tests {
 </array>
 </plist>";
 
-        let actual = events_to_xml(plist, XmlWriteOptions::default().indent_string("."));
+        let actual = events_to_xml(plist, XmlWriteOptions::default().with_indent(b'.', 1));
 
         assert_eq!(actual, expected);
     }

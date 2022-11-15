@@ -1,15 +1,5 @@
-use base64;
-use std::{
-    io::{self, Read},
-    str::FromStr,
-};
-use xml_rs::{
-    common::{is_whitespace_str, Position},
-    reader::{
-        Error as XmlReaderError, ErrorKind as XmlReaderErrorKind, EventReader, ParserConfig,
-        XmlEvent,
-    },
-};
+use quick_xml::{events::Event as XmlEvent, Error as XmlReaderError, Reader as EventReader};
+use std::io::{self, BufReader, Read};
 
 use crate::{
     error::{Error, ErrorKind, FilePosition},
@@ -17,154 +7,55 @@ use crate::{
     Date, Integer,
 };
 
-pub struct XmlReader<R: Read> {
-    xml_reader: EventReader<R>,
-    queued_event: Option<XmlEvent>,
-    element_stack: Vec<String>,
-    finished: bool,
+#[derive(Clone, PartialEq, Eq)]
+struct ElmName(Box<[u8]>);
+
+impl From<&[u8]> for ElmName {
+    fn from(bytes: &[u8]) -> Self {
+        ElmName(Box::from(bytes))
+    }
 }
+
+impl AsRef<[u8]> for ElmName {
+    fn as_ref(&self) -> &[u8] {
+        &*self.0
+    }
+}
+
+pub struct XmlReader<R: Read> {
+    buffer: Vec<u8>,
+    finished: bool,
+    state: ReaderState<R>,
+}
+
+struct ReaderState<R: Read>(EventReader<BufReader<R>>);
 
 impl<R: Read> XmlReader<R> {
     pub fn new(reader: R) -> XmlReader<R> {
-        let config = ParserConfig::new()
-            .trim_whitespace(false)
-            .whitespace_to_characters(true)
-            .cdata_to_characters(true)
-            .ignore_comments(true)
-            .coalesce_characters(true);
+        let mut xml_reader = EventReader::from_reader(BufReader::new(reader));
+        xml_reader.trim_text(true);
+        xml_reader.check_end_names(true);
+        xml_reader.expand_empty_elements(true);
 
         XmlReader {
-            xml_reader: EventReader::new_with_config(reader, config),
-            queued_event: None,
-            element_stack: Vec::new(),
+            buffer: Vec::new(),
             finished: false,
+            state: ReaderState(xml_reader),
         }
     }
+}
 
-    fn read_content(&mut self) -> Result<String, Error> {
-        loop {
-            match self.xml_reader.next() {
-                Ok(XmlEvent::Characters(s)) => return Ok(s),
-                Ok(event @ XmlEvent::EndElement { .. }) => {
-                    self.queued_event = Some(event);
-                    return Ok("".to_owned());
-                }
-                Ok(XmlEvent::EndDocument) => {
-                    return Err(self.with_pos(ErrorKind::UnclosedXmlElement))
-                }
-                Ok(XmlEvent::StartElement { .. }) => {
-                    return Err(self.with_pos(ErrorKind::UnexpectedXmlOpeningTag));
-                }
-                Ok(XmlEvent::ProcessingInstruction { .. }) => (),
-                Ok(XmlEvent::StartDocument { .. })
-                | Ok(XmlEvent::CData(_))
-                | Ok(XmlEvent::Comment(_))
-                | Ok(XmlEvent::Whitespace(_)) => {
-                    unreachable!("parser does not output CData, Comment or Whitespace events");
-                }
-                Err(err) => return Err(from_xml_error(err)),
+impl From<XmlReaderError> for ErrorKind {
+    fn from(err: XmlReaderError) -> Self {
+        match err {
+            XmlReaderError::Io(err) if err.kind() == io::ErrorKind::UnexpectedEof => {
+                ErrorKind::UnexpectedEof
             }
+            XmlReaderError::Io(err) => ErrorKind::Io(err),
+            XmlReaderError::UnexpectedEof(_) => ErrorKind::UnexpectedEof,
+            XmlReaderError::Utf8(_) => ErrorKind::InvalidXmlUtf8,
+            _ => ErrorKind::InvalidXmlSyntax,
         }
-    }
-
-    fn next_event(&mut self) -> Result<XmlEvent, XmlReaderError> {
-        if let Some(event) = self.queued_event.take() {
-            Ok(event)
-        } else {
-            self.xml_reader.next()
-        }
-    }
-
-    fn read_next(&mut self) -> Result<Option<OwnedEvent>, Error> {
-        loop {
-            match self.next_event() {
-                Ok(XmlEvent::StartDocument { .. }) => {}
-                Ok(XmlEvent::StartElement { name, .. }) => {
-                    // Add the current element to the element stack
-                    self.element_stack.push(name.local_name.clone());
-
-                    match &name.local_name[..] {
-                        "plist" => (),
-                        "array" => return Ok(Some(Event::StartArray(None))),
-                        "dict" => return Ok(Some(Event::StartDictionary(None))),
-                        "key" => return Ok(Some(Event::String(self.read_content()?.into()))),
-                        "true" => return Ok(Some(Event::Boolean(true))),
-                        "false" => return Ok(Some(Event::Boolean(false))),
-                        "data" => {
-                            let mut s = self.read_content()?;
-                            // Strip whitespace and line endings from input string
-                            s.retain(|c| !c.is_ascii_whitespace());
-                            let data = base64::decode(&s)
-                                .map_err(|_| self.with_pos(ErrorKind::InvalidDataString))?;
-                            return Ok(Some(Event::Data(data.into())));
-                        }
-                        "date" => {
-                            let s = self.read_content()?;
-                            let date =
-                                Date::from_xml_format(&s).map_err(|e| self.with_pos(e.into()))?;
-                            return Ok(Some(Event::Date(date)));
-                        }
-                        "integer" => {
-                            let s = self.read_content()?;
-                            match Integer::from_str(&s) {
-                                Ok(i) => return Ok(Some(Event::Integer(i))),
-                                Err(_) => {
-                                    return Err(self.with_pos(ErrorKind::InvalidIntegerString))
-                                }
-                            }
-                        }
-                        "real" => {
-                            let s = self.read_content()?;
-                            match f64::from_str(&s) {
-                                Ok(f) => return Ok(Some(Event::Real(f))),
-                                Err(_) => return Err(self.with_pos(ErrorKind::InvalidRealString)),
-                            }
-                        }
-                        "string" => return Ok(Some(Event::String(self.read_content()?.into()))),
-                        _ => return Err(self.with_pos(ErrorKind::UnknownXmlElement)),
-                    }
-                }
-                Ok(XmlEvent::EndElement { name, .. }) => {
-                    // Check the corrent element is being closed
-                    match self.element_stack.pop() {
-                        Some(ref open_name) if &name.local_name == open_name => (),
-                        Some(ref _open_name) => {
-                            return Err(self.with_pos(ErrorKind::UnclosedXmlElement))
-                        }
-                        None => return Err(self.with_pos(ErrorKind::UnpairedXmlClosingTag)),
-                    }
-
-                    match &name.local_name[..] {
-                        "array" | "dict" => return Ok(Some(Event::EndCollection)),
-                        "plist" | _ => (),
-                    }
-                }
-                Ok(XmlEvent::EndDocument) => {
-                    if self.element_stack.is_empty() {
-                        return Ok(None);
-                    } else {
-                        return Err(self.with_pos(ErrorKind::UnclosedXmlElement));
-                    }
-                }
-
-                Ok(XmlEvent::Characters(c)) => {
-                    if !is_whitespace_str(&c) {
-                        return Err(
-                            self.with_pos(ErrorKind::UnexpectedXmlCharactersExpectedElement)
-                        );
-                    }
-                }
-                Ok(XmlEvent::CData(_)) | Ok(XmlEvent::Comment(_)) | Ok(XmlEvent::Whitespace(_)) => {
-                    unreachable!("parser does not output CData, Comment or Whitespace events")
-                }
-                Ok(XmlEvent::ProcessingInstruction { .. }) => (),
-                Err(err) => return Err(from_xml_error(err)),
-            }
-        }
-    }
-
-    fn with_pos(&self, kind: ErrorKind) -> Error {
-        kind.with_position(convert_xml_pos(self.xml_reader.position()))
     }
 }
 
@@ -173,47 +64,135 @@ impl<R: Read> Iterator for XmlReader<R> {
 
     fn next(&mut self) -> Option<Result<OwnedEvent, Error>> {
         if self.finished {
-            None
-        } else {
-            match self.read_next() {
-                Ok(Some(event)) => Some(Ok(event)),
-                Ok(None) => {
-                    self.finished = true;
-                    None
-                }
-                Err(err) => {
-                    self.finished = true;
-                    Some(Err(err))
-                }
+            return None;
+        }
+        match self.state.read_next(&mut self.buffer) {
+            Ok(Some(event)) => Some(Ok(event)),
+            Ok(None) => {
+                self.finished = true;
+                None
+            }
+            Err(err) => {
+                self.finished = true;
+                Some(Err(err))
             }
         }
     }
 }
 
-fn convert_xml_pos(pos: xml_rs::common::TextPosition) -> FilePosition {
-    // TODO: pos.row and pos.column counts from 0. what do we want to do?
-    FilePosition::LineColumn(pos.row, pos.column)
-}
+impl<R: Read> ReaderState<R> {
+    fn xml_reader_pos(&self) -> FilePosition {
+        let pos = self.0.buffer_position();
+        FilePosition(pos as u64)
+    }
 
-fn from_xml_error(err: XmlReaderError) -> Error {
-    let kind = match err.kind() {
-        XmlReaderErrorKind::Io(err) if err.kind() == io::ErrorKind::UnexpectedEof => {
-            ErrorKind::UnexpectedEof
-        }
-        XmlReaderErrorKind::Io(err) => {
-            let err = if let Some(code) = err.raw_os_error() {
-                io::Error::from_raw_os_error(code)
-            } else {
-                io::Error::new(err.kind(), err.to_string())
-            };
-            ErrorKind::Io(err)
-        }
-        XmlReaderErrorKind::Syntax(_) => ErrorKind::InvalidXmlSyntax,
-        XmlReaderErrorKind::UnexpectedEof => ErrorKind::UnexpectedEof,
-        XmlReaderErrorKind::Utf8(_) => ErrorKind::InvalidXmlUtf8,
-    };
+    fn with_pos(&self, kind: ErrorKind) -> Error {
+        kind.with_position(self.xml_reader_pos())
+    }
 
-    kind.with_position(convert_xml_pos(err.position()))
+    fn read_xml_event<'buf>(&mut self, buffer: &'buf mut Vec<u8>) -> Result<XmlEvent<'buf>, Error> {
+        let event = self.0.read_event(buffer);
+        let pos = self.xml_reader_pos();
+        event.map_err(|err| ErrorKind::from(err).with_position(pos))
+    }
+
+    fn read_content(&mut self, buffer: &mut Vec<u8>) -> Result<String, Error> {
+        loop {
+            match self.read_xml_event(buffer)? {
+                XmlEvent::Text(text) => {
+                    let unespcaped = text
+                        .unescaped()
+                        .map_err(|err| self.with_pos(ErrorKind::from(err)))?;
+                    return String::from_utf8(unespcaped.to_vec())
+                        .map_err(|_| self.with_pos(ErrorKind::InvalidUtf8String));
+                }
+                XmlEvent::End(_) => {
+                    return Ok("".to_owned());
+                }
+                XmlEvent::Eof => return Err(self.with_pos(ErrorKind::UnclosedXmlElement)),
+                XmlEvent::Start(_) => return Err(self.with_pos(ErrorKind::UnexpectedXmlOpeningTag)),
+                XmlEvent::PI(_)
+                | XmlEvent::Empty(_)
+                | XmlEvent::Comment(_)
+                | XmlEvent::CData(_)
+                | XmlEvent::Decl(_)
+                | XmlEvent::DocType(_) => {
+                    // skip
+                }
+            }
+        }
+    }
+
+    fn read_next(&mut self, buffer: &mut Vec<u8>) -> Result<Option<OwnedEvent>, Error> {
+        loop {
+            match self.read_xml_event(buffer)? {
+                XmlEvent::Start(name) => {
+                    match name.local_name() {
+                        b"plist" => {}
+                        b"array" => return Ok(Some(Event::StartArray(None))),
+                        b"dict" => return Ok(Some(Event::StartDictionary(None))),
+                        b"key" => {
+                            return Ok(Some(Event::String(self.read_content(buffer)?.into())))
+                        }
+                        b"data" => {
+                            let mut encoded = self.read_content(buffer)?;
+                            // Strip whitespace and line endings from input string
+                            encoded.retain(|c| !c.is_ascii_whitespace());
+                            let data = base64::decode(&encoded)
+                                .map_err(|_| self.with_pos(ErrorKind::InvalidDataString))?;
+                            return Ok(Some(Event::Data(data.into())));
+                        }
+                        b"date" => {
+                            let s = self.read_content(buffer)?;
+                            let date = Date::from_xml_format(&s)
+                                .map_err(|_| self.with_pos(ErrorKind::InvalidDateString))?;
+                            return Ok(Some(Event::Date(date)));
+                        }
+                        b"integer" => {
+                            let s = self.read_content(buffer)?;
+                            match Integer::from_str(&s) {
+                                Ok(i) => return Ok(Some(Event::Integer(i))),
+                                Err(_) => {
+                                    return Err(self.with_pos(ErrorKind::InvalidIntegerString))
+                                }
+                            }
+                        }
+                        b"real" => {
+                            let s = self.read_content(buffer)?;
+                            match s.parse() {
+                                Ok(f) => return Ok(Some(Event::Real(f))),
+                                Err(_) => return Err(self.with_pos(ErrorKind::InvalidRealString)),
+                            }
+                        }
+                        b"string" => {
+                            return Ok(Some(Event::String(self.read_content(buffer)?.into())))
+                        }
+                        b"true" => return Ok(Some(Event::Boolean(true))),
+                        b"false" => return Ok(Some(Event::Boolean(false))),
+                        _ => return Err(self.with_pos(ErrorKind::UnknownXmlElement)),
+                    }
+                }
+                XmlEvent::End(name) => {
+                    match name.local_name() {
+                        b"array" | b"dict" => return Ok(Some(Event::EndCollection)),
+                        b"plist" | _ => (),
+                    }
+                }
+                XmlEvent::Eof => return Ok(None),
+                XmlEvent::Text(_) => {
+                    return Err(self.with_pos(ErrorKind::UnexpectedXmlCharactersExpectedElement))
+                }
+                XmlEvent::PI(_)
+                | XmlEvent::Decl(_)
+                | XmlEvent::DocType(_)
+                | XmlEvent::CData(_)
+                | XmlEvent::Comment(_)
+                | XmlEvent::Empty(_) => {
+                    // skip
+                }
+            }
+        }
+    }
 }
 
 #[cfg(test)]

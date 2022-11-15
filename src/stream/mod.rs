@@ -86,8 +86,9 @@ enum StackItem<'a> {
 /// Options for customizing serialization of XML plists.
 #[derive(Clone, Debug)]
 pub struct XmlWriteOptions {
-    indent_str: Cow<'static, str>,
     root_element: bool,
+    indent_char: u8,
+    indent_amount: usize,
 }
 
 impl XmlWriteOptions {
@@ -96,8 +97,38 @@ impl XmlWriteOptions {
     /// This may be either an `&'static str` or an owned `String`.
     ///
     /// The default is `\t`.
-    pub fn indent_string(mut self, indent_str: impl Into<Cow<'static, str>>) -> Self {
-        self.indent_str = indent_str.into();
+    ///
+    /// Since replacing `xml-rs` with `quick-xml`, the indent string has to consist of a single
+    /// repeating ascii character. This is a backwards compatibility function, prefer using
+    /// `XmlWriteOptions::with_indent`.
+    #[deprecated(since="1.4.0", note="please use `with_indent` instead")]
+    pub fn indent_string(self, indent_str: impl Into<Cow<'static, str>>) -> Self {
+        let indent_str = indent_str.into();
+        let indent_str = indent_str.as_ref();
+
+        if indent_str.is_empty() {
+            return self.with_indent(0, 0);
+        }
+
+        assert!(
+            indent_str.chars().all(|chr| chr.is_ascii()),
+            "indent str must be ascii"
+        );
+        let indent_str = indent_str.as_bytes();
+        assert!(
+            indent_str.iter().all(|chr| chr == &indent_str[0]),
+            "indent str must consist of a single repeating character"
+        );
+
+        self.with_indent(indent_str[0], indent_str.len())
+    }
+
+    /// Specifies the character and amount used for indentation.
+    ///
+    /// The default is indenting with a single tab.
+    pub fn with_indent(mut self, indent_char: u8, indent_amount: usize) -> Self {
+        self.indent_char = indent_char;
+        self.indent_amount = indent_amount;
         self
     }
 
@@ -122,7 +153,8 @@ impl XmlWriteOptions {
 impl Default for XmlWriteOptions {
     fn default() -> Self {
         XmlWriteOptions {
-            indent_str: Cow::Borrowed("\t"),
+            indent_char: b'\t',
+            indent_amount: 1,
             root_element: true,
         }
     }

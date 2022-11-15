@@ -27,7 +27,6 @@ pub(crate) enum ErrorKind {
 
     // Xml format-specific errors
     UnclosedXmlElement,
-    UnpairedXmlClosingTag,
     UnexpectedXmlCharactersExpectedElement,
     UnexpectedXmlOpeningTag,
     UnknownXmlElement,
@@ -61,11 +60,8 @@ pub(crate) enum ErrorKind {
     Serde(String),
 }
 
-#[derive(Debug)]
-pub(crate) enum FilePosition {
-    LineColumn(u64, u64),
-    Offset(u64),
-}
+#[derive(Debug, Clone, Copy)]
+pub(crate) struct FilePosition(pub(crate) u64);
 
 #[derive(Copy, Clone, PartialEq, Eq, Debug)]
 pub(crate) enum EventKind {
@@ -141,14 +137,7 @@ impl fmt::Display for Error {
 
 impl fmt::Display for FilePosition {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        match self {
-            FilePosition::LineColumn(line, column) => {
-                write!(f, "line {}, column {}", line, column)
-            }
-            FilePosition::Offset(offset) => {
-                write!(f, "offset {}", offset)
-            }
-        }
+        write!(f, "offset {}", self.0)
     }
 }
 
@@ -160,7 +149,7 @@ impl From<InvalidXmlDate> for Error {
 
 impl ErrorKind {
     pub fn with_byte_offset(self, offset: u64) -> Error {
-        self.with_position(FilePosition::Offset(offset))
+        self.with_position(FilePosition(offset))
     }
 
     pub fn with_position(self, pos: FilePosition) -> Error {
