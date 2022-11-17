@@ -36,7 +36,7 @@ enum PendingCollection {
 }
 
 impl<W: Write> XmlWriter<W> {
-    #[cfg(fearure = "enable_unstable_features_that_may_break_with_minor_version_bumps")]
+    #[cfg(feature = "enable_unstable_features_that_may_break_with_minor_version_bumps")]
     pub fn new(writer: W) -> XmlWriter<W> {
         let opts = XmlWriteOptions::default();
         XmlWriter::new_with_options(writer, &opts)
