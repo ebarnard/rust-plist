@@ -101,7 +101,7 @@ impl XmlWriteOptions {
     /// Since replacing `xml-rs` with `quick-xml`, the indent string has to consist of a single
     /// repeating ascii character. This is a backwards compatibility function, prefer using
     /// `XmlWriteOptions::with_indent`.
-    #[deprecated(since="1.4.0", note="please use `with_indent` instead")]
+    #[deprecated(since = "1.4.0", note = "please use `with_indent` instead")]
     pub fn indent_string(self, indent_str: impl Into<Cow<'static, str>>) -> Self {
         let indent_str = indent_str.into();
         let indent_str = indent_str.as_ref();
@@ -190,7 +190,7 @@ impl<'a> Iterator for Events<'a> {
                     Event::StartDictionary(Some(len as u64))
                 }
                 Value::Boolean(value) => Event::Boolean(*value),
-                Value::Data(value) => Event::Data(Cow::Borrowed(&value)),
+                Value::Data(value) => Event::Data(Cow::Borrowed(value)),
                 Value::Date(value) => Event::Date(*value),
                 Value::Real(value) => Event::Real(*value),
                 Value::Integer(value) => Event::Integer(*value),

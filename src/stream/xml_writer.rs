@@ -149,21 +149,21 @@ impl<W: Write> XmlWriter<W> {
     fn handle_pending_collection(&mut self) -> Result<(), Error> {
         if let Some(PendingCollection::Array) = self.pending_collection {
             self.pending_collection = None;
-            let res = self.write_value_event(EventKind::StartArray, |this| {
+
+            self.write_value_event(EventKind::StartArray, |this| {
                 this.start_element("array")?;
                 this.stack.push(Element::Array);
                 Ok(())
-            });
-            res
+            })
         } else if let Some(PendingCollection::Dictionary) = self.pending_collection {
             self.pending_collection = None;
-            let res = self.write_value_event(EventKind::StartDictionary, |this| {
+
+            self.write_value_event(EventKind::StartDictionary, |this| {
                 this.start_element("dict")?;
                 this.stack.push(Element::Dictionary);
                 this.expecting_key = true;
                 Ok(())
-            });
-            res
+            })
         } else {
             Ok(())
         }
@@ -200,10 +200,7 @@ impl<W: Write> Writer for XmlWriter<W> {
                 }
                 _ => {}
             };
-            match (
-                this.stack.pop(),
-                this.expecting_key,
-            ) {
+            match (this.stack.pop(), this.expecting_key) {
                 (Some(Element::Dictionary), true) => {
                     this.end_element("dict")?;
                 }
@@ -234,7 +231,7 @@ impl<W: Write> Writer for XmlWriter<W> {
 
     fn write_data(&mut self, value: &[u8]) -> Result<(), Error> {
         self.write_value_event(EventKind::Data, |this| {
-            let base64_data = base64_encode_plist(&value, this.stack.len());
+            let base64_data = base64_encode_plist(value, this.stack.len());
             this.write_element_and_value("data", &base64_data)
         })
     }
@@ -261,10 +258,10 @@ impl<W: Write> Writer for XmlWriter<W> {
         self.handle_pending_collection()?;
         self.write_event(|this| {
             if this.expecting_key {
-                this.write_element_and_value("key", &*value)?;
+                this.write_element_and_value("key", value)?;
                 this.expecting_key = false;
             } else {
-                this.write_element_and_value("string", &*value)?;
+                this.write_element_and_value("string", value)?;
                 this.expecting_key = this.stack.last() == Some(&Element::Dictionary);
             }
             Ok(())

@@ -14,6 +14,7 @@ use std::{
 use crate::Value;
 
 /// Represents a plist dictionary type.
+#[derive(Clone, Default, PartialEq)]
 pub struct Dictionary {
     map: IndexMap<String, Value>,
 }
@@ -157,31 +158,6 @@ impl Dictionary {
         ValuesMut {
             iter: self.map.values_mut(),
         }
-    }
-}
-
-impl Default for Dictionary {
-    #[inline]
-    fn default() -> Self {
-        Dictionary {
-            map: Default::default(),
-        }
-    }
-}
-
-impl Clone for Dictionary {
-    #[inline]
-    fn clone(&self) -> Self {
-        Dictionary {
-            map: self.map.clone(),
-        }
-    }
-}
-
-impl PartialEq for Dictionary {
-    #[inline]
-    fn eq(&self, other: &Self) -> bool {
-        self.map.eq(&other.map)
     }
 }
 

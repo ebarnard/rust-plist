@@ -2,7 +2,7 @@ use serde::{
     de::{Deserialize, DeserializeOwned},
     ser::Serialize,
 };
-use std::{collections::BTreeMap, fmt::Debug, fs::File, io::Cursor, path::Path};
+use std::{collections::BTreeMap, fmt::Debug, fs::File, io::Cursor};
 
 use crate::{
     stream::{private::Sealed, Event, OwnedEvent, Writer},
@@ -183,7 +183,7 @@ fn dog() {
 fn frog() {
     let frog = Animal::Frog(
         Ok("hello".to_owned()),
-        Some(vec![1.0, 2.0, 3.14159, 0.000000001, 1.27e31]),
+        Some(vec![1.0, 2.0, std::f64::consts::PI, 0.000000001, 1.27e31]),
     );
 
     let comparison = &[
@@ -199,7 +199,7 @@ fn frog() {
         Event::StartArray(Some(5)),
         Event::Real(1.0),
         Event::Real(2.0),
-        Event::Real(3.14159),
+        Event::Real(std::f64::consts::PI),
         Event::Real(0.000000001),
         Event::Real(1.27e31),
         Event::EndCollection,
@@ -346,7 +346,7 @@ fn type_with_date() {
 
     let obj = TypeWithDate {
         a: Some(28),
-        b: Some(date.clone()),
+        b: Some(date),
     };
 
     let comparison = &[
@@ -586,7 +586,7 @@ fn deserialise_old_enum_unit_variant_encoding() {
 
 #[test]
 fn deserialize_dictionary_xml() {
-    let reader = File::open(&Path::new("./tests/data/xml.plist")).unwrap();
+    let reader = File::open("./tests/data/xml.plist").unwrap();
     let dict: Dictionary = crate::from_reader(reader).unwrap();
 
     check_common_plist(&dict);
@@ -603,7 +603,7 @@ fn deserialize_dictionary_xml() {
 
 #[test]
 fn deserialize_dictionary_binary() {
-    let reader = File::open(&Path::new("./tests/data/binary.plist")).unwrap();
+    let reader = File::open("./tests/data/binary.plist").unwrap();
     let dict: Dictionary = crate::from_reader(reader).unwrap();
 
     check_common_plist(&dict);
@@ -634,9 +634,9 @@ fn check_common_plist(dict: &Dictionary) {
 
     // Boolean elements
 
-    assert_eq!(dict.get("IsTrue").unwrap().as_boolean().unwrap(), true);
+    assert!(dict.get("IsTrue").unwrap().as_boolean().unwrap());
 
-    assert_eq!(dict.get("IsNotFalse").unwrap().as_boolean().unwrap(), false);
+    assert!(!dict.get("IsNotFalse").unwrap().as_boolean().unwrap());
 
     // Data
 
@@ -699,7 +699,7 @@ fn check_common_plist(dict: &Dictionary) {
 
 #[test]
 fn deserialize_dictionary_binary_nskeyedarchiver() {
-    let reader = File::open(&Path::new("./tests/data/binary_NSKeyedArchiver.plist")).unwrap();
+    let reader = File::open("./tests/data/binary_NSKeyedArchiver.plist").unwrap();
     let dict: Dictionary = crate::from_reader(reader).unwrap();
 
     assert_eq!(

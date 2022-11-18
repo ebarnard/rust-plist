@@ -18,7 +18,7 @@ impl From<&[u8]> for ElmName {
 
 impl AsRef<[u8]> for ElmName {
     fn as_ref(&self) -> &[u8] {
-        &*self.0
+        &self.0
     }
 }
 
@@ -172,12 +172,10 @@ impl<R: Read> ReaderState<R> {
                         _ => return Err(self.with_pos(ErrorKind::UnknownXmlElement)),
                     }
                 }
-                XmlEvent::End(name) => {
-                    match name.local_name() {
-                        b"array" | b"dict" => return Ok(Some(Event::EndCollection)),
-                        b"plist" | _ => (),
-                    }
-                }
+                XmlEvent::End(name) => match name.local_name() {
+                    b"array" | b"dict" => return Ok(Some(Event::EndCollection)),
+                    _ => (),
+                },
                 XmlEvent::Eof => return Ok(None),
                 XmlEvent::Text(_) => {
                     return Err(self.with_pos(ErrorKind::UnexpectedXmlCharactersExpectedElement))
@@ -197,14 +195,14 @@ impl<R: Read> ReaderState<R> {
 
 #[cfg(test)]
 mod tests {
-    use std::{fs::File, path::Path};
+    use std::fs::File;
 
     use super::*;
     use crate::stream::Event::{self, *};
 
     #[test]
     fn streaming_parser() {
-        let reader = File::open(&Path::new("./tests/data/xml.plist")).unwrap();
+        let reader = File::open("./tests/data/xml.plist").unwrap();
         let streaming_parser = XmlReader::new(reader);
         let events: Vec<Event> = streaming_parser.map(|e| e.unwrap()).collect();
 
@@ -245,7 +243,7 @@ mod tests {
 
     #[test]
     fn bad_data() {
-        let reader = File::open(&Path::new("./tests/data/xml_error.plist")).unwrap();
+        let reader = File::open("./tests/data/xml_error.plist").unwrap();
         let streaming_parser = XmlReader::new(reader);
         let events: Vec<_> = streaming_parser.collect();
 

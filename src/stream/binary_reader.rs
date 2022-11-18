@@ -187,7 +187,7 @@ impl<R: Read + Seek> BinaryReader<R> {
         if offset >= self.trailer_start_offset {
             return Err(self.with_pos(ErrorKind::ObjectOffsetTooLarge));
         }
-        Ok(self.reader.seek(SeekFrom::Start(offset))?)
+        self.reader.seek(SeekFrom::Start(offset))
     }
 
     fn push_stack_item_and_check_for_recursion(&mut self, item: StackItem) -> Result<(), Error> {
@@ -409,7 +409,7 @@ impl<R: Read + Seek> Iterator for BinaryReader<R> {
 
 #[cfg(test)]
 mod tests {
-    use std::{fs::File, path::Path};
+    use std::fs::File;
 
     use super::*;
     use crate::{stream::Event, Uid};
@@ -418,7 +418,7 @@ mod tests {
     fn streaming_parser() {
         use crate::stream::Event::*;
 
-        let reader = File::open(&Path::new("./tests/data/binary.plist")).unwrap();
+        let reader = File::open("./tests/data/binary.plist").unwrap();
         let streaming_parser = BinaryReader::new(reader);
         let events: Vec<Event> = streaming_parser.map(|e| e.unwrap()).collect();
 
@@ -463,7 +463,7 @@ mod tests {
 
     #[test]
     fn utf16_plist() {
-        let reader = File::open(&Path::new("./tests/data/utf16_bplist.plist")).unwrap();
+        let reader = File::open("./tests/data/utf16_bplist.plist").unwrap();
         let streaming_parser = BinaryReader::new(reader);
         let mut events: Vec<Event> = streaming_parser.map(|e| e.unwrap()).collect();
 
@@ -480,7 +480,7 @@ mod tests {
 
     #[test]
     fn nskeyedarchiver_plist() {
-        let reader = File::open(&Path::new("./tests/data/binary_NSKeyedArchiver.plist")).unwrap();
+        let reader = File::open("./tests/data/binary_NSKeyedArchiver.plist").unwrap();
         let streaming_parser = BinaryReader::new(reader);
         let events: Vec<Event> = streaming_parser.map(|e| e.unwrap()).collect();
 

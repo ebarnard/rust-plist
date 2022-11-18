@@ -5,7 +5,6 @@ use indexmap::IndexMap;
 use std::{
     borrow::Cow,
     io::{self, Write},
-    mem,
     num::NonZeroUsize,
 };
 
@@ -273,7 +272,7 @@ impl<W: Write> BinaryWriter<W> {
         self.writer.write_exact(b"bplist00")?;
 
         // Write objects
-        let mut events_vec = mem::replace(&mut self.events, Vec::new());
+        let mut events_vec = std::mem::take(&mut self.events);
         let mut events = &mut events_vec[..];
         let ref_size = plist_ref_size(self.num_objects - 1);
         let mut offset_table = vec![0; self.num_objects];
@@ -358,7 +357,7 @@ impl<W: Write> BinaryWriter<W> {
         events: &mut [Event],
         ref_size: u8,
         next_object_ref: &mut ObjectRef,
-        offset_table: &mut Vec<usize>,
+        offset_table: &mut [usize],
     ) -> Result<(), Error> {
         if let Some(object_ref) = &collection.object_ref {
             offset_table[object_ref.value()] = self.writer.pos;
@@ -437,7 +436,7 @@ impl<W: Write> BinaryWriter<W> {
     fn write_plist_value(
         &mut self,
         value_index: usize,
-        offset_table: &mut Vec<usize>,
+        offset_table: &mut [usize],
     ) -> Result<(), Error> {
         let (value, value_state) = value_mut(&mut self.values, value_index);
 
@@ -464,7 +463,7 @@ impl<W: Write> BinaryWriter<W> {
                 self.writer.write_exact(&v[..])?;
             }
             Value::Date(v) => {
-                let secs = v.to_seconds_since_plist_epoch();
+                let secs = v.as_seconds_since_plist_epoch();
                 let mut buf: [_; 9] = [0x33, 0, 0, 0, 0, 0, 0, 0, 0];
                 buf[1..].copy_from_slice(&secs.to_bits().to_be_bytes());
                 self.writer.write_exact(&buf)?;
@@ -527,6 +526,8 @@ impl<W: Write> BinaryWriter<W> {
                     self.writer.write_exact(&buf)?;
                 } else {
                     let mut buf: [_; 9] = [0x87, 0, 0, 0, 0, 0, 0, 0, 0];
+                    // we want to be explicit about the type here
+                    #[allow(clippy::unnecessary_cast)]
                     buf[1..].copy_from_slice(&(v as u64).to_be_bytes());
                     self.writer.write_exact(&buf)?;
                 }
@@ -701,7 +702,7 @@ mod tests {
 
     use crate::{stream::BinaryReader, Value};
 
-    fn test_roundtrip(path: &Path) {
+    fn test_roundtrip<P: AsRef<Path>>(path: P) {
         let reader = File::open(path).unwrap();
         let streaming_parser = BinaryReader::new(reader);
         let value_to_encode = Value::from_events(streaming_parser).unwrap();
@@ -721,16 +722,16 @@ mod tests {
 
     #[test]
     fn bplist_roundtrip() {
-        test_roundtrip(&Path::new("./tests/data/binary.plist"))
+        test_roundtrip("./tests/data/binary.plist")
     }
 
     #[test]
     fn utf16_roundtrip() {
-        test_roundtrip(&Path::new("./tests/data/utf16_bplist.plist"))
+        test_roundtrip("./tests/data/utf16_bplist.plist")
     }
 
     #[test]
     fn nskeyedarchiver_roundtrip() {
-        test_roundtrip(&Path::new("./tests/data/binary_NSKeyedArchiver.plist"))
+        test_roundtrip("./tests/data/binary_NSKeyedArchiver.plist")
     }
 }

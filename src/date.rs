@@ -68,7 +68,7 @@ impl Date {
         Ok(Date { inner })
     }
 
-    pub(crate) fn to_seconds_since_plist_epoch(&self) -> f64 {
+    pub(crate) fn as_seconds_since_plist_epoch(&self) -> f64 {
         // needed until #![feature(duration_float)] is stabilized
         fn as_secs_f64(d: Duration) -> f64 {
             const NANOS_PER_SEC: f64 = 1_000_000_000.00;
@@ -95,9 +95,9 @@ impl From<SystemTime> for Date {
     }
 }
 
-impl Into<SystemTime> for Date {
-    fn into(self) -> SystemTime {
-        self.inner
+impl From<Date> for SystemTime {
+    fn from(val: Date) -> Self {
+        val.inner
     }
 }
 

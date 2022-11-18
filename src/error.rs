@@ -88,11 +88,7 @@ impl Error {
 
     /// Returns true if this error was caused by prematurely reaching the end of the input data.
     pub fn is_eof(&self) -> bool {
-        if let ErrorKind::UnexpectedEof = self.inner.kind {
-            true
-        } else {
-            false
-        }
+        matches!(self.inner.kind, ErrorKind::UnexpectedEof)
     }
 
     /// Returns the underlying error if it was caused by a failure to read or write bytes on an IO
@@ -219,6 +215,6 @@ pub(crate) fn from_io_without_position(err: io::Error) -> Error {
 }
 
 pub(crate) fn unexpected_event_type(expected: EventKind, found: &Event) -> Error {
-    let found = EventKind::of_event(&found);
+    let found = EventKind::of_event(found);
     ErrorKind::UnexpectedEventType { expected, found }.without_position()
 }

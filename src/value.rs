@@ -796,11 +796,10 @@ mod tests {
         let plist = builder.build();
 
         // Expected output
-        let mut lines = Vec::new();
-        lines.push(Value::String("It is a tale told by an idiot,".to_owned()));
-        lines.push(Value::String(
-            "Full of sound and fury, signifying nothing.".to_owned(),
-        ));
+        let lines = vec![
+            Value::String("It is a tale told by an idiot,".to_owned()),
+            Value::String("Full of sound and fury, signifying nothing.".to_owned()),
+        ];
 
         let mut dict = Dictionary::new();
         dict.insert(

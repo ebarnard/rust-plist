@@ -183,7 +183,7 @@ where
             }
             OptionMode::StructField => {
                 // None struct values are ignored so if we're here the value must be Some.
-                self.with_option_mode(OptionMode::Explicit, |this| Ok(visitor.visit_some(this)?))
+                self.with_option_mode(OptionMode::Explicit, |this| visitor.visit_some(this))
             }
             OptionMode::Explicit => {
                 expect!(self.events.next(), EventKind::StartDictionary);
@@ -391,7 +391,7 @@ where
             OptionMode::Explicit
         };
         self.de
-            .with_option_mode(option_mode, |this| Ok(seed.deserialize(this)?))
+            .with_option_mode(option_mode, |this| seed.deserialize(this))
     }
 
     fn size_hint(&self) -> Option<usize> {
