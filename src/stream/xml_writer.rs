@@ -73,19 +73,19 @@ impl<W: Write> XmlWriter<W> {
 
     fn start_element(&mut self, name: &str) -> Result<(), Error> {
         self.xml_writer
-            .write_event(XmlEvent::Start(BytesStart::borrowed_name(name.as_bytes())))?;
+            .write_event(XmlEvent::Start(BytesStart::new(name)))?;
         Ok(())
     }
 
     fn end_element(&mut self, name: &str) -> Result<(), Error> {
         self.xml_writer
-            .write_event(XmlEvent::End(BytesEnd::borrowed(name.as_bytes())))?;
+            .write_event(XmlEvent::End(BytesEnd::new(name)))?;
         Ok(())
     }
 
     fn write_value(&mut self, value: &str) -> Result<(), Error> {
         self.xml_writer
-            .write_event(XmlEvent::Text(BytesText::from_plain_str(value)))?;
+            .write_event(XmlEvent::Text(BytesText::new(value)))?;
         Ok(())
     }
 
@@ -188,13 +188,13 @@ impl<W: Write> Writer for XmlWriter<W> {
             match this.pending_collection.take() {
                 Some(PendingCollection::Array) => {
                     this.xml_writer
-                        .write_event(XmlEvent::Empty(BytesStart::borrowed_name(b"array")))?;
+                        .write_event(XmlEvent::Empty(BytesStart::new("array")))?;
                     this.expecting_key = this.stack.last() == Some(&Element::Dictionary);
                     return Ok(());
                 }
                 Some(PendingCollection::Dictionary) => {
                     this.xml_writer
-                        .write_event(XmlEvent::Empty(BytesStart::borrowed_name(b"dict")))?;
+                        .write_event(XmlEvent::Empty(BytesStart::new("dict")))?;
                     this.expecting_key = this.stack.last() == Some(&Element::Dictionary);
                     return Ok(());
                 }
@@ -222,10 +222,10 @@ impl<W: Write> Writer for XmlWriter<W> {
 
     fn write_boolean(&mut self, value: bool) -> Result<(), Error> {
         self.write_value_event(EventKind::Boolean, |this| {
-            let value = if value { "true" } else { "false" }.as_bytes();
+            let value = if value { "true" } else { "false" };
             Ok(this
                 .xml_writer
-                .write_event(XmlEvent::Empty(BytesStart::borrowed_name(value)))?)
+                .write_event(XmlEvent::Empty(BytesStart::new(value)))?)
         })
     }
 

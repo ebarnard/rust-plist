@@ -53,7 +53,7 @@ impl From<XmlReaderError> for ErrorKind {
             }
             XmlReaderError::Io(err) => ErrorKind::Io(err),
             XmlReaderError::UnexpectedEof(_) => ErrorKind::UnexpectedEof,
-            XmlReaderError::Utf8(_) => ErrorKind::InvalidXmlUtf8,
+            XmlReaderError::NonDecodable(_) => ErrorKind::InvalidXmlUtf8,
             _ => ErrorKind::InvalidXmlSyntax,
         }
     }
@@ -91,7 +91,7 @@ impl<R: Read> ReaderState<R> {
     }
 
     fn read_xml_event<'buf>(&mut self, buffer: &'buf mut Vec<u8>) -> Result<XmlEvent<'buf>, Error> {
-        let event = self.0.read_event(buffer);
+        let event = self.0.read_event_into(buffer);
         let pos = self.xml_reader_pos();
         event.map_err(|err| ErrorKind::from(err).with_position(pos))
     }
@@ -100,10 +100,10 @@ impl<R: Read> ReaderState<R> {
         loop {
             match self.read_xml_event(buffer)? {
                 XmlEvent::Text(text) => {
-                    let unespcaped = text
-                        .unescaped()
+                    let unescaped = text
+                        .unescape()
                         .map_err(|err| self.with_pos(ErrorKind::from(err)))?;
-                    return String::from_utf8(unespcaped.to_vec())
+                    return String::from_utf8(unescaped.as_ref().into())
                         .map_err(|_| self.with_pos(ErrorKind::InvalidUtf8String));
                 }
                 XmlEvent::End(_) => {
@@ -127,7 +127,7 @@ impl<R: Read> ReaderState<R> {
         loop {
             match self.read_xml_event(buffer)? {
                 XmlEvent::Start(name) => {
-                    match name.local_name() {
+                    match name.local_name().as_ref() {
                         b"plist" => {}
                         b"array" => return Ok(Some(Event::StartArray(None))),
                         b"dict" => return Ok(Some(Event::StartDictionary(None))),
@@ -172,7 +172,7 @@ impl<R: Read> ReaderState<R> {
                         _ => return Err(self.with_pos(ErrorKind::UnknownXmlElement)),
                     }
                 }
-                XmlEvent::End(name) => match name.local_name() {
+                XmlEvent::End(name) => match name.local_name().as_ref() {
                     b"array" | b"dict" => return Ok(Some(Event::EndCollection)),
                     _ => (),
                 },
