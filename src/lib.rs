@@ -82,12 +82,16 @@ pub mod stream;
 #[cfg(not(feature = "enable_unstable_features_that_may_break_with_minor_version_bumps"))]
 mod stream;
 
+#[cfg(feature = "serde")]
+mod data;
 mod date;
 mod error;
 mod integer;
 mod uid;
 mod value;
 
+#[cfg(feature = "serde")]
+pub use data::Data;
 pub use date::{Date, InvalidXmlDate};
 pub use dictionary::Dictionary;
 pub use error::Error;

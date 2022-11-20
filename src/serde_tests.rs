@@ -6,7 +6,7 @@ use std::{collections::BTreeMap, fmt::Debug, fs::File, io::Cursor};
 
 use crate::{
     stream::{private::Sealed, Event, OwnedEvent, Writer},
-    Date, Deserializer, Dictionary, Error, Integer, Serializer, Uid, Value,
+    Data, Date, Deserializer, Dictionary, Error, Integer, Serializer, Uid, Value,
 };
 
 struct VecWriter {
@@ -130,6 +130,7 @@ struct DogInner {
     b: usize,
     c: Vec<String>,
     d: Option<Uid>,
+    e: Data,
 }
 
 #[test]
@@ -149,6 +150,7 @@ fn dog() {
             b: 12,
             c: vec!["a".to_string(), "b".to_string()],
             d: Some(Uid::new(42)),
+            e: Data::new(vec![20, 22]),
         }],
     });
 
@@ -170,6 +172,8 @@ fn dog() {
         Event::EndCollection,
         Event::String("d".into()),
         Event::Uid(Uid::new(42)),
+        Event::String("e".into()),
+        Event::Data(vec![20, 22].into()),
         Event::EndCollection,
         Event::EndCollection,
         Event::EndCollection,
