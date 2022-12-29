@@ -4,7 +4,6 @@ use std::io::{self, BufReader, Read};
 use crate::{
     error::{Error, ErrorKind, FilePosition},
     stream::{Event, OwnedEvent},
-    // Date, Integer,
     Integer,
 };
 
@@ -127,52 +126,29 @@ impl<R: Read> ReaderState<R> {
     fn read_next(&mut self, buffer: &mut Vec<u8>) -> Result<Option<OwnedEvent>, Error> {
         loop {
             match self.read_xml_event(buffer)? {
-                XmlEvent::Start(name) => {
-                    match name.local_name().as_ref() {
-                        b"plist" => {}
-                        // b"array" => return Ok(Some(Event::StartArray(None))),
-                        b"d" => return Ok(Some(Event::StartDictionary(None))),
-                        b"k" => {
-                            return Ok(Some(Event::String(self.read_content(buffer)?.into())))
+                XmlEvent::Start(name) => match name.local_name().as_ref() {
+                    b"plist" => {}
+                    b"d" => return Ok(Some(Event::StartDictionary(None))),
+                    b"k" => return Ok(Some(Event::String(self.read_content(buffer)?.into()))),
+                    b"i" => {
+                        let s = self.read_content(buffer)?;
+                        match Integer::from_str(&s) {
+                            Ok(i) => return Ok(Some(Event::Integer(i))),
+                            Err(_) => return Err(self.with_pos(ErrorKind::InvalidIntegerString)),
                         }
-                        // b"data" => {
-                        //     let mut encoded = self.read_content(buffer)?;
-                        //     // Strip whitespace and line endings from input string
-                        //     encoded.retain(|c| !c.is_ascii_whitespace());
-                        //     let data = base64::decode(&encoded)
-                        //         .map_err(|_| self.with_pos(ErrorKind::InvalidDataString))?;
-                        //     return Ok(Some(Event::Data(data.into())));
-                        // }
-                        // b"date" => {
-                        //     let s = self.read_content(buffer)?;
-                        //     let date = Date::from_xml_format(&s)
-                        //         .map_err(|_| self.with_pos(ErrorKind::InvalidDateString))?;
-                        //     return Ok(Some(Event::Date(date)));
-                        // }
-                        b"i" => {
-                            let s = self.read_content(buffer)?;
-                            match Integer::from_str(&s) {
-                                Ok(i) => return Ok(Some(Event::Integer(i))),
-                                Err(_) => {
-                                    return Err(self.with_pos(ErrorKind::InvalidIntegerString))
-                                }
-                            }
-                        }
-                        b"r" => {
-                            let s = self.read_content(buffer)?;
-                            match s.parse() {
-                                Ok(f) => return Ok(Some(Event::Real(f))),
-                                Err(_) => return Err(self.with_pos(ErrorKind::InvalidRealString)),
-                            }
-                        }
-                        b"s" => {
-                            return Ok(Some(Event::String(self.read_content(buffer)?.into())))
-                        }
-                        b"t" => return Ok(Some(Event::Boolean(true))),
-                        b"f" => return Ok(Some(Event::Boolean(false))),
-                        _ => return Err(self.with_pos(ErrorKind::UnknownXmlElement)),
                     }
-                }
+                    b"r" => {
+                        let s = self.read_content(buffer)?;
+                        match s.parse() {
+                            Ok(f) => return Ok(Some(Event::Real(f))),
+                            Err(_) => return Err(self.with_pos(ErrorKind::InvalidRealString)),
+                        }
+                    }
+                    b"s" => return Ok(Some(Event::String(self.read_content(buffer)?.into()))),
+                    b"t" => return Ok(Some(Event::Boolean(true))),
+                    b"f" => return Ok(Some(Event::Boolean(false))),
+                    _ => return Err(self.with_pos(ErrorKind::UnknownXmlElement)),
+                },
                 XmlEvent::End(name) => match name.local_name().as_ref() {
                     b"d" => return Ok(Some(Event::EndCollection)),
                     _ => (),
@@ -211,19 +187,10 @@ mod tests {
             StartDictionary(None),
             String("Author".into()),
             String("William Shakespeare".into()),
-            // String("Lines".into()),
-            // StartArray(None),
-            // String("It is a tale told by an idiot,".into()),
-            // String("Full of sound and fury, signifying nothing.".into()),
-            // EndCollection,
             String("Death".into()),
             Integer(1564.into()),
             String("Height".into()),
             Real(1.60),
-            // String("Data".into()),
-            // Data(vec![0, 0, 0, 190, 0, 0, 0, 3, 0, 0, 0, 30, 0, 0, 0].into()),
-            // String("Birthdate".into()),
-            // Date(super::Date::from_xml_format("1981-05-16T11:32:06Z").unwrap()),
             String("Blank".into()),
             String("".into()),
             String("BiggestNumber".into()),

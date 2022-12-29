@@ -1,11 +1,5 @@
 //! An abstraction of a plist file as a stream of events. Used to support multiple encodings.
 
-// mod binary_reader;
-// pub use self::binary_reader::BinaryReader;
-//
-// mod binary_writer;
-// pub use self::binary_writer::BinaryWriter;
-
 mod xml_reader;
 pub use self::xml_reader::XmlReader;
 
@@ -22,7 +16,9 @@ use crate::{
     dictionary,
     error::{Error, ErrorKind},
     // Date, Integer, Uid, Value,
-    Integer, Uid, Value,
+    Integer,
+    Uid,
+    Value,
 };
 
 /// An encoding of a plist as a flat structure.
@@ -53,13 +49,10 @@ use crate::{
 pub enum Event<'a> {
     // While the length of an array or dict cannot be feasably greater than max(usize) this better
     // conveys the concept of an effectively unbounded event stream.
-    // StartArray(Option<u64>),
     StartDictionary(Option<u64>),
     EndCollection,
 
     Boolean(bool),
-    // Data(Cow<'a, [u8]>),
-    // Date(Date),
     Integer(Integer),
     Real(f64),
     String(Cow<'a, str>),
@@ -79,7 +72,6 @@ pub struct Events<'a> {
 
 enum StackItem<'a> {
     Root(&'a Value),
-    // Array(std::slice::Iter<'a, Value>),
     Dict(dictionary::Iter<'a>),
     DictValue(&'a Value),
 }
@@ -178,12 +170,6 @@ impl<'a> Iterator for Events<'a> {
             stack: &'c mut Vec<StackItem<'b>>,
         ) -> Event<'b> {
             match value {
-                // Value::Array(array) => {
-                //     let len = array.len();
-                //     let iter = array.iter();
-                //     stack.push(StackItem::Array(iter));
-                //     Event::StartArray(Some(len as u64))
-                // }
                 Value::Dictionary(dict) => {
                     let len = dict.len();
                     let iter = dict.into_iter();
@@ -191,8 +177,6 @@ impl<'a> Iterator for Events<'a> {
                     Event::StartDictionary(Some(len as u64))
                 }
                 Value::Boolean(value) => Event::Boolean(*value),
-                // Value::Data(value) => Event::Data(Cow::Borrowed(value)),
-                // Value::Date(value) => Event::Date(*value),
                 Value::Real(value) => Event::Real(*value),
                 Value::Integer(value) => Event::Integer(*value),
                 Value::String(value) => Event::String(Cow::Borrowed(value.as_str())),
@@ -202,15 +186,6 @@ impl<'a> Iterator for Events<'a> {
 
         Some(match self.stack.pop()? {
             StackItem::Root(value) => handle_value(value, &mut self.stack),
-            // StackItem::Array(mut array) => {
-            //     if let Some(value) = array.next() {
-            //         // There might still be more items in the array so return it to the stack.
-            //         self.stack.push(StackItem::Array(array));
-            //         handle_value(value, &mut self.stack)
-            //     } else {
-            //         Event::EndCollection
-            //     }
-            // }
             StackItem::Dict(mut dict) => {
                 if let Some((key, value)) = dict.next() {
                     // There might still be more items in the dictionary so return it to the stack.
@@ -233,7 +208,6 @@ pub struct Reader<R: Read + Seek>(ReaderInner<R>);
 enum ReaderInner<R: Read + Seek> {
     Uninitialized(Option<R>),
     Xml(XmlReader<R>),
-    // Binary(BinaryReader<R>),
 }
 
 impl<R: Read + Seek> Reader<R> {
@@ -261,7 +235,6 @@ impl<R: Read + Seek> Iterator for Reader<R> {
     fn next(&mut self) -> Option<Result<OwnedEvent, Error>> {
         let mut reader = match self.0 {
             ReaderInner::Xml(ref mut parser) => return parser.next(),
-            // ReaderInner::Binary(ref mut parser) => return parser.next(),
             ReaderInner::Uninitialized(ref mut reader) => reader.take().unwrap(),
         };
 
@@ -282,12 +255,9 @@ impl<R: Read + Seek> Iterator for Reader<R> {
 pub trait Writer: private::Sealed {
     fn write(&mut self, event: &Event) -> Result<(), Error> {
         match event {
-            // Event::StartArray(len) => self.write_start_array(*len),
             Event::StartDictionary(len) => self.write_start_dictionary(*len),
             Event::EndCollection => self.write_end_collection(),
             Event::Boolean(value) => self.write_boolean(*value),
-            // Event::Data(value) => self.write_data(value),
-            // Event::Date(value) => self.write_date(*value),
             Event::Integer(value) => self.write_integer(*value),
             Event::Real(value) => self.write_real(*value),
             Event::String(value) => self.write_string(value),
@@ -295,13 +265,10 @@ pub trait Writer: private::Sealed {
         }
     }
 
-    // fn write_start_array(&mut self, len: Option<u64>) -> Result<(), Error>;
     fn write_start_dictionary(&mut self, len: Option<u64>) -> Result<(), Error>;
     fn write_end_collection(&mut self) -> Result<(), Error>;
 
     fn write_boolean(&mut self, value: bool) -> Result<(), Error>;
-    // fn write_data(&mut self, value: &[u8]) -> Result<(), Error>;
-    // fn write_date(&mut self, value: Date) -> Result<(), Error>;
     fn write_integer(&mut self, value: Integer) -> Result<(), Error>;
     fn write_real(&mut self, value: f64) -> Result<(), Error>;
     fn write_string(&mut self, value: &str) -> Result<(), Error>;
@@ -313,6 +280,5 @@ pub(crate) mod private {
 
     pub trait Sealed {}
 
-    // impl<W: Write> Sealed for super::BinaryWriter<W> {}
     impl<W: Write> Sealed for super::XmlWriter<W> {}
 }

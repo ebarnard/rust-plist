@@ -6,13 +6,7 @@ use std::{
 
 use crate::{
     error::{self, Error, ErrorKind, EventKind},
-    stream::{
-        // BinaryWriter,
-        Event, Events, OwnedEvent, Reader, Writer, XmlReader, XmlWriteOptions,
-        XmlWriter,
-    },
-    // u64_to_usize, Date, Dictionary, Integer, Uid,
-    // u64_to_usize,
+    stream::{Event, Events, OwnedEvent, Reader, Writer, XmlReader, XmlWriteOptions, XmlWriter},
     Dictionary, Integer, Uid,
 };
 
@@ -20,11 +14,8 @@ use crate::{
 #[derive(Clone, Debug, PartialEq)]
 #[non_exhaustive]
 pub enum Value {
-    // Array(Vec<Value>),
     Dictionary(Dictionary),
     Boolean(bool),
-    // Data(Vec<u8>),
-    // Date(Date),
     Real(f64),
     Integer(Integer),
     String(String),
@@ -50,14 +41,6 @@ impl Value {
         Value::from_events(reader)
     }
 
-    // /// Serializes a `Value` to a file as a binary encoded plist.
-    // pub fn to_file_binary<P: AsRef<Path>>(&self, path: P) -> Result<(), Error> {
-    //     let mut file = File::create(path).map_err(error::from_io_without_position)?;
-    //     self.to_writer_binary(BufWriter::new(&mut file))?;
-    //     file.sync_all().map_err(error::from_io_without_position)?;
-    //     Ok(())
-    // }
-
     /// Serializes a `Value` to a file as an XML encoded plist.
     pub fn to_file_xml<P: AsRef<Path>>(&self, path: P) -> Result<(), Error> {
         let mut file = File::create(path).map_err(error::from_io_without_position)?;
@@ -65,12 +48,6 @@ impl Value {
         file.sync_all().map_err(error::from_io_without_position)?;
         Ok(())
     }
-
-    // /// Serializes a `Value` to a byte stream as a binary encoded plist.
-    // pub fn to_writer_binary<W: Write>(&self, writer: W) -> Result<(), Error> {
-    //     let mut writer = BinaryWriter::new(writer);
-    //     self.to_writer_inner(&mut writer)
-    // }
 
     /// Serializes a `Value` to a byte stream as an XML encoded plist.
     pub fn to_writer_xml<W: Write>(&self, writer: W) -> Result<(), Error> {
@@ -153,39 +130,6 @@ impl Value {
         Events::new(self)
     }
 
-    // /// If the `Value` is a Array, returns the underlying `Vec`.
-    // ///
-    // /// Returns `None` otherwise.
-    // ///
-    // /// This method consumes the `Value`. To get a reference instead, use
-    // /// `as_array`.
-    // pub fn into_array(self) -> Option<Vec<Value>> {
-    //     match self {
-    //         Value::Array(dict) => Some(dict),
-    //         _ => None,
-    //     }
-    // }
-
-    // /// If the `Value` is an Array, returns the associated `Vec`.
-    // ///
-    // /// Returns `None` otherwise.
-    // pub fn as_array(&self) -> Option<&Vec<Value>> {
-    //     match *self {
-    //         Value::Array(ref array) => Some(array),
-    //         _ => None,
-    //     }
-    // }
-
-    // /// If the `Value` is an Array, returns the associated mutable `Vec`.
-    // ///
-    // /// Returns `None` otherwise.
-    // pub fn as_array_mut(&mut self) -> Option<&mut Vec<Value>> {
-    //     match *self {
-    //         Value::Array(ref mut array) => Some(array),
-    //         _ => None,
-    //     }
-    // }
-
     /// If the `Value` is a Dictionary, returns the associated `BTreeMap`.
     ///
     /// Returns `None` otherwise.
@@ -228,39 +172,6 @@ impl Value {
             _ => None,
         }
     }
-
-    // /// If the `Value` is a Data, returns the underlying `Vec`.
-    // ///
-    // /// Returns `None` otherwise.
-    // ///
-    // /// This method consumes the `Value`. If this is not desired, please use
-    // /// `as_data` method.
-    // pub fn into_data(self) -> Option<Vec<u8>> {
-    //     match self {
-    //         Value::Data(data) => Some(data),
-    //         _ => None,
-    //     }
-    // }
-
-    // /// If the `Value` is a Data, returns the associated `Vec`.
-    // ///
-    // /// Returns `None` otherwise.
-    // pub fn as_data(&self) -> Option<&[u8]> {
-    //     match *self {
-    //         Value::Data(ref data) => Some(data),
-    //         _ => None,
-    //     }
-    // }
-
-    // /// If the `Value` is a Date, returns the associated `Date`.
-    // ///
-    // /// Returns `None` otherwise.
-    // pub fn as_date(&self) -> Option<Date> {
-    //     match *self {
-    //         Value::Date(date) => Some(date),
-    //         _ => None,
-    //     }
-    // }
 
     /// If the `Value` is a Real, returns the associated `f64`.
     ///
@@ -343,16 +254,11 @@ impl Value {
 pub mod serde_impls {
     use serde::{
         de,
-        // de::{EnumAccess, MapAccess, SeqAccess, VariantAccess, Visitor},
         de::{EnumAccess, MapAccess, VariantAccess, Visitor},
         ser,
     };
 
-    use crate::{
-        // date::serde_impls::DATE_NEWTYPE_STRUCT_NAME,
-        uid::serde_impls::UID_NEWTYPE_STRUCT_NAME,
-        Dictionary, Value,
-    };
+    use crate::{uid::serde_impls::UID_NEWTYPE_STRUCT_NAME, Dictionary, Value};
 
     pub const VALUE_NEWTYPE_STRUCT_NAME: &str = "PLIST-VALUE";
 
@@ -362,11 +268,8 @@ pub mod serde_impls {
             S: serde::Serializer,
         {
             match *self {
-                // Value::Array(ref v) => v.serialize(serializer),
                 Value::Dictionary(ref m) => m.serialize(serializer),
                 Value::Boolean(b) => serializer.serialize_bool(b),
-                // Value::Data(ref v) => serializer.serialize_bytes(v),
-                // Value::Date(d) => d.serialize(serializer),
                 Value::Real(n) => serializer.serialize_f64(n),
                 Value::Integer(n) => n.serialize(serializer),
                 Value::String(ref s) => serializer.serialize_str(s),
@@ -392,14 +295,6 @@ pub mod serde_impls {
                 fn visit_bool<E>(self, value: bool) -> Result<Value, E> {
                     Ok(Value::Boolean(value))
                 }
-
-                // fn visit_byte_buf<E>(self, v: Vec<u8>) -> Result<Value, E> {
-                //     Ok(Value::Data(v))
-                // }
-                //
-                // fn visit_bytes<E>(self, v: &[u8]) -> Result<Value, E> {
-                //     Ok(Value::Data(v.to_vec()))
-                // }
 
                 fn visit_i64<E>(self, value: i64) -> Result<Value, E> {
                     Ok(Value::Integer(value.into()))
@@ -439,28 +334,15 @@ pub mod serde_impls {
                     deserializer.deserialize_any(self)
                 }
 
-                // fn visit_seq<A>(self, mut seq: A) -> Result<Value, A::Error>
-                // where
-                //     A: SeqAccess<'de>,
-                // {
-                //     let mut vec = Vec::with_capacity(seq.size_hint().unwrap_or(0));
-                //     while let Some(elem) = seq.next_element()? {
-                //         vec.push(elem);
-                //     }
-                //     Ok(Value::Array(vec))
-                // }
-
                 fn visit_enum<A>(self, data: A) -> Result<Value, A::Error>
                 where
                     A: EnumAccess<'de>,
                 {
                     let (name, variant) = data.variant::<String>()?;
                     match &*name {
-                        // DATE_NEWTYPE_STRUCT_NAME => Ok(Value::Date(variant.newtype_variant()?)),
                         UID_NEWTYPE_STRUCT_NAME => Ok(Value::Uid(variant.newtype_variant()?)),
                         _ => Err(de::Error::unknown_variant(
                             &name,
-                            // &[DATE_NEWTYPE_STRUCT_NAME, UID_NEWTYPE_STRUCT_NAME],
                             &[UID_NEWTYPE_STRUCT_NAME],
                         )),
                     }

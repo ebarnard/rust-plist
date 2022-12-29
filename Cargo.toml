@@ -1,8 +1,8 @@
 [package]
-name = "plist"
+name = "gd_plist"
 version = "1.4.1"
-authors = ["Ed Barnard <eabarnard@gmail.com>"]
-description = "A rusty plist parser. Supports Serde serialization."
+authors = ["Ed Barnard <eabarnard@gmail.com>", "Syudagye <syudagye@gmail.com>"]
+description = "A rusty plist parser for Geometry Dash's plist format"
 license = "MIT"
 repository = "https://github.com/ebarnard/rust-plist/"
 documentation = "https://docs.rs/plist/1.4.1/plist/"

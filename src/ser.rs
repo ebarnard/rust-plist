@@ -8,14 +8,10 @@ use std::{
 };
 
 use crate::{
-    // date::serde_impls::DATE_NEWTYPE_STRUCT_NAME,
     error::{self, ErrorKind},
     stream::{self, Writer},
     uid::serde_impls::UID_NEWTYPE_STRUCT_NAME,
-    // Date, Integer, Uid, XmlWriteOptions,
-    Integer,
-    Uid,
-    XmlWriteOptions, Error,
+    Error, Integer, Uid, XmlWriteOptions,
 };
 
 #[doc(hidden)]
@@ -69,11 +65,6 @@ impl<W: Writer> Serializer<W> {
         Ok(())
     }
 
-    // fn write_start_array(&mut self, len: Option<u64>) -> Result<(), Error> {
-    //     self.maybe_write_pending_struct_field_name()?;
-    //     self.writer.write_start_array(len)
-    // }
-
     fn write_start_dictionary(&mut self, len: Option<u64>) -> Result<(), Error> {
         self.maybe_write_pending_struct_field_name()?;
         self.writer.write_start_dictionary(len)
@@ -88,16 +79,6 @@ impl<W: Writer> Serializer<W> {
         self.maybe_write_pending_struct_field_name()?;
         self.writer.write_boolean(value)
     }
-
-    // fn write_data(&mut self, value: &[u8]) -> Result<(), Error> {
-    //     self.maybe_write_pending_struct_field_name()?;
-    //     self.writer.write_data(value)
-    // }
-
-    // fn write_date(&mut self, value: Date) -> Result<(), Error> {
-    //     self.maybe_write_pending_struct_field_name()?;
-    //     self.writer.write_date(value)
-    // }
 
     fn write_integer(&mut self, value: Integer) -> Result<(), Error> {
         self.maybe_write_pending_struct_field_name()?;
@@ -321,168 +302,6 @@ impl<'a, W: Writer> ser::Serializer for &'a mut Serializer<W> {
         self.serialize_struct(name, len)
     }
 }
-
-// struct DateSerializer<'a, W: 'a + Writer> {
-//     ser: &'a mut Serializer<W>,
-// }
-//
-// impl<'a, W: Writer> DateSerializer<'a, W> {
-//     fn expecting_date_error(&self) -> Error {
-//         ser::Error::custom("plist date string expected")
-//     }
-// }
-//
-// impl<'a, W: Writer> ser::Serializer for DateSerializer<'a, W> {
-//     type Ok = ();
-//     type Error = Error;
-//
-//     type SerializeSeq = ser::Impossible<(), Error>;
-//     type SerializeTuple = ser::Impossible<(), Error>;
-//     type SerializeTupleStruct = ser::Impossible<(), Error>;
-//     type SerializeTupleVariant = ser::Impossible<(), Error>;
-//     type SerializeMap = ser::Impossible<(), Error>;
-//     type SerializeStruct = ser::Impossible<(), Error>;
-//     type SerializeStructVariant = ser::Impossible<(), Error>;
-//
-//     fn serialize_bool(self, _: bool) -> Result<(), Error> {
-//         Err(self.expecting_date_error())
-//     }
-//
-//     fn serialize_i8(self, _: i8) -> Result<(), Error> {
-//         Err(self.expecting_date_error())
-//     }
-//
-//     fn serialize_i16(self, _: i16) -> Result<(), Error> {
-//         Err(self.expecting_date_error())
-//     }
-//
-//     fn serialize_i32(self, _: i32) -> Result<(), Error> {
-//         Err(self.expecting_date_error())
-//     }
-//
-//     fn serialize_i64(self, _: i64) -> Result<(), Error> {
-//         Err(self.expecting_date_error())
-//     }
-//
-//     fn serialize_u8(self, _: u8) -> Result<(), Error> {
-//         Err(self.expecting_date_error())
-//     }
-//
-//     fn serialize_u16(self, _: u16) -> Result<(), Error> {
-//         Err(self.expecting_date_error())
-//     }
-//
-//     fn serialize_u32(self, _: u32) -> Result<(), Error> {
-//         Err(self.expecting_date_error())
-//     }
-//
-//     fn serialize_u64(self, _: u64) -> Result<(), Error> {
-//         Err(self.expecting_date_error())
-//     }
-//
-//     fn serialize_f32(self, _: f32) -> Result<(), Error> {
-//         Err(self.expecting_date_error())
-//     }
-//
-//     fn serialize_f64(self, _: f64) -> Result<(), Error> {
-//         Err(self.expecting_date_error())
-//     }
-//
-//     fn serialize_char(self, _: char) -> Result<(), Error> {
-//         Err(self.expecting_date_error())
-//     }
-//
-//     fn serialize_str(self, v: &str) -> Result<(), Error> {
-//         let date = Date::from_xml_format(v).map_err(|_| self.expecting_date_error())?;
-//         self.ser.write_date(date)
-//     }
-//
-//     fn serialize_bytes(self, _: &[u8]) -> Result<(), Error> {
-//         Err(self.expecting_date_error())
-//     }
-//
-//     fn serialize_none(self) -> Result<(), Error> {
-//         Err(self.expecting_date_error())
-//     }
-//
-//     fn serialize_some<T: ?Sized + ser::Serialize>(self, _: &T) -> Result<(), Error> {
-//         Err(self.expecting_date_error())
-//     }
-//
-//     fn serialize_unit(self) -> Result<(), Error> {
-//         Err(self.expecting_date_error())
-//     }
-//
-//     fn serialize_unit_struct(self, _: &'static str) -> Result<(), Error> {
-//         Err(self.expecting_date_error())
-//     }
-//
-//     fn serialize_unit_variant(self, _: &'static str, _: u32, _: &'static str) -> Result<(), Error> {
-//         Err(self.expecting_date_error())
-//     }
-//
-//     fn serialize_newtype_struct<T: ?Sized + ser::Serialize>(
-//         self,
-//         _: &'static str,
-//         _: &T,
-//     ) -> Result<(), Error> {
-//         Err(self.expecting_date_error())
-//     }
-//
-//     fn serialize_newtype_variant<T: ?Sized + ser::Serialize>(
-//         self,
-//         _: &'static str,
-//         _: u32,
-//         _: &'static str,
-//         _: &T,
-//     ) -> Result<(), Error> {
-//         Err(self.expecting_date_error())
-//     }
-//
-//     fn serialize_seq(self, _: Option<usize>) -> Result<Self::SerializeSeq, Error> {
-//         Err(self.expecting_date_error())
-//     }
-//
-//     fn serialize_tuple(self, _: usize) -> Result<Self::SerializeTuple, Error> {
-//         Err(self.expecting_date_error())
-//     }
-//
-//     fn serialize_tuple_struct(
-//         self,
-//         _: &'static str,
-//         _: usize,
-//     ) -> Result<Self::SerializeTupleStruct, Error> {
-//         Err(self.expecting_date_error())
-//     }
-//
-//     fn serialize_tuple_variant(
-//         self,
-//         _: &'static str,
-//         _: u32,
-//         _: &'static str,
-//         _: usize,
-//     ) -> Result<Self::SerializeTupleVariant, Error> {
-//         Err(self.expecting_date_error())
-//     }
-//
-//     fn serialize_map(self, _: Option<usize>) -> Result<Self::SerializeMap, Error> {
-//         Err(self.expecting_date_error())
-//     }
-//
-//     fn serialize_struct(self, _: &'static str, _: usize) -> Result<Self::SerializeStruct, Error> {
-//         Err(self.expecting_date_error())
-//     }
-//
-//     fn serialize_struct_variant(
-//         self,
-//         _: &'static str,
-//         _: u32,
-//         _: &'static str,
-//         _: usize,
-//     ) -> Result<Self::SerializeStructVariant, Error> {
-//         Err(self.expecting_date_error())
-//     }
-// }
 
 struct UidSerializer<'a, W: 'a + Writer> {
     ser: &'a mut Serializer<W>,
@@ -765,14 +584,6 @@ impl<'a, W: Writer> ser::SerializeStructVariant for Compound<'a, W> {
     }
 }
 
-/// Serializes the given data structure to a file as a binary encoded plist.
-// pub fn to_file_binary<P: AsRef<Path>, T: ser::Serialize>(path: P, value: &T) -> Result<(), Error> {
-//     let mut file = File::create(path).map_err(error::from_io_without_position)?;
-//     to_writer_binary(BufWriter::new(&mut file), value)?;
-//     file.sync_all().map_err(error::from_io_without_position)?;
-//     Ok(())
-// }
-
 /// Serializes the given data structure to a file as an XML encoded plist.
 pub fn to_file_xml<P: AsRef<Path>, T: ser::Serialize>(path: P, value: &T) -> Result<(), Error> {
     let mut file = File::create(path).map_err(error::from_io_without_position)?;
@@ -780,13 +591,6 @@ pub fn to_file_xml<P: AsRef<Path>, T: ser::Serialize>(path: P, value: &T) -> Res
     file.sync_all().map_err(error::from_io_without_position)?;
     Ok(())
 }
-
-/// Serializes the given data structure to a byte stream as a binary encoded plist.
-// pub fn to_writer_binary<W: Write, T: ser::Serialize>(writer: W, value: &T) -> Result<(), Error> {
-//     let writer = stream::BinaryWriter::new(writer);
-//     let mut ser = Serializer::new(writer);
-//     value.serialize(&mut ser)
-// }
 
 /// Serializes the given data structure to a byte stream as an XML encoded plist.
 pub fn to_writer_xml<W: Write, T: ser::Serialize>(writer: W, value: &T) -> Result<(), Error> {

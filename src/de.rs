@@ -13,7 +13,6 @@ use std::{
 };
 
 use crate::{
-    // date::serde_impls::DATE_NEWTYPE_STRUCT_NAME,
     error::{self, Error, ErrorKind, EventKind},
     stream::{self, Event, OwnedEvent},
     u64_to_usize,
@@ -112,12 +111,6 @@ where
         V: de::Visitor<'de>,
     {
         match try_next!(self.events.next()) {
-            // Event::StartArray(len) => {
-            //     let len = len.and_then(u64_to_usize);
-            //     let ret = visitor.visit_seq(MapAndSeqAccess::new(self, false, len))?;
-            //     expect!(self.events.next(), EventKind::EndCollection);
-            //     Ok(ret)
-            // }
             Event::StartDictionary(len) => {
                 let len = len.and_then(u64_to_usize);
                 let ret = visitor.visit_map(MapAndSeqAccess::new(self, false, len))?;
@@ -130,13 +123,6 @@ where
             )),
 
             Event::Boolean(v) => visitor.visit_bool(v),
-            // Event::Data(v) => visitor.visit_byte_buf(v.into_owned()),
-            // Event::Date(v) if self.in_plist_value => {
-            //     visitor.visit_enum(MapAccessDeserializer::new(MapDeserializer::new(
-            //         [(DATE_NEWTYPE_STRUCT_NAME, v.to_xml_format())].into_iter(),
-            //     )))
-            // }
-            // Event::Date(v) => visitor.visit_string(v.to_xml_format()),
             Event::Integer(v) => {
                 if let Some(v) = v.as_unsigned() {
                     visitor.visit_u64(v)

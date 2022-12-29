@@ -1,6 +1,6 @@
-//! # Plist
+//! # gd-plist
 //!
-//! A rusty plist parser.
+//! A rusty plist parser, modified to handle Geometry Dash's plist format.
 //!
 //! ## Usage
 //!
@@ -8,13 +8,13 @@
 //!
 //! ```toml
 //! [dependencies]
-//! plist = "1"
+//! gd_plist = { git = "https://github.com/Syduagye/gd-plist" }
 //! ```
 //!
 //! And put this in your crate root:
 //!
 //! ```rust
-//! extern crate plist;
+//! extern crate gd_plist;
 //! ```
 //!
 //! ## Examples
@@ -22,7 +22,7 @@
 //! ### Using `serde`
 //!
 //! ```rust
-//! extern crate plist;
+//! extern crate gd_plist;
 //! # #[cfg(feature = "serde")]
 //! #[macro_use]
 //! extern crate serde_derive;
@@ -51,7 +51,7 @@
 //! ### Using `Value`
 //!
 //! ```rust
-//! use plist::Value;
+//! use gd_plist::Value;
 //!
 //! let book = Value::from_file("tests/data/book.plist")
 //!     .expect("failed to read book.plist");
@@ -83,16 +83,12 @@ pub mod stream;
 mod stream;
 
 #[cfg(feature = "serde")]
-// mod data;
-// mod date;
 mod error;
 mod integer;
 mod uid;
 mod value;
 
 #[cfg(feature = "serde")]
-// pub use data::Data;
-// pub use date::{Date, InvalidXmlDate};
 pub use dictionary::Dictionary;
 pub use error::Error;
 pub use integer::Integer;
@@ -119,10 +115,7 @@ pub use self::{de::Deserializer, ser::Serializer};
 #[cfg(feature = "serde")]
 pub use self::{
     de::{from_bytes, from_file, from_reader, from_reader_xml},
-    ser::{
-        // to_file_binary, to_file_xml, to_writer_binary, to_writer_xml, to_writer_xml_with_options,
-        to_file_xml, to_writer_xml, to_writer_xml_with_options,
-    },
+    ser::{to_file_xml, to_writer_xml, to_writer_xml_with_options},
 };
 
 #[cfg(all(test, feature = "serde"))]
@@ -130,7 +123,7 @@ pub use self::{
 extern crate serde_derive;
 
 #[cfg(all(test, feature = "serde"))]
-mod serde_tests; // TODO: Fix this module
+mod serde_tests;
 
 fn u64_to_usize(len_u64: u64) -> Option<usize> {
     let len = len_u64 as usize;
