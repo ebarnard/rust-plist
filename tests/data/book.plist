@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
-<d>
+<dict>
     <k>Title</k>
     <s>Great Expectations</s>
 	<k>Author</k>
@@ -10,5 +10,5 @@
     <s>Whether I should have made out this object so soon, if there had been no fine lady sitting at it, I cannot say. In an armchair, with an elbow resting on the table and her head leaning on that hand, sat the strangest lady I have ever seen, or shall ever see.</s>
 	<k>CopiesSold</k>
 	<i>123456789</i>
-</d>
+</dict>
 </plist>

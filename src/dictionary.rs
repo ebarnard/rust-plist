@@ -164,7 +164,7 @@ impl Dictionary {
 /// Access an element of this dictionary. Panics if the given key is not present in the dictionary.
 ///
 /// ```
-/// # use plist::Value;
+/// # use gd_plist::Value;
 /// #
 /// # let val = &Value::String("".to_owned());
 /// # let _ =
@@ -187,8 +187,8 @@ impl<'a> ops::Index<&'a str> for Dictionary {
 /// dictionary.
 ///
 /// ```
-/// # let mut dict = plist::Dictionary::new();
-/// # dict.insert("key".to_owned(), plist::Value::Boolean(false));
+/// # let mut dict = gd_plist::Dictionary::new();
+/// # dict.insert("key".to_owned(), gd_plist::Value::Boolean(false));
 /// #
 /// dict["key"] = "value".into();
 /// ```

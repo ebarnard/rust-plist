@@ -128,7 +128,7 @@ impl<R: Read> ReaderState<R> {
             match self.read_xml_event(buffer)? {
                 XmlEvent::Start(name) => match name.local_name().as_ref() {
                     b"plist" => {}
-                    b"d" => return Ok(Some(Event::StartDictionary(None))),
+                    b"d" | b"dict" => return Ok(Some(Event::StartDictionary(None))),
                     b"k" => return Ok(Some(Event::String(self.read_content(buffer)?.into()))),
                     b"i" => {
                         let s = self.read_content(buffer)?;
@@ -150,7 +150,7 @@ impl<R: Read> ReaderState<R> {
                     _ => return Err(self.with_pos(ErrorKind::UnknownXmlElement)),
                 },
                 XmlEvent::End(name) => match name.local_name().as_ref() {
-                    b"d" => return Ok(Some(Event::EndCollection)),
+                    b"d" | b"dict" => return Ok(Some(Event::EndCollection)),
                     _ => (),
                 },
                 XmlEvent::Eof => return Ok(None),

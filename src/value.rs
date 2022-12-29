@@ -64,7 +64,7 @@ impl Value {
     /// ```no_run
     /// use std::io::{BufWriter, Write};
     /// use std::fs::File;
-    /// use plist::{Dictionary, Value, XmlWriteOptions};
+    /// use gd_plist::{Dictionary, Value, XmlWriteOptions};
     ///
     /// let value: Value = Dictionary::new().into();
     /// // .. add some keys & values

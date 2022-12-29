@@ -149,7 +149,7 @@ impl<W: Write> XmlWriter<W> {
             self.pending_collection = None;
 
             self.write_value_event(EventKind::StartDictionary, |this| {
-                this.start_element("d")?;
+                this.start_element(if this.stack.len() > 0 { "d" } else { "dict" })?;
                 this.stack.push(Element::Dictionary);
                 this.expecting_key = true;
                 Ok(())
@@ -169,10 +169,11 @@ impl<W: Write> Writer for XmlWriter<W> {
 
     fn write_end_collection(&mut self) -> Result<(), Error> {
         self.write_event(|this| {
+            let ident = if this.stack.len() <= 1 { "dict" } else { "d" };
             match this.pending_collection.take() {
                 Some(PendingCollection::Dictionary) => {
                     this.xml_writer
-                        .write_event(XmlEvent::Empty(BytesStart::new("d")))?;
+                        .write_event(XmlEvent::Empty(BytesStart::new(ident)))?;
                     this.expecting_key = this.stack.last() == Some(&Element::Dictionary);
                     return Ok(());
                 }
@@ -180,7 +181,7 @@ impl<W: Write> Writer for XmlWriter<W> {
             };
             match (this.stack.pop(), this.expecting_key) {
                 (Some(Element::Dictionary), true) => {
-                    this.end_element("d")?;
+                    this.end_element(ident)?;
                 }
                 (Some(Element::Dictionary), false) | (None, _) => {
                     return Err(ErrorKind::UnexpectedEventType {
@@ -277,7 +278,7 @@ mod tests {
         let expected = "<?xml version=\"1.0\" encoding=\"UTF-8\"?>
 <!DOCTYPE plist PUBLIC \"-//Apple//DTD PLIST 1.0//EN\" \"http://www.apple.com/DTDs/PropertyList-1.0.dtd\">
 <plist version=\"1.0\">
-<d>
+<dict>
 \t<k>Author</k>
 \t<s>William Shakespeare</s>
 \t<k>Death</k>
@@ -294,7 +295,7 @@ mod tests {
 \t<t/>
 \t<k>IsNotFalse</k>
 \t<f/>
-</d>
+</dict>
 </plist>";
 
         let actual = events_to_xml(plist, XmlWriteOptions::default());
@@ -314,10 +315,10 @@ mod tests {
         let expected = "<?xml version=\"1.0\" encoding=\"UTF-8\"?>
 <!DOCTYPE plist PUBLIC \"-//Apple//DTD PLIST 1.0//EN\" \"http://www.apple.com/DTDs/PropertyList-1.0.dtd\">
 <plist version=\"1.0\">
-<d>
+<dict>
 ...<k>Test</k>
 ...<t/>
-</d>
+</dict>
 </plist>";
 
         let actual = events_to_xml(plist, XmlWriteOptions::default().indent(b'.', 3));
@@ -334,10 +335,10 @@ mod tests {
             Event::EndCollection,
         ];
 
-        let expected = "<d>
+        let expected = "<dict>
 \t<k>Test</k>
 \t<t/>
-</d>";
+</dict>";
 
         let actual = events_to_xml(plist, XmlWriteOptions::default().root_element(false));
 

@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
-<d>
+<dict>
 	<k>Author</k>
 	<s>William Shakespeare</s>
 	<k>Death</k>
@@ -20,5 +20,5 @@
     <t/>
     <k>IsNotFalse</k>
     <f/>
-</d>
+</dict>
 </plist>

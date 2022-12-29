@@ -135,7 +135,7 @@ fn dog() {
         Event::String("".into()),
         Event::String("b".into()),
         Event::Integer(12.into()),
-        Event::String("d".into()),
+        Event::String("c".into()),
         Event::Uid(Uid::new(42)),
         Event::EndCollection,
         Event::EndCollection,
@@ -497,7 +497,7 @@ fn dictionary_deserialize_dictionary_in_struct() {
         <?xml version="1.0" encoding="UTF-8"?>
         <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
         <plist version="1.0">
-        <d>
+        <dict>
             <k>color</k>
             <s>1,0.75,0,0.7</s>
             <k>lib</k>
@@ -505,7 +505,7 @@ fn dictionary_deserialize_dictionary_in_struct() {
             <k>com.typemytype.robofont.segmentType</k>
             <s>curve</s>
             </d>
-        </d>
+        </dict>
         </plist>
         "#.as_bytes()).unwrap();
 
@@ -548,7 +548,7 @@ fn dictionary_serialize_xml() {
     let comparison = "<?xml version=\"1.0\" encoding=\"UTF-8\"?>
 <!DOCTYPE plist PUBLIC \"-//Apple//DTD PLIST 1.0//EN\" \"http://www.apple.com/DTDs/PropertyList-1.0.dtd\">
 <plist version=\"1.0\">
-<d>
+<dict>
 \t<k>ADictionary</k>
 \t<d>
 \t\t<k>FirstKey</k>
@@ -562,7 +562,7 @@ fn dictionary_serialize_xml() {
 \t<t/>
 \t<k>AFalseBoolean</k>
 \t<f/>
-</d>
+</dict>
 </plist>";
 
     assert_eq!(xml, comparison);

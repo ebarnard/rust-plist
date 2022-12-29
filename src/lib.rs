@@ -38,7 +38,7 @@
 //!     copies_sold: u64,
 //! }
 //!
-//! let book: Book = plist::from_file("tests/data/book.plist")
+//! let book: Book = gd_plist::from_file("tests/data/book.plist")
 //!     .expect("failed to read book.plist");
 //!
 //! assert_eq!(book.title, "Great Expectations");
