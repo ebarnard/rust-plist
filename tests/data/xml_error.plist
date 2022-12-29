@@ -2,16 +2,17 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
-	<key>Author</key>
-	<string>William Shakespeare</string>
-	<key>Lines</key>
-	<array>
-		<string>It is a tale told by an idiot,</string>
-		<string>Full of sound and fury, signifying nothing.</string>
-	</array>
-	<key>Death</key>
-	<integer>1564</integer>
-	<key>Height</key>
-	<real>1.6</real>
-	<key>Data</ke
+	<k>Author</k>
+	<s>William Shakespeare</s>
+	<k>Lines</k>
+	<!-- "array" is not used by the gd format -->
+	<!-- <array> -->
+	<!-- 	<s>It is a tale told by an idiot,</s> -->
+	<!-- 	<s>Full of sound and fury, signifying nothing.</s> -->
+	<!-- </array> -->
+	<k>Death</k>
+	<i>1564</i>
+	<k>Height</k>
+	<r>1.6</r>
+	<k>Data</ke
 	BADNESS

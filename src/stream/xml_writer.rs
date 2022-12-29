@@ -7,7 +7,8 @@ use std::io::Write;
 use crate::{
     error::{self, Error, ErrorKind, EventKind},
     stream::{Writer, XmlWriteOptions},
-    Date, Integer, Uid,
+    // Date, Integer, Uid,
+    Integer, Uid,
 };
 
 static XML_PROLOGUE: &[u8] = br#"<?xml version="1.0" encoding="UTF-8"?>
@@ -18,7 +19,7 @@ static XML_PROLOGUE: &[u8] = br#"<?xml version="1.0" encoding="UTF-8"?>
 #[derive(PartialEq)]
 enum Element {
     Dictionary,
-    Array,
+    // Array,
 }
 
 pub struct XmlWriter<W: Write> {
@@ -31,7 +32,7 @@ pub struct XmlWriter<W: Write> {
 }
 
 enum PendingCollection {
-    Array,
+    // Array,
     Dictionary,
 }
 
@@ -147,19 +148,20 @@ impl<W: Write> XmlWriter<W> {
     }
 
     fn handle_pending_collection(&mut self) -> Result<(), Error> {
-        if let Some(PendingCollection::Array) = self.pending_collection {
-            self.pending_collection = None;
-
-            self.write_value_event(EventKind::StartArray, |this| {
-                this.start_element("array")?;
-                this.stack.push(Element::Array);
-                Ok(())
-            })
-        } else if let Some(PendingCollection::Dictionary) = self.pending_collection {
+        // if let Some(PendingCollection::Array) = self.pending_collection {
+        //     self.pending_collection = None;
+        //
+        //     self.write_value_event(EventKind::StartArray, |this| {
+        //         this.start_element("array")?;
+        //         this.stack.push(Element::Array);
+        //         Ok(())
+        //     })
+        // } else
+        if let Some(PendingCollection::Dictionary) = self.pending_collection {
             self.pending_collection = None;
 
             self.write_value_event(EventKind::StartDictionary, |this| {
-                this.start_element("dict")?;
+                this.start_element("d")?;
                 this.stack.push(Element::Dictionary);
                 this.expecting_key = true;
                 Ok(())
@@ -171,11 +173,11 @@ impl<W: Write> XmlWriter<W> {
 }
 
 impl<W: Write> Writer for XmlWriter<W> {
-    fn write_start_array(&mut self, _len: Option<u64>) -> Result<(), Error> {
-        self.handle_pending_collection()?;
-        self.pending_collection = Some(PendingCollection::Array);
-        Ok(())
-    }
+    // fn write_start_array(&mut self, _len: Option<u64>) -> Result<(), Error> {
+    //     self.handle_pending_collection()?;
+    //     self.pending_collection = Some(PendingCollection::Array);
+    //     Ok(())
+    // }
 
     fn write_start_dictionary(&mut self, _len: Option<u64>) -> Result<(), Error> {
         self.handle_pending_collection()?;
@@ -186,15 +188,15 @@ impl<W: Write> Writer for XmlWriter<W> {
     fn write_end_collection(&mut self) -> Result<(), Error> {
         self.write_event(|this| {
             match this.pending_collection.take() {
-                Some(PendingCollection::Array) => {
-                    this.xml_writer
-                        .write_event(XmlEvent::Empty(BytesStart::new("array")))?;
-                    this.expecting_key = this.stack.last() == Some(&Element::Dictionary);
-                    return Ok(());
-                }
+                // Some(PendingCollection::Array) => {
+                //     this.xml_writer
+                //         .write_event(XmlEvent::Empty(BytesStart::new("array")))?;
+                //     this.expecting_key = this.stack.last() == Some(&Element::Dictionary);
+                //     return Ok(());
+                // }
                 Some(PendingCollection::Dictionary) => {
                     this.xml_writer
-                        .write_event(XmlEvent::Empty(BytesStart::new("dict")))?;
+                        .write_event(XmlEvent::Empty(BytesStart::new("d")))?;
                     this.expecting_key = this.stack.last() == Some(&Element::Dictionary);
                     return Ok(());
                 }
@@ -202,11 +204,11 @@ impl<W: Write> Writer for XmlWriter<W> {
             };
             match (this.stack.pop(), this.expecting_key) {
                 (Some(Element::Dictionary), true) => {
-                    this.end_element("dict")?;
+                    this.end_element("d")?;
                 }
-                (Some(Element::Array), _) => {
-                    this.end_element("array")?;
-                }
+                // (Some(Element::Array), _) => {
+                //     this.end_element("array")?;
+                // }
                 (Some(Element::Dictionary), false) | (None, _) => {
                     return Err(ErrorKind::UnexpectedEventType {
                         expected: EventKind::ValueOrStartCollection,
@@ -222,35 +224,35 @@ impl<W: Write> Writer for XmlWriter<W> {
 
     fn write_boolean(&mut self, value: bool) -> Result<(), Error> {
         self.write_value_event(EventKind::Boolean, |this| {
-            let value = if value { "true" } else { "false" };
+            let value = if value { "t" } else { "f" };
             Ok(this
                 .xml_writer
                 .write_event(XmlEvent::Empty(BytesStart::new(value)))?)
         })
     }
 
-    fn write_data(&mut self, value: &[u8]) -> Result<(), Error> {
-        self.write_value_event(EventKind::Data, |this| {
-            let base64_data = base64_encode_plist(value, this.stack.len());
-            this.write_element_and_value("data", &base64_data)
-        })
-    }
-
-    fn write_date(&mut self, value: Date) -> Result<(), Error> {
-        self.write_value_event(EventKind::Date, |this| {
-            this.write_element_and_value("date", &value.to_xml_format())
-        })
-    }
+    // fn write_data(&mut self, value: &[u8]) -> Result<(), Error> {
+    //     self.write_value_event(EventKind::Data, |this| {
+    //         let base64_data = base64_encode_plist(value, this.stack.len());
+    //         this.write_element_and_value("data", &base64_data)
+    //     })
+    // }
+    //
+    // fn write_date(&mut self, value: Date) -> Result<(), Error> {
+    //     self.write_value_event(EventKind::Date, |this| {
+    //         this.write_element_and_value("date", &value.to_xml_format())
+    //     })
+    // }
 
     fn write_integer(&mut self, value: Integer) -> Result<(), Error> {
         self.write_value_event(EventKind::Integer, |this| {
-            this.write_element_and_value("integer", &value.to_string())
+            this.write_element_and_value("i", &value.to_string())
         })
     }
 
     fn write_real(&mut self, value: f64) -> Result<(), Error> {
         self.write_value_event(EventKind::Real, |this| {
-            this.write_element_and_value("real", &value.to_string())
+            this.write_element_and_value("r", &value.to_string())
         })
     }
 
@@ -258,10 +260,10 @@ impl<W: Write> Writer for XmlWriter<W> {
         self.handle_pending_collection()?;
         self.write_event(|this| {
             if this.expecting_key {
-                this.write_element_and_value("key", value)?;
+                this.write_element_and_value("k", value)?;
                 this.expecting_key = false;
             } else {
-                this.write_element_and_value("string", value)?;
+                this.write_element_and_value("s", value)?;
                 this.expecting_key = this.stack.last() == Some(&Element::Dictionary);
             }
             Ok(())
@@ -282,50 +284,50 @@ impl From<XmlWriterError> for Error {
     }
 }
 
-fn base64_encode_plist(data: &[u8], indent: usize) -> String {
-    // XML plist data elements are always formatted by apple tools as
-    // <data>
-    // AAAA..AA (68 characters per line)
-    // </data>
-    // Allocate space for base 64 string and line endings up front
-    const LINE_LEN: usize = 68;
-    let mut line_ending = Vec::with_capacity(1 + indent);
-    line_ending.push(b'\n');
-    (0..indent).for_each(|_| line_ending.push(b'\t'));
-
-    // Find the max length of `data` encoded as a base 64 string with padding
-    let base64_max_string_len = data.len() * 4 / 3 + 4;
-
-    // Find the max length of the formatted base 64 string as: max length of the base 64 string
-    // + line endings and indents at the start of the string and after every line
-    let base64_max_string_len_with_formatting =
-        base64_max_string_len + (2 + base64_max_string_len / LINE_LEN) * line_ending.len();
-
-    let mut output = vec![0; base64_max_string_len_with_formatting];
-
-    // Start output with a line ending and indent
-    output[..line_ending.len()].copy_from_slice(&line_ending);
-
-    // Encode `data` as a base 64 string
-    let base64_string_len =
-        base64::encode_config_slice(data, base64::STANDARD, &mut output[line_ending.len()..]);
-
-    // Line wrap the base 64 encoded string
-    let line_wrap_len = line_wrap::line_wrap(
-        &mut output[line_ending.len()..],
-        base64_string_len,
-        LINE_LEN,
-        &line_wrap::SliceLineEnding::new(&line_ending),
-    );
-
-    // Add the final line ending and indent
-    output[line_ending.len() + base64_string_len + line_wrap_len..][..line_ending.len()]
-        .copy_from_slice(&line_ending);
-
-    // Ensure output is the correct length
-    output.truncate(base64_string_len + line_wrap_len + 2 * line_ending.len());
-    String::from_utf8(output).expect("base 64 string must be valid utf8")
-}
+// fn base64_encode_plist(data: &[u8], indent: usize) -> String {
+//     // XML plist data elements are always formatted by apple tools as
+//     // <data>
+//     // AAAA..AA (68 characters per line)
+//     // </data>
+//     // Allocate space for base 64 string and line endings up front
+//     const LINE_LEN: usize = 68;
+//     let mut line_ending = Vec::with_capacity(1 + indent);
+//     line_ending.push(b'\n');
+//     (0..indent).for_each(|_| line_ending.push(b'\t'));
+//
+//     // Find the max length of `data` encoded as a base 64 string with padding
+//     let base64_max_string_len = data.len() * 4 / 3 + 4;
+//
+//     // Find the max length of the formatted base 64 string as: max length of the base 64 string
+//     // + line endings and indents at the start of the string and after every line
+//     let base64_max_string_len_with_formatting =
+//         base64_max_string_len + (2 + base64_max_string_len / LINE_LEN) * line_ending.len();
+//
+//     let mut output = vec![0; base64_max_string_len_with_formatting];
+//
+//     // Start output with a line ending and indent
+//     output[..line_ending.len()].copy_from_slice(&line_ending);
+//
+//     // Encode `data` as a base 64 string
+//     let base64_string_len =
+//         base64::encode_config_slice(data, base64::STANDARD, &mut output[line_ending.len()..]);
+//
+//     // Line wrap the base 64 encoded string
+//     let line_wrap_len = line_wrap::line_wrap(
+//         &mut output[line_ending.len()..],
+//         base64_string_len,
+//         LINE_LEN,
+//         &line_wrap::SliceLineEnding::new(&line_ending),
+//     );
+//
+//     // Add the final line ending and indent
+//     output[line_ending.len() + base64_string_len + line_wrap_len..][..line_ending.len()]
+//         .copy_from_slice(&line_ending);
+//
+//     // Ensure output is the correct length
+//     output.truncate(base64_string_len + line_wrap_len + 2 * line_ending.len());
+//     String::from_utf8(output).expect("base 64 string must be valid utf8")
+// }
 
 #[cfg(test)]
 mod tests {
@@ -340,20 +342,20 @@ mod tests {
             Event::StartDictionary(None),
             Event::String("Author".into()),
             Event::String("William Shakespeare".into()),
-            Event::String("Lines".into()),
-            Event::StartArray(None),
-            Event::String("It is a tale told by an idiot,".into()),
-            Event::String("Full of sound and fury, signifying nothing.".into()),
-            Event::Data((0..128).collect::<Vec<_>>().into()),
-            Event::EndCollection,
+            // Event::String("Lines".into()),
+            // Event::StartArray(None),
+            // Event::String("It is a tale told by an idiot,".into()),
+            // Event::String("Full of sound and fury, signifying nothing.".into()),
+            // Event::Data((0..128).collect::<Vec<_>>().into()),
+            // Event::EndCollection,
             Event::String("Death".into()),
             Event::Integer(1564.into()),
             Event::String("Height".into()),
             Event::Real(1.60),
-            Event::String("Data".into()),
-            Event::Data(vec![0, 0, 0, 190, 0, 0, 0, 3, 0, 0, 0, 30, 0, 0, 0].into()),
-            Event::String("Birthdate".into()),
-            Event::Date(super::Date::from_xml_format("1981-05-16T11:32:06Z").unwrap()),
+            // Event::String("Data".into()),
+            // Event::Data(vec![0, 0, 0, 190, 0, 0, 0, 3, 0, 0, 0, 30, 0, 0, 0].into()),
+            // Event::String("Birthdate".into()),
+            // Event::Date(super::Date::from_xml_format("1981-05-16T11:32:06Z").unwrap()),
             Event::String("Comment".into()),
             Event::String("2 < 3".into()), // make sure characters are escaped
             Event::String("BiggestNumber".into()),
@@ -370,40 +372,24 @@ mod tests {
         let expected = "<?xml version=\"1.0\" encoding=\"UTF-8\"?>
 <!DOCTYPE plist PUBLIC \"-//Apple//DTD PLIST 1.0//EN\" \"http://www.apple.com/DTDs/PropertyList-1.0.dtd\">
 <plist version=\"1.0\">
-<dict>
-\t<key>Author</key>
-\t<string>William Shakespeare</string>
-\t<key>Lines</key>
-\t<array>
-\t\t<string>It is a tale told by an idiot,</string>
-\t\t<string>Full of sound and fury, signifying nothing.</string>
-\t\t<data>
-\t\tAAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8gISIjJCUmJygpKissLS4vMDEy
-\t\tMzQ1Njc4OTo7PD0+P0BBQkNERUZHSElKS0xNTk9QUVJTVFVWV1hZWltcXV5fYGFiY2Rl
-\t\tZmdoaWprbG1ub3BxcnN0dXZ3eHl6e3x9fn8=
-\t\t</data>
-\t</array>
-\t<key>Death</key>
-\t<integer>1564</integer>
-\t<key>Height</key>
-\t<real>1.6</real>
-\t<key>Data</key>
-\t<data>
-\tAAAAvgAAAAMAAAAeAAAA
-\t</data>
-\t<key>Birthdate</key>
-\t<date>1981-05-16T11:32:06Z</date>
-\t<key>Comment</key>
-\t<string>2 &lt; 3</string>
-\t<key>BiggestNumber</key>
-\t<integer>18446744073709551615</integer>
-\t<key>SmallestNumber</key>
-\t<integer>-9223372036854775808</integer>
-\t<key>IsTrue</key>
-\t<true/>
-\t<key>IsNotFalse</key>
-\t<false/>
-</dict>
+<d>
+\t<k>Author</k>
+\t<s>William Shakespeare</s>
+\t<k>Death</k>
+\t<i>1564</i>
+\t<k>Height</k>
+\t<r>1.6</r>
+\t<k>Comment</k>
+\t<s>2 &lt; 3</s>
+\t<k>BiggestNumber</k>
+\t<i>18446744073709551615</i>
+\t<k>SmallestNumber</k>
+\t<i>-9223372036854775808</i>
+\t<k>IsTrue</k>
+\t<t/>
+\t<k>IsNotFalse</k>
+\t<f/>
+</d>
 </plist>";
 
         let actual = events_to_xml(plist, XmlWriteOptions::default());
@@ -414,19 +400,23 @@ mod tests {
     #[test]
     fn custom_indent_string() {
         let plist = &[
-            Event::StartArray(None),
-            Event::String("It is a tale told by an idiot,".into()),
-            Event::String("Full of sound and fury, signifying nothing.".into()),
+            Event::StartDictionary(None),
+            Event::String("Test".into()),
+            Event::Boolean(true),
             Event::EndCollection,
+            // Event::StartArray(None),
+            // Event::String("It is a tale told by an idiot,".into()),
+            // Event::String("Full of sound and fury, signifying nothing.".into()),
+            // Event::EndCollection,
         ];
 
         let expected = "<?xml version=\"1.0\" encoding=\"UTF-8\"?>
 <!DOCTYPE plist PUBLIC \"-//Apple//DTD PLIST 1.0//EN\" \"http://www.apple.com/DTDs/PropertyList-1.0.dtd\">
 <plist version=\"1.0\">
-<array>
-...<string>It is a tale told by an idiot,</string>
-...<string>Full of sound and fury, signifying nothing.</string>
-</array>
+<d>
+...<k>Test</k>
+...<t/>
+</d>
 </plist>";
 
         let actual = events_to_xml(plist, XmlWriteOptions::default().indent(b'.', 3));
@@ -437,16 +427,20 @@ mod tests {
     #[test]
     fn no_root() {
         let plist = &[
-            Event::StartArray(None),
-            Event::String("It is a tale told by an idiot,".into()),
-            Event::String("Full of sound and fury, signifying nothing.".into()),
+            Event::StartDictionary(None),
+            Event::String("Test".into()),
+            Event::Boolean(true),
             Event::EndCollection,
+            // Event::StartArray(None),
+            // Event::String("It is a tale told by an idiot,".into()),
+            // Event::String("Full of sound and fury, signifying nothing.".into()),
+            // Event::EndCollection,
         ];
 
-        let expected = "<array>
-\t<string>It is a tale told by an idiot,</string>
-\t<string>Full of sound and fury, signifying nothing.</string>
-</array>";
+        let expected = "<d>
+\t<k>Test</k>
+\t<t/>
+</d>";
 
         let actual = events_to_xml(plist, XmlWriteOptions::default().root_element(false));
 

@@ -1,6 +1,7 @@
 use std::{error, fmt, io};
 
-use crate::{stream::Event, InvalidXmlDate};
+// use crate::{stream::Event, InvalidXmlDate};
+use crate::stream::Event;
 
 /// This type represents all possible errors that can occur when working with plist data.
 #[derive(Debug)]
@@ -32,28 +33,28 @@ pub(crate) enum ErrorKind {
     UnknownXmlElement,
     InvalidXmlSyntax,
     InvalidXmlUtf8,
-    InvalidDataString,
-    InvalidDateString,
+    // InvalidDataString,
+    // InvalidDateString,
     InvalidIntegerString,
     InvalidRealString,
     UidNotSupportedInXmlPlist,
 
-    // Binary format-specific errors
-    ObjectTooLarge,
-    InvalidMagic,
-    InvalidTrailerObjectOffsetSize, // the size of byte offsets to objects in the object table
-    InvalidTrailerObjectReferenceSize, // the size of indices into the object table
-    InvalidObjectLength,
-    ObjectReferenceTooLarge,
-    ObjectOffsetTooLarge,
-    RecursiveObject,
-    NullObjectUnimplemented,
-    FillObjectUnimplemented,
-    IntegerOutOfRange,
-    InfiniteOrNanDate,
+    // // Binary format-specific errors
+    // ObjectTooLarge,
+    // InvalidMagic,
+    // InvalidTrailerObjectOffsetSize, // the size of byte offsets to objects in the object table
+    // InvalidTrailerObjectReferenceSize, // the size of indices into the object table
+    // InvalidObjectLength,
+    // ObjectReferenceTooLarge,
+    // ObjectOffsetTooLarge,
+    // RecursiveObject,
+    // NullObjectUnimplemented,
+    // FillObjectUnimplemented,
+    // IntegerOutOfRange,
+    // InfiniteOrNanDate,
     InvalidUtf8String,
-    InvalidUtf16String,
-    UnknownObjectType(u8),
+    // InvalidUtf16String,
+    // UnknownObjectType(u8),
 
     Io(io::Error),
     #[cfg(feature = "serde")]
@@ -65,12 +66,12 @@ pub(crate) struct FilePosition(pub(crate) u64);
 
 #[derive(Copy, Clone, PartialEq, Eq, Debug)]
 pub(crate) enum EventKind {
-    StartArray,
+    // StartArray,
     StartDictionary,
     EndCollection,
     Boolean,
-    Data,
-    Date,
+    // Data,
+    // Date,
     Integer,
     Real,
     String,
@@ -137,11 +138,11 @@ impl fmt::Display for FilePosition {
     }
 }
 
-impl From<InvalidXmlDate> for Error {
-    fn from(error: InvalidXmlDate) -> Self {
-        ErrorKind::from(error).without_position()
-    }
-}
+// impl From<InvalidXmlDate> for Error {
+//     fn from(error: InvalidXmlDate) -> Self {
+//         ErrorKind::from(error).without_position()
+//     }
+// }
 
 impl ErrorKind {
     pub fn with_byte_offset(self, offset: u64) -> Error {
@@ -167,21 +168,21 @@ impl ErrorKind {
     }
 }
 
-impl From<InvalidXmlDate> for ErrorKind {
-    fn from(_: InvalidXmlDate) -> Self {
-        ErrorKind::InvalidDateString
-    }
-}
+// impl From<InvalidXmlDate> for ErrorKind {
+//     fn from(_: InvalidXmlDate) -> Self {
+//         ErrorKind::InvalidDateString
+//     }
+// }
 
 impl EventKind {
     pub fn of_event(event: &Event) -> EventKind {
         match event {
-            Event::StartArray(_) => EventKind::StartArray,
+            // Event::StartArray(_) => EventKind::StartArray,
             Event::StartDictionary(_) => EventKind::StartDictionary,
             Event::EndCollection => EventKind::EndCollection,
             Event::Boolean(_) => EventKind::Boolean,
-            Event::Data(_) => EventKind::Data,
-            Event::Date(_) => EventKind::Date,
+            // Event::Data(_) => EventKind::Data,
+            // Event::Date(_) => EventKind::Date,
             Event::Integer(_) => EventKind::Integer,
             Event::Real(_) => EventKind::Real,
             Event::String(_) => EventKind::String,
@@ -193,12 +194,12 @@ impl EventKind {
 impl fmt::Display for EventKind {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
-            EventKind::StartArray => "StartArray",
+            // EventKind::StartArray => "StartArray",
             EventKind::StartDictionary => "StartDictionary",
             EventKind::EndCollection => "EndCollection",
             EventKind::Boolean => "Boolean",
-            EventKind::Data => "Data",
-            EventKind::Date => "Date",
+            // EventKind::Data => "Data",
+            // EventKind::Date => "Date",
             EventKind::Integer => "Integer",
             EventKind::Real => "Real",
             EventKind::String => "String",
