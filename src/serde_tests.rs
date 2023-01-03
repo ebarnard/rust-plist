@@ -24,6 +24,11 @@ impl VecWriter {
 }
 
 impl Writer for VecWriter {
+    fn write_start_array(&mut self, len: Option<u64>) -> Result<(), Error> {
+        self.events.push(Event::StartArray(len));
+        Ok(())
+    }
+
     fn write_start_dictionary(&mut self, len: Option<u64>) -> Result<(), Error> {
         self.events.push(Event::StartDictionary(len));
         Ok(())
@@ -95,19 +100,26 @@ where
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 enum Animal {
     Cow,
-    Dog(Dog),
+    Dog(DogOuter),
+    Frog(Result<String, bool>, Option<Vec<f64>>),
     Cat {
         age: Integer,
         name: String,
-        firmware: Option<u8>,
+        firmware: Option<Vec<u8>>,
     },
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
-struct Dog {
+struct DogOuter {
+    inner: Vec<DogInner>,
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+struct DogInner {
     a: (),
     b: usize,
-    c: Option<Uid>,
+    c: Vec<String>,
+    d: Option<Uid>,
 }
 
 #[test]
@@ -121,22 +133,36 @@ fn cow() {
 
 #[test]
 fn dog() {
-    let dog = Animal::Dog(Dog {
-        a: (),
-        b: 12,
-        c: Some(Uid::new(42)),
+    let dog = Animal::Dog(DogOuter {
+        inner: vec![DogInner {
+            a: (),
+            b: 12,
+            c: vec!["a".to_string(), "b".to_string()],
+            d: Some(Uid::new(42)),
+        }],
     });
 
     let comparison = &[
         Event::StartDictionary(Some(1)),
         Event::String("Dog".into()),
         Event::StartDictionary(None),
+        Event::String("inner".into()),
+        Event::StartArray(Some(1)),
+        Event::StartDictionary(None),
         Event::String("a".into()),
         Event::String("".into()),
         Event::String("b".into()),
         Event::Integer(12.into()),
         Event::String("c".into()),
+        Event::StartArray(Some(2)),
+        Event::String("a".into()),
+        Event::String("b".into()),
+        Event::EndCollection,
+        Event::String("d".into()),
         Event::Uid(Uid::new(42)),
+        Event::String("e".into()),
+        Event::EndCollection,
+        Event::EndCollection,
         Event::EndCollection,
         Event::EndCollection,
     ];
@@ -145,11 +171,43 @@ fn dog() {
 }
 
 #[test]
+fn frog() {
+    let frog = Animal::Frog(
+        Ok("hello".to_owned()),
+        Some(vec![1.0, 2.0, std::f64::consts::PI, 0.000000001, 1.27e31]),
+    );
+
+    let comparison = &[
+        Event::StartDictionary(Some(1)),
+        Event::String("Frog".into()),
+        Event::StartArray(Some(2)),
+        Event::StartDictionary(Some(1)),
+        Event::String("Ok".into()),
+        Event::String("hello".into()),
+        Event::EndCollection,
+        Event::StartDictionary(Some(1)),
+        Event::String("Some".into()),
+        Event::StartArray(Some(5)),
+        Event::Real(1.0),
+        Event::Real(2.0),
+        Event::Real(std::f64::consts::PI),
+        Event::Real(0.000000001),
+        Event::Real(1.27e31),
+        Event::EndCollection,
+        Event::EndCollection,
+        Event::EndCollection,
+        Event::EndCollection,
+    ];
+
+    assert_roundtrip(frog, Some(comparison));
+}
+
+#[test]
 fn cat_with_firmware() {
     let cat = Animal::Cat {
         age: 12.into(),
         name: "Paws".to_owned(),
-        firmware: Some(8),
+        firmware: Some(vec![0, 1, 2, 3, 4, 5, 6, 7, 8]),
     };
 
     let comparison = &[
@@ -161,7 +219,17 @@ fn cat_with_firmware() {
         Event::String("name".into()),
         Event::String("Paws".into()),
         Event::String("firmware".into()),
+        Event::StartArray(Some(9)),
+        Event::Integer(0.into()),
+        Event::Integer(1.into()),
+        Event::Integer(2.into()),
+        Event::Integer(3.into()),
+        Event::Integer(4.into()),
+        Event::Integer(5.into()),
+        Event::Integer(6.into()),
+        Event::Integer(7.into()),
         Event::Integer(8.into()),
+        Event::EndCollection,
         Event::EndCollection,
         Event::EndCollection,
     ];
@@ -190,6 +258,27 @@ fn cat_without_firmware() {
     ];
 
     assert_roundtrip(cat, Some(comparison));
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+struct NewtypeStruct(NewtypeInner);
+
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+struct NewtypeInner(u8, u8, u8);
+
+#[test]
+fn newtype_struct() {
+    let newtype = NewtypeStruct(NewtypeInner(34, 32, 13));
+
+    let comparison = &[
+        Event::StartArray(Some(3)),
+        Event::Integer(34.into()),
+        Event::Integer(32.into()),
+        Event::Integer(13.into()),
+        Event::EndCollection,
+    ];
+
+    assert_roundtrip(newtype, Some(comparison));
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
@@ -355,15 +444,66 @@ fn option_dictionary_keys() {
 }
 
 #[test]
+fn option_array() {
+    let obj = vec![None, Some(None), Some(Some(144))];
+
+    let comparison = &[
+        Event::StartArray(Some(3)),
+        Event::StartDictionary(Some(1)),
+        Event::String("None".into()),
+        Event::String("".into()),
+        Event::EndCollection,
+        Event::StartDictionary(Some(1)),
+        Event::String("Some".into()),
+        Event::StartDictionary(Some(1)),
+        Event::String("None".into()),
+        Event::String("".into()),
+        Event::EndCollection,
+        Event::EndCollection,
+        Event::StartDictionary(Some(1)),
+        Event::String("Some".into()),
+        Event::StartDictionary(Some(1)),
+        Event::String("Some".into()),
+        Event::Integer(144.into()),
+        Event::EndCollection,
+        Event::EndCollection,
+        Event::EndCollection,
+    ];
+
+    assert_roundtrip(obj, Some(comparison));
+}
+
+#[test]
 fn enum_variant_types() {
     #[derive(Debug, Deserialize, Eq, PartialEq, Serialize)]
     enum Foo {
         Unit,
+        Newtype(u32),
+        Tuple(u32, String),
         Struct { v: u32, s: String },
     }
 
     let expected = &[Event::String("Unit".into())];
     assert_roundtrip(Foo::Unit, Some(expected));
+
+    let expected = &[
+        Event::StartDictionary(Some(1)),
+        Event::String("Newtype".into()),
+        Event::Integer(42.into()),
+        Event::EndCollection,
+    ];
+    assert_roundtrip(Foo::Newtype(42), Some(expected));
+
+    let expected = &[
+        Event::StartDictionary(Some(1)),
+        Event::String("Tuple".into()),
+        Event::StartArray(Some(2)),
+        Event::Integer(42.into()),
+        Event::String("bar".into()),
+        Event::EndCollection,
+        Event::EndCollection,
+    ];
+    assert_roundtrip(Foo::Tuple(42, "bar".into()), Some(expected));
 
     let expected = &[
         Event::StartDictionary(Some(1)),
@@ -429,6 +569,19 @@ fn deserialize_dictionary_xml() {
 // deserialize_dictionary_binary(), which load files with different formats
 // but the same data elements.
 fn check_common_plist(dict: &Dictionary) {
+    // Array elements
+
+    let lines = dict.get("Lines").unwrap().as_array().unwrap();
+    assert_eq!(lines.len(), 2);
+    assert_eq!(
+        lines[0].as_string().unwrap(),
+        "It is a tale told by an idiot,"
+    );
+    assert_eq!(
+        lines[1].as_string().unwrap(),
+        "Full of sound and fury, signifying nothing."
+    );
+
     // Dictionary
     //
     // There is no embedded dictionary in this plist.  See
@@ -502,8 +655,8 @@ fn dictionary_deserialize_dictionary_in_struct() {
             <s>1,0.75,0,0.7</s>
             <k>lib</k>
             <d>
-            <k>com.typemytype.robofont.segmentType</k>
-            <s>curve</s>
+                <k>com.typemytype.robofont.segmentType</k>
+                <s>curve</s>
             </d>
         </dict>
         </plist>
@@ -534,6 +687,13 @@ fn dictionary_serialize_xml() {
 
     // Top-level dictionary.
     let mut dict = Dictionary::new();
+    dict.insert(
+        "AnArray".to_owned(),
+        Value::Array(vec![
+            Value::String("Hello, world!".to_owned()),
+            Value::Integer(Integer::from(345)),
+        ]),
+    );
     dict.insert("ADictionary".to_owned(), Value::Dictionary(inner_dict));
     dict.insert("AnInteger".to_owned(), Value::Integer(Integer::from(123)));
     dict.insert("ATrueBoolean".to_owned(), Value::Boolean(true));
@@ -549,6 +709,15 @@ fn dictionary_serialize_xml() {
 <!DOCTYPE plist PUBLIC \"-//Apple//DTD PLIST 1.0//EN\" \"http://www.apple.com/DTDs/PropertyList-1.0.dtd\">
 <plist version=\"1.0\">
 <dict>
+\t<k>AnArray</k>
+\t<d>
+\t\t<k>_isArr</k>
+\t\t<t/>
+\t\t<k>k_0</k>
+\t\t<s>Hello, world!</s>
+\t\t<k>k_1</k>
+\t\t<i>345</i>
+\t</d>
 \t<k>ADictionary</k>
 \t<d>
 \t\t<k>FirstKey</k>
@@ -562,6 +731,37 @@ fn dictionary_serialize_xml() {
 \t<t/>
 \t<k>AFalseBoolean</k>
 \t<f/>
+</dict>
+</plist>";
+
+    assert_eq!(xml, comparison);
+}
+
+#[test]
+fn empty_array_and_dictionary_serialize_to_xml() {
+    #[derive(Serialize, Default)]
+    struct Empty {
+        vec: Vec<String>,
+        map: BTreeMap<String, String>,
+    }
+
+    // Serialize dictionary as an XML plist.
+    let mut buf = Cursor::new(Vec::new());
+    crate::to_writer_xml(&mut buf, &Empty::default()).unwrap();
+    let buf = buf.into_inner();
+    let xml = std::str::from_utf8(&buf).unwrap();
+
+    let comparison = "<?xml version=\"1.0\" encoding=\"UTF-8\"?>
+<!DOCTYPE plist PUBLIC \"-//Apple//DTD PLIST 1.0//EN\" \"http://www.apple.com/DTDs/PropertyList-1.0.dtd\">
+<plist version=\"1.0\">
+<dict>
+\t<k>vec</k>
+\t<d>
+\t\t<k>_isArr</k>
+\t\t<t/>
+\t</d>
+\t<k>map</k>
+\t<d/>
 </dict>
 </plist>";
 

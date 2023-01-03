@@ -258,6 +258,11 @@ mod tests {
             Event::StartDictionary(None),
             Event::String("Author".into()),
             Event::String("William Shakespeare".into()),
+            Event::String("Lines".into()),
+            Event::StartArray(None),
+            Event::String("It is a tale told by an idiot,".into()),
+            Event::String("Full of sound and fury, signifying nothing.".into()),
+            Event::EndCollection,
             Event::String("Death".into()),
             Event::Integer(1564.into()),
             Event::String("Height".into()),
@@ -281,6 +286,15 @@ mod tests {
 <dict>
 \t<k>Author</k>
 \t<s>William Shakespeare</s>
+\t<k>Lines</k>
+\t<d>
+\t\t<k>_isArr</k>
+\t\t<t/>
+\t\t<k>k_0</k>
+\t\t<s>It is a tale told by an idiot,</s>
+\t\t<k>k_1</k>
+\t\t<s>Full of sound and fury, signifying nothing.</s>
+\t</d>
 \t<k>Death</k>
 \t<i>1564</i>
 \t<k>Height</k>
@@ -307,8 +321,11 @@ mod tests {
     fn custom_indent_string() {
         let plist = &[
             Event::StartDictionary(None),
-            Event::String("Test".into()),
-            Event::Boolean(true),
+            Event::String("Lines".into()),
+            Event::StartArray(None),
+            Event::String("It is a tale told by an idiot,".into()),
+            Event::String("Full of sound and fury, signifying nothing.".into()),
+            Event::EndCollection,
             Event::EndCollection,
         ];
 
@@ -316,8 +333,15 @@ mod tests {
 <!DOCTYPE plist PUBLIC \"-//Apple//DTD PLIST 1.0//EN\" \"http://www.apple.com/DTDs/PropertyList-1.0.dtd\">
 <plist version=\"1.0\">
 <dict>
-...<k>Test</k>
-...<t/>
+...<k>Lines</k>
+...<d>
+......<k>_isArr</k>
+......<t/>
+......<k>k_0</k>
+......<s>It is a tale told by an idiot,</s>
+......<k>k_1</k>
+......<s>Full of sound and fury, signifying nothing.</s>
+...</d>
 </dict>
 </plist>";
 
@@ -330,14 +354,24 @@ mod tests {
     fn no_root() {
         let plist = &[
             Event::StartDictionary(None),
-            Event::String("Test".into()),
-            Event::Boolean(true),
+            Event::String("Lines".into()),
+            Event::StartArray(None),
+            Event::String("It is a tale told by an idiot,".into()),
+            Event::String("Full of sound and fury, signifying nothing.".into()),
+            Event::EndCollection,
             Event::EndCollection,
         ];
 
         let expected = "<dict>
-\t<k>Test</k>
-\t<t/>
+\t<k>Lines</k>
+\t<d>
+\t\t<k>_isArr</k>
+\t\t<t/>
+\t\t<k>k_0</k>
+\t\t<s>It is a tale told by an idiot,</s>
+\t\t<k>k_1</k>
+\t\t<s>Full of sound and fury, signifying nothing\t</s>
+\t</d>
 </dict>";
 
         let actual = events_to_xml(plist, XmlWriteOptions::default().root_element(false));

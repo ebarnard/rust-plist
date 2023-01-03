@@ -624,10 +624,10 @@ mod tests {
 
     #[test]
     fn value_accessors() {
-        // let vec = vec![Value::Real(0.0)];
-        // let mut array = Value::Array(vec.clone());
-        // assert_eq!(array.as_array(), Some(&vec.clone()));
-        // assert_eq!(array.as_array_mut(), Some(&mut vec.clone()));
+        let vec = vec![Value::Real(0.0)];
+        let mut array = Value::Array(vec.clone());
+        assert_eq!(array.as_array(), Some(&vec.clone()));
+        assert_eq!(array.as_array_mut(), Some(&mut vec.clone()));
 
         let mut map = Dictionary::new();
         map.insert("key1".to_owned(), Value::String("value1".to_owned()));
@@ -636,16 +636,6 @@ mod tests {
         assert_eq!(dict.as_dictionary_mut(), Some(&mut map.clone()));
 
         assert_eq!(Value::Boolean(true).as_boolean(), Some(true));
-
-        // let slice: &[u8] = &[1, 2, 3];
-        // assert_eq!(Value::Data(slice.to_vec()).as_data(), Some(slice));
-        // assert_eq!(
-        //     Value::Data(slice.to_vec()).into_data(),
-        //     Some(slice.to_vec())
-        // );
-
-        // let date: Date = SystemTime::now().into();
-        // assert_eq!(Value::Date(date.clone()).as_date(), Some(date));
 
         assert_eq!(Value::Real(0.0).as_real(), Some(0.0));
         assert_eq!(Value::Integer(1.into()).as_signed_integer(), Some(1));
@@ -669,13 +659,11 @@ mod tests {
             StartDictionary(None),
             String("Author".into()),
             String("William Shakespeare".into()),
-            // String("Lines".into()),
-            // StartArray(None),
-            // String("It is a tale told by an idiot,".into()),
-            // String("Full of sound and fury, signifying nothing.".into()),
-            // EndCollection,
-            // String("Birthdate".into()),
-            // Integer(1564.into()),
+            String("Lines".into()),
+            StartArray(None),
+            String("It is a tale told by an idiot,".into()),
+            String("Full of sound and fury, signifying nothing.".into()),
+            EndCollection,
             String("Height".into()),
             Real(1.60),
             EndCollection,
@@ -685,18 +673,17 @@ mod tests {
         let plist = builder.build();
 
         // Expected output
-        // let lines = vec![
-        //     Value::String("It is a tale told by an idiot,".to_owned()),
-        //     Value::String("Full of sound and fury, signifying nothing.".to_owned()),
-        // ];
+        let lines = vec![
+            Value::String("It is a tale told by an idiot,".to_owned()),
+            Value::String("Full of sound and fury, signifying nothing.".to_owned()),
+        ];
 
         let mut dict = Dictionary::new();
         dict.insert(
             "Author".to_owned(),
             Value::String("William Shakespeare".to_owned()),
         );
-        // dict.insert("Lines".to_owned(), Value::Array(lines));
-        // dict.insert("Birthdate".to_owned(), Value::Integer(1564.into()));
+        dict.insert("Lines".to_owned(), Value::Array(lines));
         dict.insert("Height".to_owned(), Value::Real(1.60));
 
         assert_eq!(plist.unwrap(), Value::Dictionary(dict));

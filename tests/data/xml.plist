@@ -4,6 +4,15 @@
 <dict>
 	<k>Author</k>
 	<s>William Shakespeare</s>
+    <k>Lines</k>
+    <d>
+        <k>_isArr</k>
+        <t/>
+        <k>k_0</k>
+        <s>It is a tale told by an idiot,</s>
+        <k>k_1</k>
+        <s>Full of sound and fury, signifying nothing.</s>
+    </d>
 	<k>Death</k>
 	<i>1564</i>
 	<k>Height</k>
