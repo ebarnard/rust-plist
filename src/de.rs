@@ -111,6 +111,12 @@ where
         V: de::Visitor<'de>,
     {
         match try_next!(self.events.next()) {
+            Event::StartArray(len) => {
+                let len = len.and_then(u64_to_usize);
+                let ret = visitor.visit_seq(MapAndSeqAccess::new(self, false, len))?;
+                expect!(self.events.next(), EventKind::EndCollection);
+                Ok(ret)
+            }
             Event::StartDictionary(len) => {
                 let len = len.and_then(u64_to_usize);
                 let ret = visitor.visit_map(MapAndSeqAccess::new(self, false, len))?;

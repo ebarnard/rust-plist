@@ -7,13 +7,14 @@ use std::{
 use crate::{
     error::{self, Error, ErrorKind, EventKind},
     stream::{Event, Events, OwnedEvent, Reader, Writer, XmlReader, XmlWriteOptions, XmlWriter},
-    Dictionary, Integer, Uid,
+    u64_to_usize, Dictionary, Integer, Uid,
 };
 
 /// Represents any plist value.
 #[derive(Clone, Debug, PartialEq)]
 #[non_exhaustive]
 pub enum Value {
+    Array(Vec<Value>),
     Dictionary(Dictionary),
     Boolean(bool),
     Real(f64),
@@ -128,6 +129,39 @@ impl Value {
     #[cfg(feature = "enable_unstable_features_that_may_break_with_minor_version_bumps")]
     pub fn events(&self) -> Events {
         Events::new(self)
+    }
+
+    /// If the `Value` is a Array, returns the underlying `Vec`.
+    ///
+    /// Returns `None` otherwise.
+    ///
+    /// This method consumes the `Value`. To get a reference instead, use
+    /// `as_array`.
+    pub fn into_array(self) -> Option<Vec<Value>> {
+        match self {
+            Value::Array(dict) => Some(dict),
+            _ => None,
+        }
+    }
+
+    /// If the `Value` is an Array, returns the associated `Vec`.
+    ///
+    /// Returns `None` otherwise.
+    pub fn as_array(&self) -> Option<&Vec<Value>> {
+        match *self {
+            Value::Array(ref array) => Some(array),
+            _ => None,
+        }
+    }
+
+    /// If the `Value` is an Array, returns the associated mutable `Vec`.
+    ///
+    /// Returns `None` otherwise.
+    pub fn as_array_mut(&mut self) -> Option<&mut Vec<Value>> {
+        match *self {
+            Value::Array(ref mut array) => Some(array),
+            _ => None,
+        }
     }
 
     /// If the `Value` is a Dictionary, returns the associated `BTreeMap`.
@@ -254,7 +288,7 @@ impl Value {
 pub mod serde_impls {
     use serde::{
         de,
-        de::{EnumAccess, MapAccess, VariantAccess, Visitor},
+        de::{EnumAccess, MapAccess, SeqAccess, VariantAccess, Visitor},
         ser,
     };
 
@@ -268,6 +302,7 @@ pub mod serde_impls {
             S: serde::Serializer,
         {
             match *self {
+                Value::Array(ref v) => v.serialize(serializer),
                 Value::Dictionary(ref m) => m.serialize(serializer),
                 Value::Boolean(b) => serializer.serialize_bool(b),
                 Value::Real(n) => serializer.serialize_f64(n),
@@ -334,6 +369,17 @@ pub mod serde_impls {
                     deserializer.deserialize_any(self)
                 }
 
+                fn visit_seq<A>(self, mut seq: A) -> Result<Value, A::Error>
+                where
+                    A: SeqAccess<'de>,
+                {
+                    let mut vec = Vec::with_capacity(seq.size_hint().unwrap_or(0));
+                    while let Some(elem) = seq.next_element()? {
+                        vec.push(elem);
+                    }
+                    Ok(Value::Array(vec))
+                }
+
                 fn visit_enum<A>(self, data: A) -> Result<Value, A::Error>
                 where
                     A: EnumAccess<'de>,
@@ -358,11 +404,11 @@ pub mod serde_impls {
     }
 }
 
-// impl From<Vec<Value>> for Value {
-//     fn from(from: Vec<Value>) -> Value {
-//         Value::Array(from)
-//     }
-// }
+impl From<Vec<Value>> for Value {
+    fn from(from: Vec<Value>) -> Value {
+        Value::Array(from)
+    }
+}
 
 impl From<Dictionary> for Value {
     fn from(from: Dictionary) -> Value {
@@ -381,18 +427,6 @@ impl<'a> From<&'a bool> for Value {
         Value::Boolean(*from)
     }
 }
-
-// impl From<Date> for Value {
-//     fn from(from: Date) -> Value {
-//         Value::Date(from)
-//     }
-// }
-//
-// impl<'a> From<&'a Date> for Value {
-//     fn from(from: &'a Date) -> Value {
-//         Value::Date(*from)
-//     }
-// }
 
 impl From<f64> for Value {
     fn from(from: f64) -> Value {
@@ -555,12 +589,10 @@ impl<T: Iterator<Item = Result<OwnedEvent, Error>>> Builder<T> {
 
     fn build_value(&mut self) -> Result<Value, Error> {
         match self.token.take() {
-            // Some(Event::StartArray(len)) => Ok(Value::Array(self.build_array(len)?)),
+            Some(Event::StartArray(len)) => Ok(Value::Array(self.build_array(len)?)),
             Some(Event::StartDictionary(len)) => Ok(Value::Dictionary(self.build_dict(len)?)),
 
             Some(Event::Boolean(b)) => Ok(Value::Boolean(b)),
-            // Some(Event::Data(d)) => Ok(Value::Data(d.into_owned())),
-            // Some(Event::Date(d)) => Ok(Value::Date(d)),
             Some(Event::Integer(i)) => Ok(Value::Integer(i)),
             Some(Event::Real(f)) => Ok(Value::Real(f)),
             Some(Event::String(s)) => Ok(Value::String(s.into_owned())),
@@ -575,21 +607,21 @@ impl<T: Iterator<Item = Result<OwnedEvent, Error>>> Builder<T> {
         }
     }
 
-    // fn build_array(&mut self, len: Option<u64>) -> Result<Vec<Value>, Error> {
-    //     let mut values = match len.and_then(u64_to_usize) {
-    //         Some(len) => Vec::with_capacity(len),
-    //         None => Vec::new(),
-    //     };
-    //
-    //     loop {
-    //         self.bump()?;
-    //         if let Some(Event::EndCollection) = self.token {
-    //             self.token.take();
-    //             return Ok(values);
-    //         }
-    //         values.push(self.build_value()?);
-    //     }
-    // }
+    fn build_array(&mut self, len: Option<u64>) -> Result<Vec<Value>, Error> {
+        let mut values = match len.and_then(u64_to_usize) {
+            Some(len) => Vec::with_capacity(len),
+            None => Vec::new(),
+        };
+
+        loop {
+            self.bump()?;
+            if let Some(Event::EndCollection) = self.token {
+                self.token.take();
+                return Ok(values);
+            }
+            values.push(self.build_value()?);
+        }
+    }
 
     fn build_dict(&mut self, _len: Option<u64>) -> Result<Dictionary, Error> {
         let mut dict = Dictionary::new();

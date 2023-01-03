@@ -18,6 +18,7 @@ static XML_PROLOGUE: &[u8] = br#"<?xml version="1.0" encoding="UTF-8"?>
 #[derive(PartialEq)]
 enum Element {
     Dictionary,
+    Array,
 }
 
 pub struct XmlWriter<W: Write> {
@@ -30,6 +31,7 @@ pub struct XmlWriter<W: Write> {
 }
 
 enum PendingCollection {
+    Array,
     Dictionary,
 }
 
@@ -145,7 +147,17 @@ impl<W: Write> XmlWriter<W> {
     }
 
     fn handle_pending_collection(&mut self) -> Result<(), Error> {
-        if let Some(PendingCollection::Dictionary) = self.pending_collection {
+        if let Some(PendingCollection::Array) = self.pending_collection {
+            self.pending_collection = None;
+
+            self.write_value_event(EventKind::StartArray, |this| {
+                this.start_element("d")?;
+                this.write_element_and_value("k", "_isArr")?;
+                this.write_boolean(true)?;
+                this.stack.push(Element::Array);
+                Ok(())
+            })
+        } else if let Some(PendingCollection::Dictionary) = self.pending_collection {
             self.pending_collection = None;
 
             self.write_value_event(EventKind::StartDictionary, |this| {
@@ -161,6 +173,12 @@ impl<W: Write> XmlWriter<W> {
 }
 
 impl<W: Write> Writer for XmlWriter<W> {
+    fn write_start_array(&mut self, _len: Option<u64>) -> Result<(), Error> {
+        self.handle_pending_collection()?;
+        self.pending_collection = Some(PendingCollection::Array);
+        Ok(())
+    }
+
     fn write_start_dictionary(&mut self, _len: Option<u64>) -> Result<(), Error> {
         self.handle_pending_collection()?;
         self.pending_collection = Some(PendingCollection::Dictionary);
@@ -171,7 +189,7 @@ impl<W: Write> Writer for XmlWriter<W> {
         self.write_event(|this| {
             let ident = if this.stack.len() <= 1 { "dict" } else { "d" };
             match this.pending_collection.take() {
-                Some(PendingCollection::Dictionary) => {
+                Some(_) => {
                     this.xml_writer
                         .write_event(XmlEvent::Empty(BytesStart::new(ident)))?;
                     this.expecting_key = this.stack.last() == Some(&Element::Dictionary);
@@ -180,7 +198,7 @@ impl<W: Write> Writer for XmlWriter<W> {
                 _ => {}
             };
             match (this.stack.pop(), this.expecting_key) {
-                (Some(Element::Dictionary), true) => {
+                (Some(Element::Dictionary), true) | (Some(Element::Array), _) => {
                     this.end_element(ident)?;
                 }
                 (Some(Element::Dictionary), false) | (None, _) => {

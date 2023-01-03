@@ -15,7 +15,6 @@ use std::{
 use crate::{
     dictionary,
     error::{Error, ErrorKind},
-    // Date, Integer, Uid, Value,
     Integer,
     Uid,
     Value,
@@ -49,6 +48,7 @@ use crate::{
 pub enum Event<'a> {
     // While the length of an array or dict cannot be feasably greater than max(usize) this better
     // conveys the concept of an effectively unbounded event stream.
+    StartArray(Option<u64>),
     StartDictionary(Option<u64>),
     EndCollection,
 
@@ -72,6 +72,7 @@ pub struct Events<'a> {
 
 enum StackItem<'a> {
     Root(&'a Value),
+    Array(std::slice::Iter<'a, Value>),
     Dict(dictionary::Iter<'a>),
     DictValue(&'a Value),
 }
@@ -170,6 +171,12 @@ impl<'a> Iterator for Events<'a> {
             stack: &'c mut Vec<StackItem<'b>>,
         ) -> Event<'b> {
             match value {
+                Value::Array(array) => {
+                    let len = array.len();
+                    let iter = array.iter();
+                    stack.push(StackItem::Array(iter));
+                    Event::StartArray(Some(len as u64))
+                }
                 Value::Dictionary(dict) => {
                     let len = dict.len();
                     let iter = dict.into_iter();
@@ -186,6 +193,15 @@ impl<'a> Iterator for Events<'a> {
 
         Some(match self.stack.pop()? {
             StackItem::Root(value) => handle_value(value, &mut self.stack),
+            StackItem::Array(mut array) => {
+                if let Some(value) = array.next() {
+                    // There might still be more items in the array so return it to the stack.
+                    self.stack.push(StackItem::Array(array));
+                    handle_value(value, &mut self.stack)
+                } else {
+                    Event::EndCollection
+                }
+            }
             StackItem::Dict(mut dict) => {
                 if let Some((key, value)) = dict.next() {
                     // There might still be more items in the dictionary so return it to the stack.
@@ -255,6 +271,7 @@ impl<R: Read + Seek> Iterator for Reader<R> {
 pub trait Writer: private::Sealed {
     fn write(&mut self, event: &Event) -> Result<(), Error> {
         match event {
+            Event::StartArray(len) => self.write_start_array(*len),
             Event::StartDictionary(len) => self.write_start_dictionary(*len),
             Event::EndCollection => self.write_end_collection(),
             Event::Boolean(value) => self.write_boolean(*value),
@@ -265,6 +282,7 @@ pub trait Writer: private::Sealed {
         }
     }
 
+    fn write_start_array(&mut self, len: Option<u64>) -> Result<(), Error>;
     fn write_start_dictionary(&mut self, len: Option<u64>) -> Result<(), Error>;
     fn write_end_collection(&mut self) -> Result<(), Error>;
 

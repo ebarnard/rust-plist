@@ -65,6 +65,11 @@ impl<W: Writer> Serializer<W> {
         Ok(())
     }
 
+    fn write_start_array(&mut self, len: Option<u64>) -> Result<(), Error> {
+        self.maybe_write_pending_struct_field_name()?;
+        self.writer.write_start_array(len)
+    }
+
     fn write_start_dictionary(&mut self, len: Option<u64>) -> Result<(), Error> {
         self.maybe_write_pending_struct_field_name()?;
         self.writer.write_start_dictionary(len)
@@ -247,8 +252,10 @@ impl<'a, W: Writer> ser::Serializer for &'a mut Serializer<W> {
         self.write_end_collection()
     }
 
-    fn serialize_seq(self, _len: Option<usize>) -> Result<Self::SerializeSeq, Error> {
-        unimplemented!()
+    fn serialize_seq(self, len: Option<usize>) -> Result<Self::SerializeSeq, Error> {
+        let len = len.map(|len| len as u64);
+        self.write_start_array(len)?;
+        Ok(Compound { ser: self })
     }
 
     fn serialize_tuple(self, len: usize) -> Result<Self::SerializeTuple, Error> {

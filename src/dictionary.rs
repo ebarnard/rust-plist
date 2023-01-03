@@ -169,6 +169,7 @@ impl Dictionary {
 /// # let val = &Value::String("".to_owned());
 /// # let _ =
 /// match *val {
+///     Value::Array(ref arr) => arr[0].as_string(),
 ///     Value::Dictionary(ref dict) => dict["type"].as_string(),
 ///     Value::String(ref s) => Some(s.as_str()),
 ///     _ => None,
