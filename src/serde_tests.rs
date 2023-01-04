@@ -160,7 +160,6 @@ fn dog() {
         Event::EndCollection,
         Event::String("d".into()),
         Event::Uid(Uid::new(42)),
-        Event::String("e".into()),
         Event::EndCollection,
         Event::EndCollection,
         Event::EndCollection,
