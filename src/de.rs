@@ -119,34 +119,34 @@ where
             }
             Event::StartDictionary(len) => {
                 // An array is a dictionnary with a first key of "_isArr"
-                let key = self.events.next_if(|e| {
-                    if let Ok(Event::String(s)) = e {
-                        return s.to_string() == "_isArr";
-                    }
-                    false
-                });
-                let mut is_arr = None;
-                if let Some(_) = key {
-                    // If the value of the "_isArr" field is true, then it's an array
-                    is_arr = self.events.next_if(|e| {
-                        if let Ok(Event::Boolean(b)) = e {
-                            return *b;
+                let has_key = self
+                    .events
+                    .next_if(|e| {
+                        if let Ok(Event::String(s)) = e {
+                            return *s == "_isArr";
                         }
                         false
                     })
-                }
+                    .is_some();
+                // If the value of the "_isArr" field is true, then it's an array
+                let is_arr = self
+                    .events
+                    .next_if(|e| {
+                        if let Ok(Event::Boolean(b)) = e {
+                            return *b && has_key;
+                        }
+                        false
+                    })
+                    .is_some();
 
-                if let Some(_) = is_arr {
-                    let len = len.and_then(u64_to_usize);
-                    let ret = visitor.visit_seq(MapAndSeqAccess::new(self, false, len))?;
-                    expect!(self.events.next(), EventKind::EndCollection);
-                    return Ok(ret);
+                let len = len.and_then(u64_to_usize);
+                let ret = if is_arr {
+                    visitor.visit_seq(MapAndSeqAccess::new(self, false, len))?
                 } else {
-                    let len = len.and_then(u64_to_usize);
-                    let ret = visitor.visit_map(MapAndSeqAccess::new(self, false, len))?;
-                    expect!(self.events.next(), EventKind::EndCollection);
-                    Ok(ret)
-                }
+                    visitor.visit_map(MapAndSeqAccess::new(self, false, len))?
+                };
+                expect!(self.events.next(), EventKind::EndCollection);
+                Ok(ret)
             }
             event @ Event::EndCollection => Err(error::unexpected_event_type(
                 EventKind::ValueOrStartCollection,

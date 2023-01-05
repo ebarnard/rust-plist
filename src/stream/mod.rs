@@ -15,9 +15,7 @@ use std::{
 use crate::{
     dictionary,
     error::{Error, ErrorKind},
-    Integer,
-    Uid,
-    Value,
+    Integer, Uid, Value,
 };
 
 /// An encoding of a plist as a flat structure.

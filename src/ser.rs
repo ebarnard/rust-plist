@@ -173,7 +173,7 @@ impl<'a, W: Writer> ser::Serializer for &'a mut Serializer<W> {
     }
 
     fn serialize_bytes(self, _: &[u8]) -> Result<(), Error> {
-        unimplemented!()
+        todo!("Is this going to be used ?");
     }
 
     fn serialize_none(self) -> Result<(), Error> {
