@@ -255,7 +255,7 @@ impl<R: Read + Seek> Iterator for Reader<R> {
         };
 
         match Reader::is_binary(&mut reader) {
-            Ok(true) => todo!("This is not supported"),
+            Ok(true) => return Some(Err(ErrorKind::UnsupportedBinaryData.without_position())),
             Ok(false) => self.0 = ReaderInner::Xml(XmlReader::new(reader)),
             Err(err) => {
                 self.0 = ReaderInner::Uninitialized(Some(reader));

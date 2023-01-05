@@ -36,6 +36,7 @@ pub(crate) enum ErrorKind {
     InvalidIntegerString,
     InvalidRealString,
     UidNotSupportedInXmlPlist,
+    UnsupportedBinaryData,
 
     InvalidUtf8String,
 

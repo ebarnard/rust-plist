@@ -118,10 +118,35 @@ where
                 Ok(ret)
             }
             Event::StartDictionary(len) => {
-                let len = len.and_then(u64_to_usize);
-                let ret = visitor.visit_map(MapAndSeqAccess::new(self, false, len))?;
-                expect!(self.events.next(), EventKind::EndCollection);
-                Ok(ret)
+                // An array is a dictionnary with a first key of "_isArr"
+                let key = self.events.next_if(|e| {
+                    if let Ok(Event::String(s)) = e {
+                        return s.to_string() == "_isArr";
+                    }
+                    false
+                });
+                let mut is_arr = None;
+                if let Some(_) = key {
+                    // If the value of the "_isArr" field is true, then it's an array
+                    is_arr = self.events.next_if(|e| {
+                        if let Ok(Event::Boolean(b)) = e {
+                            return *b;
+                        }
+                        false
+                    })
+                }
+
+                if let Some(_) = is_arr {
+                    let len = len.and_then(u64_to_usize);
+                    let ret = visitor.visit_seq(MapAndSeqAccess::new(self, false, len))?;
+                    expect!(self.events.next(), EventKind::EndCollection);
+                    return Ok(ret);
+                } else {
+                    let len = len.and_then(u64_to_usize);
+                    let ret = visitor.visit_map(MapAndSeqAccess::new(self, false, len))?;
+                    expect!(self.events.next(), EventKind::EndCollection);
+                    Ok(ret)
+                }
             }
             event @ Event::EndCollection => Err(error::unexpected_event_type(
                 EventKind::ValueOrStartCollection,
@@ -341,6 +366,16 @@ where
         if let Some(&Ok(Event::EndCollection)) = self.de.events.peek() {
             return Ok(None);
         }
+
+        // We ignore the keys when in an "array dictionnary"
+        self.de.events.next_if(|next| {
+            if let Ok(Event::String(key)) = next {
+                if key.len() >= 2 {
+                    return &key[..2] == "k_";
+                }
+            }
+            false
+        });
 
         self.remaining = self.remaining.map(|r| r.saturating_sub(1));
         self.de
