@@ -107,7 +107,7 @@ impl XmlWriteOptions {
         let indent_str = indent_str.as_ref();
 
         if indent_str.is_empty() {
-            return self.with_indent(0, 0);
+            return self.indent(0, 0);
         }
 
         assert!(
@@ -120,13 +120,13 @@ impl XmlWriteOptions {
             "indent str must consist of a single repeating character"
         );
 
-        self.with_indent(indent_str[0], indent_str.len())
+        self.indent(indent_str[0], indent_str.len())
     }
 
     /// Specifies the character and amount used for indentation.
     ///
     /// The default is indenting with a single tab.
-    pub fn with_indent(mut self, indent_char: u8, indent_amount: usize) -> Self {
+    pub fn indent(mut self, indent_char: u8, indent_amount: usize) -> Self {
         self.indent_char = indent_char;
         self.indent_amount = indent_amount;
         self

@@ -424,12 +424,12 @@ mod tests {
 <!DOCTYPE plist PUBLIC \"-//Apple//DTD PLIST 1.0//EN\" \"http://www.apple.com/DTDs/PropertyList-1.0.dtd\">
 <plist version=\"1.0\">
 <array>
-.<string>It is a tale told by an idiot,</string>
-.<string>Full of sound and fury, signifying nothing.</string>
+...<string>It is a tale told by an idiot,</string>
+...<string>Full of sound and fury, signifying nothing.</string>
 </array>
 </plist>";
 
-        let actual = events_to_xml(plist, XmlWriteOptions::default().with_indent(b'.', 1));
+        let actual = events_to_xml(plist, XmlWriteOptions::default().indent(b'.', 3));
 
         assert_eq!(actual, expected);
     }
