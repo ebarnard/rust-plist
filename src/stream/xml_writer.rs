@@ -1,3 +1,4 @@
+use base64::{engine::general_purpose::STANDARD as base64_standard, Engine};
 use quick_xml::{
     events::{BytesEnd, BytesStart, BytesText, Event as XmlEvent},
     Error as XmlWriterError, Writer as EventWriter,
@@ -307,8 +308,9 @@ fn base64_encode_plist(data: &[u8], indent: usize) -> String {
     output[..line_ending.len()].copy_from_slice(&line_ending);
 
     // Encode `data` as a base 64 string
-    let base64_string_len =
-        base64::encode_config_slice(data, base64::STANDARD, &mut output[line_ending.len()..]);
+    let base64_string_len = base64_standard
+        .encode_slice(data, &mut output[line_ending.len()..])
+        .expect("encoding slice fits base64 buffer");
 
     // Line wrap the base 64 encoded string
     let line_wrap_len = line_wrap::line_wrap(
