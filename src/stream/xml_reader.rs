@@ -1,3 +1,4 @@
+use base64::{engine::general_purpose::STANDARD as base64_standard, Engine};
 use quick_xml::{events::Event as XmlEvent, Error as XmlReaderError, Reader as EventReader};
 use std::io::{self, BufReader, Read};
 
@@ -138,7 +139,8 @@ impl<R: Read> ReaderState<R> {
                             let mut encoded = self.read_content(buffer)?;
                             // Strip whitespace and line endings from input string
                             encoded.retain(|c| !c.is_ascii_whitespace());
-                            let data = base64::decode(&encoded)
+                            let data = base64_standard
+                                .decode(&encoded)
                                 .map_err(|_| self.with_pos(ErrorKind::InvalidDataString))?;
                             return Ok(Some(Event::Data(data.into())));
                         }
