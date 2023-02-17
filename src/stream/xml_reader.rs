@@ -34,7 +34,7 @@ struct ReaderState<R: Read>(EventReader<BufReader<R>>);
 impl<R: Read> XmlReader<R> {
     pub fn new(reader: R) -> XmlReader<R> {
         let mut xml_reader = EventReader::from_reader(BufReader::new(reader));
-        xml_reader.trim_text(true);
+        xml_reader.trim_text(false);
         xml_reader.check_end_names(true);
         xml_reader.expand_empty_elements(true);
 
@@ -179,8 +179,16 @@ impl<R: Read> ReaderState<R> {
                     _ => (),
                 },
                 XmlEvent::Eof => return Ok(None),
-                XmlEvent::Text(_) => {
-                    return Err(self.with_pos(ErrorKind::UnexpectedXmlCharactersExpectedElement))
+                XmlEvent::Text(text) => {
+                    let unescaped = text
+                        .unescape()
+                        .map_err(|err| self.with_pos(ErrorKind::from(err)))?;
+
+                    if !unescaped.chars().all(char::is_whitespace) {
+                        return Err(
+                            self.with_pos(ErrorKind::UnexpectedXmlCharactersExpectedElement)
+                        );
+                    }
                 }
                 XmlEvent::PI(_)
                 | XmlEvent::Decl(_)
@@ -214,7 +222,7 @@ mod tests {
             String("William Shakespeare".into()),
             String("Lines".into()),
             StartArray(None),
-            String("It is a tale told by an idiot,".into()),
+            String("It is a tale told by an idiot,     ".into()),
             String("Full of sound and fury, signifying nothing.".into()),
             EndCollection,
             String("Death".into()),

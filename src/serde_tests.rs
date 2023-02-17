@@ -623,7 +623,7 @@ fn check_common_plist(dict: &Dictionary) {
     assert_eq!(lines.len(), 2);
     assert_eq!(
         lines[0].as_string().unwrap(),
-        "It is a tale told by an idiot,"
+        "It is a tale told by an idiot,     "
     );
     assert_eq!(
         lines[1].as_string().unwrap(),

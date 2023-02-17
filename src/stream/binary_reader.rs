@@ -442,7 +442,7 @@ mod tests {
             Real(1.6),
             String("Lines".into()),
             StartArray(Some(2)),
-            String("It is a tale told by an idiot,".into()),
+            String("It is a tale told by an idiot,     ".into()),
             String("Full of sound and fury, signifying nothing.".into()),
             EndCollection,
             String("Death".into()),
