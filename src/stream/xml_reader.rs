@@ -52,7 +52,10 @@ impl From<XmlReaderError> for ErrorKind {
             XmlReaderError::Io(err) if err.kind() == io::ErrorKind::UnexpectedEof => {
                 ErrorKind::UnexpectedEof
             }
-            XmlReaderError::Io(err) => ErrorKind::Io(err),
+            XmlReaderError::Io(err) => match std::sync::Arc::try_unwrap(err) {
+                Ok(err) => ErrorKind::Io(err),
+                Err(err) => ErrorKind::Io(std::io::Error::from(err.kind())),
+            },
             XmlReaderError::UnexpectedEof(_) => ErrorKind::UnexpectedEof,
             XmlReaderError::NonDecodable(_) => ErrorKind::InvalidXmlUtf8,
             _ => ErrorKind::InvalidXmlSyntax,
