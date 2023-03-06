@@ -277,7 +277,11 @@ impl<W: Write> Writer for XmlWriter<W> {
 impl From<XmlWriterError> for Error {
     fn from(err: XmlWriterError) -> Self {
         match err {
-            XmlWriterError::Io(err) => ErrorKind::Io(err).without_position(),
+            XmlWriterError::Io(err) => match std::sync::Arc::try_unwrap(err) {
+                Ok(err) => ErrorKind::Io(err),
+                Err(err) => ErrorKind::Io(std::io::Error::from(err.kind())),
+            }
+            .without_position(),
             _ => unreachable!(),
         }
     }
