@@ -97,7 +97,7 @@ impl<W: Write> XmlWriter<W> {
         if !self.started_plist {
             if self.write_root_element {
                 self.xml_writer
-                    .inner()
+                    .get_mut()
                     .write_all(XML_PROLOGUE)
                     .map_err(error::from_io_without_position)?;
             }
@@ -113,13 +113,13 @@ impl<W: Write> XmlWriter<W> {
                 // We didn't tell the xml_writer about the <plist> tag so we'll skip telling it
                 // about the </plist> tag as well.
                 self.xml_writer
-                    .inner()
+                    .get_mut()
                     .write_all(b"\n</plist>")
                     .map_err(error::from_io_without_position)?;
             }
 
             self.xml_writer
-                .inner()
+                .get_mut()
                 .flush()
                 .map_err(error::from_io_without_position)?;
         }
