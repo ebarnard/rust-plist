@@ -62,7 +62,7 @@ jobs:
         uses: actions/checkout@v3
 
       - name: Check for broken intra-doc links
-        run: cargo doc --document-private-items
+        run: cargo doc --all-features --document-private-items --no-deps
 
   # This is a hack so we don't have to gate PRs on each element of the build matrix.
   build-and-test-succeeded:
