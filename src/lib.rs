@@ -72,8 +72,8 @@
 //! specify a tilde requirement e.g. `plist = "~1.0.3"` in you `Cargo.toml` so that the plist crate
 //! is not automatically updated to version 1.1.
 
-// Treat all warnings as errors.
-#![deny(warnings)]
+#![deny(warnings)] // Treat all warnings as errors
+#![deny(rustdoc::broken_intra_doc_links)]
 
 pub mod dictionary;
 
