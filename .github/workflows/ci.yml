@@ -6,7 +6,7 @@ on:
     branches:
     - master
 
-name: Build and Test
+name: CI
 
 jobs:
   build-and-test:
@@ -29,51 +29,37 @@ jobs:
             channel: nightly
     steps:
       - name: Checkout
-        uses: actions/checkout@v2
+        uses: actions/checkout@v3
 
       - name: Install Rust Toolchain
-        uses: actions-rs/toolchain@v1
-        with:
-          default: true
-          toolchain: ${{ matrix.channel }}-${{ matrix.target }}
+        run: |
+          rustup default "$TOOLCHAIN"
+          rustup update "$TOOLCHAIN"
+        env:
+          TOOLCHAIN: ${{ matrix.channel }}-${{ matrix.target }}
 
       - name: Build and Test (Debug, No Default Features)
-        uses: actions-rs/cargo@v1
-        with:
-          command: test
-          args: --no-default-features --target ${{ matrix.target }}
+        run: cargo test --no-default-features
 
       - name: Build and Test (Debug, enable_unstable_features_that_may_break_with_minor_version_bumps)
-        uses: actions-rs/cargo@v1
-        with:
-          command: test
-          args: --no-default-features --features enable_unstable_features_that_may_break_with_minor_version_bumps --target ${{ matrix.target }}
+        run: cargo test --no-default-features --features enable_unstable_features_that_may_break_with_minor_version_bumps
 
       - name: Build and Test (Debug, serde)
-        uses: actions-rs/cargo@v1
-        with:
-          command: test
-          args: --no-default-features --features serde --target ${{ matrix.target }}
+        run: cargo test --no-default-features --features serde
 
       - name: Build and Test (Release, All Features)
-        uses: actions-rs/cargo@v1
-        with:
-          command: test
-          args: --release --all-features --target ${{ matrix.target }}
+        run: cargo test --release --all-features
 
       - name: Build and Test (Minimal Versions, All Features)
-        if: ${{ matrix.channel == 'nightly' }}
-        uses: actions-rs/cargo@v1
-        with:
-          command: test
-          args: --all-features -Z minimal-versions --target ${{ matrix.target }}
+        if: matrix.channel == 'nightly'
+        run: cargo test --all-features -Z minimal-versions
 
   lint:
     name: Lint
     runs-on: ubuntu-22.04
     steps:
       - name: Checkout
-        uses: actions/checkout@v2
+        uses: actions/checkout@v3
 
       - name: Check for broken intra-doc links
         run: cargo doc --document-private-items
@@ -85,7 +71,7 @@ jobs:
     runs-on: ubuntu-22.04
     steps:
       - name: Checkout
-        uses: actions/checkout@v2
+        uses: actions/checkout@v3
 
   release:
     name: Release
@@ -94,7 +80,7 @@ jobs:
     runs-on: ubuntu-22.04
     steps:
       - name: Checkout
-        uses: actions/checkout@v2
+        uses: actions/checkout@v3
 
       - name: Check
         id: check
@@ -116,7 +102,7 @@ jobs:
         run: |
           cargo publish --token "$CRATES_IO_TOKEN"
         env:
-            CRATES_IO_TOKEN: ${{ secrets.CRATES_IO_TOKEN }}
+          CRATES_IO_TOKEN: ${{ secrets.CRATES_IO_TOKEN }}
 
       - name: Create GitHub Release
         if: steps.check.outputs.publish == 'true'
