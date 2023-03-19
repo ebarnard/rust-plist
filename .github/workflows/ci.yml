@@ -68,10 +68,20 @@ jobs:
           command: test
           args: --all-features -Z minimal-versions --target ${{ matrix.target }}
 
+  lint:
+    name: Lint
+    runs-on: ubuntu-22.04
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
+
+      - name: Check for broken intra-doc links
+        run: cargo doc --document-private-items
+
   # This is a hack so we don't have to gate PRs on each element of the build matrix.
   build-and-test-succeeded:
     name: Build and Test Succeeded
-    needs: build-and-test
+    needs: [build-and-test, lint]
     runs-on: ubuntu-22.04
     steps:
       - name: Checkout
