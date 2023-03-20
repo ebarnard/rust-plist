@@ -80,7 +80,7 @@ jobs:
         run: |
           set -euo pipefail
 
-          TAG_NAME="v$(cargo metadata --format-version=1 | jq -er '.resolve.root as $root | .packages[] | select(.id==$root) | .version')"
+          TAG_NAME="v$(cargo metadata --no-deps --format-version=1 | jq -er '.packages[] | select(.name=="plist") | .version')"
           echo "tag_name=$TAG_NAME" >> "$GITHUB_OUTPUT"
 
           if git ls-remote --exit-code origin "refs/tags/$TAG_NAME"
