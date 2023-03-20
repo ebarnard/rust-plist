@@ -9,7 +9,7 @@ on:
 name: CI
 
 jobs:
-  build-and-test:
+  build_and_test:
     name: Build and Test
     runs-on: ${{ matrix.os }}
     strategy:
@@ -64,53 +64,53 @@ jobs:
       - name: Check for broken intra-doc links
         run: cargo doc --all-features --document-private-items --no-deps
 
-  # This is a hack so we don't have to gate PRs on each element of the build matrix.
-  build-and-test-succeeded:
+  ci_succeeded:
     name: Build and Test Succeeded
-    needs: [build-and-test, lint]
+    needs: [build_and_test, lint]
     runs-on: ubuntu-22.04
+    outputs:
+      release: ${{ steps.release_check.outputs.release }}
+      tag_name: ${{ steps.release_check.outputs.tag_name }}
     steps:
       - name: Checkout
         uses: actions/checkout@v3
 
-  release:
-    name: Release
-    needs: build-and-test-succeeded
-    if: github.ref == 'refs/heads/master'
-    runs-on: ubuntu-22.04
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v3
-
-      - name: Check
-        id: check
+      - name: Check if Release Needed
+        id: release_check
         run: |
           set -euo pipefail
 
           TAG_NAME="v$(cargo metadata --format-version=1 | jq -er '.resolve.root as $root | .packages[] | select(.id==$root) | .version')"
+          echo "tag_name=$TAG_NAME" >> "$GITHUB_OUTPUT"
 
           if git ls-remote --exit-code origin "refs/tags/$TAG_NAME"
           then
-            echo "publish=false" >> "$GITHUB_OUTPUT"
+            echo "release=false" >> "$GITHUB_OUTPUT"
           else
-            echo "publish=true" >> "$GITHUB_OUTPUT"
-            echo "tag_name=$TAG_NAME" >> "$GITHUB_OUTPUT"
+            echo "release=true" >> "$GITHUB_OUTPUT"
           fi
 
-      - name: Cargo Publish
-        if: steps.check.outputs.publish == 'true'
+  release:
+    name: Release
+    needs: ci_succeeded
+    if: github.ref == 'refs/heads/master' && needs.ci_succeeded.outputs.release == 'true'
+    runs-on: ubuntu-22.04
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+
+      - name: Publish Crate
         run: |
           cargo publish --token "$CRATES_IO_TOKEN"
         env:
           CRATES_IO_TOKEN: ${{ secrets.CRATES_IO_TOKEN }}
 
       - name: Create GitHub Release
-        if: steps.check.outputs.publish == 'true'
         uses: actions/create-release@latest
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          tag_name: ${{ steps.check.outputs.tag_name }}
-          release_name: ${{ steps.check.outputs.tag_name }}
+          tag_name: ${{ needs.ci_succeeded.outputs.tag_name }}
+          release_name: ${{ needs.ci_succeeded.outputs.tag_name }}
           draft: false
           prerelease: false
