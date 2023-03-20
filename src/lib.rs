@@ -118,9 +118,10 @@ mod ser;
 pub use self::{de::Deserializer, ser::Serializer};
 #[cfg(feature = "serde")]
 pub use self::{
-    de::{from_bytes, from_file, from_reader, from_reader_xml},
+    de::{from_bytes, from_file, from_reader, from_reader_xml, from_value},
     ser::{
-        to_file_binary, to_file_xml, to_writer_binary, to_writer_xml, to_writer_xml_with_options,
+        to_file_binary, to_file_xml, to_value, to_writer_binary, to_writer_xml,
+        to_writer_xml_with_options,
     },
 };
 

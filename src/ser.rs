@@ -13,7 +13,7 @@ use crate::{
     error::{self, Error, ErrorKind},
     stream::{self, Writer},
     uid::serde_impls::UID_NEWTYPE_STRUCT_NAME,
-    Date, Integer, Uid, XmlWriteOptions,
+    Date, Integer, Uid, Value, XmlWriteOptions,
 };
 
 #[doc(hidden)]
@@ -802,4 +802,12 @@ pub fn to_writer_xml_with_options<W: Write, T: ser::Serialize>(
     let writer = stream::XmlWriter::new_with_options(writer, options);
     let mut ser = Serializer::new(writer);
     value.serialize(&mut ser)
+}
+
+/// Converts a `T` into a [`Value`] which can represent any valid plist.
+pub fn to_value<T: ser::Serialize>(value: &T) -> Result<Value, Error> {
+    let writer = crate::value::Builder::default();
+    let mut ser = Serializer::new(writer);
+    value.serialize(&mut ser)?;
+    ser.into_inner().finish()
 }

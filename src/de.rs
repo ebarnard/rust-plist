@@ -20,6 +20,7 @@ use crate::{
     u64_to_usize,
     uid::serde_impls::UID_NEWTYPE_STRUCT_NAME,
     value::serde_impls::VALUE_NEWTYPE_STRUCT_NAME,
+    Value,
 };
 
 macro_rules! expect {
@@ -431,5 +432,12 @@ pub fn from_reader<R: Read + Seek, T: de::DeserializeOwned>(reader: R) -> Result
 pub fn from_reader_xml<R: Read, T: de::DeserializeOwned>(reader: R) -> Result<T, Error> {
     let reader = stream::XmlReader::new(reader);
     let mut de = Deserializer::new(reader);
+    de::Deserialize::deserialize(&mut de)
+}
+
+/// Interprets a [`Value`] as an instance of type `T`.
+pub fn from_value<T: de::DeserializeOwned>(value: &Value) -> Result<T, Error> {
+    let events = value.events().map(Ok);
+    let mut de = Deserializer::new(events);
     de::Deserialize::deserialize(&mut de)
 }
