@@ -551,8 +551,8 @@ impl<W: Write> Writer for BinaryWriter<W> {
     fn write_boolean(&mut self, value: bool) -> Result<(), Error> {
         self.write_value(Value::Boolean(value))
     }
-    fn write_data(&mut self, value: &[u8]) -> Result<(), Error> {
-        self.write_value(Value::Data(Cow::Borrowed(value)))
+    fn write_data(&mut self, value: Cow<[u8]>) -> Result<(), Error> {
+        self.write_value(Value::Data(value))
     }
     fn write_date(&mut self, value: Date) -> Result<(), Error> {
         self.write_value(Value::Date(value))
@@ -563,8 +563,8 @@ impl<W: Write> Writer for BinaryWriter<W> {
     fn write_real(&mut self, value: f64) -> Result<(), Error> {
         self.write_value(Value::Real(value.to_bits()))
     }
-    fn write_string(&mut self, value: &str) -> Result<(), Error> {
-        self.write_value(Value::String(Cow::Borrowed(value)))
+    fn write_string(&mut self, value: Cow<str>) -> Result<(), Error> {
+        self.write_value(Value::String(value))
     }
     fn write_uid(&mut self, value: Uid) -> Result<(), Error> {
         self.write_value(Value::Uid(value))

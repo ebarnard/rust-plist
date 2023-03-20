@@ -3,7 +3,7 @@ use quick_xml::{
     events::{BytesEnd, BytesStart, BytesText, Event as XmlEvent},
     Error as XmlWriterError, Writer as EventWriter,
 };
-use std::io::Write;
+use std::{borrow::Cow, io::Write};
 
 use crate::{
     error::{self, Error, ErrorKind, EventKind},
@@ -230,9 +230,9 @@ impl<W: Write> Writer for XmlWriter<W> {
         })
     }
 
-    fn write_data(&mut self, value: &[u8]) -> Result<(), Error> {
+    fn write_data(&mut self, value: Cow<[u8]>) -> Result<(), Error> {
         self.write_value_event(EventKind::Data, |this| {
-            let base64_data = base64_encode_plist(value, this.stack.len());
+            let base64_data = base64_encode_plist(&value, this.stack.len());
             this.write_element_and_value("data", &base64_data)
         })
     }
@@ -255,14 +255,14 @@ impl<W: Write> Writer for XmlWriter<W> {
         })
     }
 
-    fn write_string(&mut self, value: &str) -> Result<(), Error> {
+    fn write_string(&mut self, value: Cow<str>) -> Result<(), Error> {
         self.handle_pending_collection()?;
         self.write_event(|this| {
             if this.expecting_key {
-                this.write_element_and_value("key", value)?;
+                this.write_element_and_value("key", &value)?;
                 this.expecting_key = false;
             } else {
-                this.write_element_and_value("string", value)?;
+                this.write_element_and_value("string", &value)?;
                 this.expecting_key = this.stack.last() == Some(&Element::Dictionary);
             }
             Ok(())
@@ -342,7 +342,7 @@ mod tests {
 
     #[test]
     fn streaming_parser() {
-        let plist = &[
+        let plist = [
             Event::StartDictionary(None),
             Event::String("Author".into()),
             Event::String("William Shakespeare".into()),
@@ -419,7 +419,7 @@ mod tests {
 
     #[test]
     fn custom_indent_string() {
-        let plist = &[
+        let plist = [
             Event::StartArray(None),
             Event::String("It is a tale told by an idiot,".into()),
             Event::String("Full of sound and fury, signifying nothing.".into()),
@@ -442,7 +442,7 @@ mod tests {
 
     #[test]
     fn no_root() {
-        let plist = &[
+        let plist = [
             Event::StartArray(None),
             Event::String("It is a tale told by an idiot,".into()),
             Event::String("Full of sound and fury, signifying nothing.".into()),
@@ -459,8 +459,8 @@ mod tests {
         assert_eq!(actual, expected);
     }
 
-    fn events_to_xml<'a>(
-        events: impl IntoIterator<Item = &'a Event<'a>>,
+    fn events_to_xml<'event>(
+        events: impl IntoIterator<Item = Event<'event>>,
         options: XmlWriteOptions,
     ) -> String {
         let mut cursor = Cursor::new(Vec::new());

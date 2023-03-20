@@ -105,7 +105,7 @@ impl Value {
     fn to_writer_inner(&self, writer: &mut dyn Writer) -> Result<(), Error> {
         let events = self.events();
         for event in events {
-            writer.write(&event)?;
+            writer.write(event)?;
         }
         Ok(())
     }

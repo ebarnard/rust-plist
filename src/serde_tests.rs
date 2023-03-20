@@ -2,7 +2,7 @@ use serde::{
     de::{Deserialize, DeserializeOwned},
     ser::Serialize,
 };
-use std::{collections::BTreeMap, fmt::Debug, fs::File, io::Cursor};
+use std::{borrow::Cow, collections::BTreeMap, fmt::Debug, fs::File, io::Cursor};
 
 use crate::{
     stream::{private::Sealed, Event, OwnedEvent, Writer},
@@ -44,8 +44,9 @@ impl Writer for VecWriter {
         Ok(())
     }
 
-    fn write_data(&mut self, value: &[u8]) -> Result<(), Error> {
-        self.events.push(Event::Data(value.to_owned().into()));
+    fn write_data(&mut self, value: Cow<[u8]>) -> Result<(), Error> {
+        self.events
+            .push(Event::Data(Cow::Owned(value.into_owned())));
         Ok(())
     }
 
@@ -64,8 +65,9 @@ impl Writer for VecWriter {
         Ok(())
     }
 
-    fn write_string(&mut self, value: &str) -> Result<(), Error> {
-        self.events.push(Event::String(value.to_owned().into()));
+    fn write_string(&mut self, value: Cow<str>) -> Result<(), Error> {
+        self.events
+            .push(Event::String(Cow::Owned(value.into_owned())));
         Ok(())
     }
 

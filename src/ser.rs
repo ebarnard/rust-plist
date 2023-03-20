@@ -1,5 +1,6 @@
 use serde::ser;
 use std::{
+    borrow::Cow,
     fmt::Display,
     fs::File,
     io::{BufWriter, Write},
@@ -61,7 +62,7 @@ impl<W: Writer> Serializer<W> {
     fn maybe_write_pending_struct_field_name(&mut self) -> Result<(), Error> {
         if let OptionMode::StructField(field_name) = self.option_mode {
             self.option_mode = OptionMode::StructFieldNameWritten;
-            self.writer.write_string(field_name)?;
+            self.writer.write_string(Cow::Borrowed(field_name))?;
         }
         Ok(())
     }
@@ -86,7 +87,7 @@ impl<W: Writer> Serializer<W> {
         self.writer.write_boolean(value)
     }
 
-    fn write_data(&mut self, value: &[u8]) -> Result<(), Error> {
+    fn write_data(&mut self, value: Cow<[u8]>) -> Result<(), Error> {
         self.maybe_write_pending_struct_field_name()?;
         self.writer.write_data(value)
     }
@@ -106,9 +107,9 @@ impl<W: Writer> Serializer<W> {
         self.writer.write_real(value)
     }
 
-    fn write_string(&mut self, value: &str) -> Result<(), Error> {
+    fn write_string<'a, T: Into<Cow<'a, str>>>(&mut self, value: T) -> Result<(), Error> {
         self.maybe_write_pending_struct_field_name()?;
-        self.writer.write_string(value)
+        self.writer.write_string(value.into())
     }
 
     fn write_uid(&mut self, value: Uid) -> Result<(), Error> {
@@ -176,7 +177,7 @@ impl<'a, W: Writer> ser::Serializer for &'a mut Serializer<W> {
     fn serialize_char(self, v: char) -> Result<(), Self::Error> {
         let mut buf = [0; 4];
         let v = v.encode_utf8(&mut buf);
-        self.write_string(v)
+        self.write_string(&*v)
     }
 
     fn serialize_str(self, v: &str) -> Result<(), Error> {
@@ -184,7 +185,7 @@ impl<'a, W: Writer> ser::Serializer for &'a mut Serializer<W> {
     }
 
     fn serialize_bytes(self, v: &[u8]) -> Result<(), Error> {
-        self.write_data(v)
+        self.write_data(Cow::Borrowed(v))
     }
 
     fn serialize_none(self) -> Result<(), Error> {
