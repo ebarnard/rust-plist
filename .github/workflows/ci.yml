@@ -99,6 +99,12 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v3
 
+      - name: Install cargo-semver-checks
+        run: cargo install cargo-semver-checks --locked
+
+      - name: Run cargo-semver-checks
+        run: cargo semver-checks check-release
+
       - name: Publish Crate
         run: |
           cargo publish --token "$CRATES_IO_TOKEN"
