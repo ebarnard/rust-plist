@@ -17,12 +17,11 @@ enable_unstable_features_that_may_break_with_minor_version_bumps = []
 
 [dependencies]
 base64 = "0.21.0"
-time = { version = "0.3.3", features = ["parsing", "formatting"] }
-indexmap = "1.0.2"
+time = { version = "0.3.20", features = ["parsing", "formatting"] }
+indexmap = "1.9.3"
 line-wrap = "0.1.1"
-quick_xml = { package = "quick-xml", version = "0.28.0" }
-serde = { version = "1.0.2", optional = true }
+quick-xml = "0.28.1"
+serde = { version = "1.0.159", features = ["derive"], optional = true }
 
 [dev-dependencies]
-serde_derive = { version = "1.0.2" }
-serde_yaml = "0.8.21"
+serde_yaml = "0.9.19"
