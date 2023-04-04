@@ -638,6 +638,12 @@ impl<'a> From<&'a str> for Value {
     }
 }
 
+impl From<Vec<u8>> for Value {
+    fn from(value: Vec<u8>) -> Value {
+        Value::Data(value)
+    }
+}
+
 enum StackItem {
     Root(Value),
     Array(Vec<Value>),
