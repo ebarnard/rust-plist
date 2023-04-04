@@ -1,7 +1,10 @@
-use serde::de::{
-    self,
-    value::{MapAccessDeserializer, MapDeserializer},
-    IntoDeserializer,
+use serde::{
+    de::{
+        self,
+        value::{MapAccessDeserializer, MapDeserializer},
+        IntoDeserializer,
+    },
+    forward_to_deserialize_any,
 };
 use std::{
     borrow::Cow,

@@ -1,5 +1,3 @@
-extern crate plist;
-
 use plist::{Error, Value};
 use std::io::Cursor;
 

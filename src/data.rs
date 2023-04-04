@@ -7,9 +7,7 @@ use std::fmt;
 /// ## Examples
 ///
 /// ```rust
-/// extern crate plist;
-/// #[macro_use]
-/// extern crate serde_derive;
+/// use serde::{Deserialize, Serialize};
 ///
 /// # fn main() {
 /// #[derive(Deserialize, Serialize)]

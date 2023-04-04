@@ -11,21 +11,13 @@
 //! plist = "1"
 //! ```
 //!
-//! And put this in your crate root:
-//!
-//! ```rust
-//! extern crate plist;
-//! ```
-//!
 //! ## Examples
 //!
 //! ### Using `serde`
 //!
 //! ```rust
-//! extern crate plist;
 //! # #[cfg(feature = "serde")]
-//! #[macro_use]
-//! extern crate serde_derive;
+//! use serde::{Deserialize, Serialize};
 //!
 //! # #[cfg(feature = "serde")]
 //! # fn main() {
@@ -102,9 +94,6 @@ pub use value::Value;
 
 // Optional serde module
 #[cfg(feature = "serde")]
-#[macro_use]
-extern crate serde;
-#[cfg(feature = "serde")]
 mod de;
 #[cfg(feature = "serde")]
 mod ser;
@@ -124,9 +113,6 @@ pub use self::{
     },
 };
 
-#[cfg(all(test, feature = "serde"))]
-#[macro_use]
-extern crate serde_derive;
 
 #[cfg(all(test, feature = "serde"))]
 mod serde_tests;

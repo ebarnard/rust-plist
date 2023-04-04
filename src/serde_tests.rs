@@ -1,7 +1,4 @@
-use serde::{
-    de::{Deserialize, DeserializeOwned},
-    ser::Serialize,
-};
+use serde::{de::DeserializeOwned, ser, Deserialize, Serialize};
 use std::{borrow::Cow, collections::BTreeMap, fmt::Debug, fs::File, io::Cursor};
 
 use crate::{
@@ -92,7 +89,7 @@ fn new_deserializer<'event>(
 
 fn assert_roundtrip<T>(obj: T, comparison: Option<&[Event]>)
 where
-    T: Debug + DeserializeOwned + PartialEq + Serialize,
+    T: Debug + DeserializeOwned + PartialEq + ser::Serialize,
 {
     let mut se = new_serializer();
 
