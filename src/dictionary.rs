@@ -59,8 +59,8 @@ impl Dictionary {
     /// If the dictionary did have this key present, the value is updated, and the old value is
     /// returned.
     #[inline]
-    pub fn insert(&mut self, k: String, v: Value) -> Option<Value> {
-        self.map.insert(k, v)
+    pub fn insert(&mut self, k: impl Into<String>, v: impl Into<Value>) -> Option<Value> {
+        self.map.insert(k.into(), v.into())
     }
 
     /// Removes a key from the dictionary, returning the value at the key if the key was previously
@@ -638,7 +638,7 @@ pub mod serde_impls {
     use serde::{de, ser};
     use std::fmt;
 
-    use crate::Dictionary;
+    use crate::{Dictionary, Value};
 
     impl ser::Serialize for Dictionary {
         #[inline]
@@ -686,7 +686,7 @@ pub mod serde_impls {
                 {
                     let mut values = Dictionary::new();
 
-                    while let Some((key, value)) = visitor.next_entry()? {
+                    while let Some((key, value)) = visitor.next_entry::<String, Value>()? {
                         values.insert(key, value);
                     }
 
