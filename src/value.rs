@@ -413,7 +413,7 @@ pub mod serde_impls {
                     V: MapAccess<'de>,
                 {
                     let mut values = Dictionary::new();
-                    while let Some((k, v)) = map.next_entry::<String, Value>()? {
+                    while let Some((k, v)) = map.next_entry()? {
                         values.insert(k, v);
                     }
                     Ok(Value::Dictionary(values))
