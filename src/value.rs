@@ -10,7 +10,7 @@ use crate::{
     stream::{
         private, BinaryWriter, Event, Events, Reader, Writer, XmlReader, XmlWriteOptions, XmlWriter,
     },
-    u64_to_usize, Date, Dictionary, Integer, Uid,
+    u64_to_usize, Data, Date, Dictionary, Integer, Uid,
 };
 
 /// Represents any plist value.
@@ -638,8 +638,8 @@ impl<'a> From<&'a str> for Value {
     }
 }
 
-impl From<Vec<u8>> for Value {
-    fn from(value: Vec<u8>) -> Value {
+impl From<Data> for Value {
+    fn from(value: Data) -> Value {
         Value::Data(value)
     }
 }
