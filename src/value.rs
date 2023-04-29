@@ -640,7 +640,7 @@ impl<'a> From<&'a str> for Value {
 
 impl From<Data> for Value {
     fn from(value: Data) -> Value {
-        Value::Data(value)
+        Value::Data(value.into())
     }
 }
 
