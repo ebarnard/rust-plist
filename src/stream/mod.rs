@@ -11,6 +11,8 @@ pub use self::xml_reader::XmlReader;
 
 mod xml_writer;
 pub use self::xml_writer::XmlWriter;
+#[cfg(feature = "serde")]
+pub(crate) use xml_writer::base64_encode_plist;
 
 use std::{
     borrow::Cow,

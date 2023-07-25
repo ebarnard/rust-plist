@@ -287,7 +287,7 @@ impl From<XmlWriterError> for Error {
     }
 }
 
-fn base64_encode_plist(data: &[u8], indent: usize) -> String {
+pub(crate) fn base64_encode_plist(data: &[u8], indent: usize) -> String {
     // XML plist data elements are always formatted by apple tools as
     // <data>
     // AAAA..AA (68 characters per line)
