@@ -103,7 +103,7 @@ impl From<Date> for SystemTime {
 
 impl fmt::Display for InvalidXmlDate {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "String was not in a XML date")
+        f.write_str("String was not a valid XML plist date")
     }
 }
 
