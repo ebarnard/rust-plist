@@ -1,5 +1,7 @@
 use std::fmt;
 
+use base64::{engine::general_purpose::STANDARD as base64_standard, Engine};
+
 /// A byte buffer used for serialization to and from the plist data type.
 ///
 /// You use it in types with derived `Serialize`/`Deserialize` traits.
@@ -34,10 +36,27 @@ pub struct Data {
     inner: Vec<u8>,
 }
 
+/// An error indicating a string was not valid XML data.
+#[derive(Debug)]
+pub struct InvalidXmlData(base64::DecodeError);
+
 impl Data {
     /// Creates a new `Data` from vec of bytes.
     pub fn new(bytes: Vec<u8>) -> Self {
         Data { inner: bytes }
+    }
+
+    /// Create a `Data` object from an XML plist (Base-64) encoded string.
+    pub fn from_xml_format(b64_str: &str) -> Result<Self, InvalidXmlData> {
+        base64_standard
+            .decode(b64_str)
+            .map_err(InvalidXmlData)
+            .map(Data::new)
+    }
+
+    /// Converts the `Data` to an XML plist (Base-64) string.
+    pub fn to_xml_format(&self) -> String {
+        crate::stream::base64_encode_plist(&self.inner, 0)
     }
 }
 
@@ -70,6 +89,14 @@ impl fmt::Debug for Data {
         self.inner.fmt(f)
     }
 }
+
+impl fmt::Display for InvalidXmlData {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "Invalid XML data: '{}'", self.0)
+    }
+}
+
+impl std::error::Error for InvalidXmlData {}
 
 pub mod serde_impls {
     use serde::{de, ser};
