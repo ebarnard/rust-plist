@@ -103,7 +103,7 @@ impl XmlWriteOptions {
     /// Since replacing `xml-rs` with `quick-xml`, the indent string has to consist of a single
     /// repeating ascii character. This is a backwards compatibility function, prefer using
     /// [`XmlWriteOptions::indent`].
-    #[deprecated(since = "1.4.0", note = "please use `with_indent` instead")]
+    #[deprecated(since = "1.4.0", note = "please use `indent` instead")]
     pub fn indent_string(self, indent_str: impl Into<Cow<'static, str>>) -> Self {
         let indent_str = indent_str.into();
         let indent_str = indent_str.as_ref();
