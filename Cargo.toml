@@ -20,7 +20,7 @@ base64 = "0.21.0"
 time = { version = "0.3.3", features = ["parsing", "formatting"] }
 indexmap = "1.0.2"
 line-wrap = "0.1.1"
-quick_xml = { package = "quick-xml", version = "0.30.0" }
+quick_xml = { package = "quick-xml", version = "0.31.0" }
 serde = { version = "1.0.2", optional = true }
 
 [dev-dependencies]
