@@ -69,12 +69,17 @@ jobs:
 
   ci_succeeded:
     name: Build and Test Succeeded
+    if: always()
     needs: [build_and_test, lint]
     runs-on: ubuntu-22.04
     outputs:
       release: ${{ steps.release_check.outputs.release }}
       tag_name: ${{ steps.release_check.outputs.tag_name }}
     steps:
+      - name: Fail if Any Previous Job Failed
+        if: contains(needs.*.result, 'failure')
+        run: exit 1
+
       - name: Checkout
         uses: actions/checkout@v3
 
