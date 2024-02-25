@@ -321,7 +321,7 @@ pub(crate) fn base64_encode_plist(data: &[u8], indent: usize) -> String {
         &mut output[line_ending.len()..],
         base64_string_len,
         LINE_LEN,
-        &line_wrap::SliceLineEnding::new(&line_ending),
+        &line_wrap::SliceLineEnding::new(&line_ending).expect("not empty"),
     );
 
     // Add the final line ending and indent
