@@ -98,13 +98,13 @@ impl<R: Read> AsciiReader<R> {
             };
         }
 
-        let string_literal = String::from_utf8(acc)
-            .map_err(|_e| self.error(ErrorKind::InvalidUtf8AsciiStream))?;
+        let string_literal =
+            String::from_utf8(acc).map_err(|_e| self.error(ErrorKind::InvalidUtf8AsciiStream))?;
 
         // Not ideal but does the trick for now
         match Integer::from_str(&string_literal) {
             Ok(i) => Ok(Some(Event::Integer(i))),
-            Err(_) => Ok(Some(Event::String(string_literal))),
+            Err(_) => Ok(Some(Event::String(string_literal.into()))),
         }
     }
 
@@ -135,7 +135,7 @@ impl<R: Read> AsciiReader<R> {
                 if c as char == '"' {
                     let string_literal = String::from_utf8(acc)
                         .map_err(|_e| self.error(ErrorKind::InvalidUtf8AsciiStream))?;
-                    Ok(Some(Event::String(string_literal)))
+                    Ok(Some(Event::String(string_literal.into())))
                 } else {
                     Err(self.error(ErrorKind::UnclosedString))
                 }
@@ -259,24 +259,24 @@ mod tests {
 
         let comparison = &[
             StartDictionary(None),
-            String("KeyName1".to_owned()),
-            String("Value1".to_owned()),
-            String("AnotherKeyName".to_owned()),
-            String("Value2".to_owned()),
-            String("Something".to_owned()),
+            String("KeyName1".into()),
+            String("Value1".into()),
+            String("AnotherKeyName".into()),
+            String("Value2".into()),
+            String("Something".into()),
             StartArray(None),
-            String("ArrayItem1".to_owned()),
-            String("ArrayItem2".to_owned()),
-            String("ArrayItem3".to_owned()),
+            String("ArrayItem1".into()),
+            String("ArrayItem2".into()),
+            String("ArrayItem3".into()),
             EndCollection,
-            String("Key4".to_owned()),
-            String("0.10".to_owned()),
-            String("KeyFive".to_owned()),
+            String("Key4".into()),
+            String("0.10".into()),
+            String("KeyFive".into()),
             StartDictionary(None),
-            String("Dictionary2Key1".to_owned()),
-            String("Something".to_owned()),
-            String("AnotherKey".to_owned()),
-            String("Somethingelse".to_owned()),
+            String("Dictionary2Key1".into()),
+            String("Something".into()),
+            String("AnotherKey".into()),
+            String("Somethingelse".into()),
             EndCollection,
             EndCollection,
         ];
@@ -292,34 +292,34 @@ mod tests {
 
         let comparison = &[
             StartDictionary(None),
-            String("AnimalColors".to_owned()),
+            String("AnimalColors".into()),
             StartDictionary(None),
-            String("lamb".to_owned()), // key
-            String("black".to_owned()),
-            String("pig".to_owned()), // key
-            String("pink".to_owned()),
-            String("worm".to_owned()), // key
-            String("pink".to_owned()),
+            String("lamb".into()), // key
+            String("black".into()),
+            String("pig".into()), // key
+            String("pink".into()),
+            String("worm".into()), // key
+            String("pink".into()),
             EndCollection,
-            String("AnimalSmells".to_owned()),
+            String("AnimalSmells".into()),
             StartDictionary(None),
-            String("lamb".to_owned()), // key
-            String("lambish".to_owned()),
-            String("pig".to_owned()), // key
-            String("piggish".to_owned()),
-            String("worm".to_owned()), // key
-            String("wormy".to_owned()),
+            String("lamb".into()), // key
+            String("lambish".into()),
+            String("pig".into()), // key
+            String("piggish".into()),
+            String("worm".into()), // key
+            String("wormy".into()),
             EndCollection,
-            String("AnimalSounds".to_owned()),
+            String("AnimalSounds".into()),
             StartDictionary(None),
-            String("Lisa".to_owned()), // key
-            String("Why is the worm talking like a lamb?".to_owned()),
-            String("lamb".to_owned()), // key
-            String("baa".to_owned()),
-            String("pig".to_owned()), // key
-            String("oink".to_owned()),
-            String("worm".to_owned()), // key
-            String("baa".to_owned()),
+            String("Lisa".into()), // key
+            String("Why is the worm talking like a lamb?".into()),
+            String("lamb".into()), // key
+            String("baa".into()),
+            String("pig".into()), // key
+            String("oink".into()),
+            String("worm".into()), // key
+            String("baa".into()),
             EndCollection,
             EndCollection,
         ];
@@ -336,12 +336,12 @@ mod tests {
 
         let comparison = &[
             StartDictionary(None),
-            String("names".to_owned()),
+            String("names".into()),
             StartArray(None),
-            String("Léa".to_owned()),
-            String("François".to_owned()),
-            String("Żaklina".to_owned()),
-            String("王芳".to_owned()),
+            String("Léa".into()),
+            String("François".into()),
+            String("Żaklina".into()),
+            String("王芳".into()),
             EndCollection,
             EndCollection,
         ];
@@ -358,8 +358,8 @@ mod tests {
 
         let comparison = &[
             StartDictionary(None),
-            String("key".to_owned()),
-            String(r#"va\"lue"#.to_owned()),
+            String("key".into()),
+            String(r#"va\"lue"#.into()),
             EndCollection,
         ];
 
@@ -375,9 +375,9 @@ mod tests {
 
         let comparison = &[
             StartDictionary(None),
-            String("name".to_owned()),
-            String("James".to_owned()),
-            String("age".to_owned()),
+            String("name".into()),
+            String("James".into()),
+            String("age".into()),
             Integer(42.into()),
             EndCollection,
         ];
