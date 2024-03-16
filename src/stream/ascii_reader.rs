@@ -19,6 +19,8 @@ pub struct AsciiReader<R: Read> {
 
     /// lookahead char to avoid backtracking.
     peeked_char: Option<u8>,
+
+    current_char: Option<u8>,
 }
 
 impl<R: Read> AsciiReader<R> {
@@ -27,6 +29,7 @@ impl<R: Read> AsciiReader<R> {
             reader,
             current_pos: 0,
             peeked_char: None,
+            current_char: None,
         }
     }
 
@@ -48,23 +51,24 @@ impl<R: Read> AsciiReader<R> {
         }
     }
 
-    /// Consume the reader and return the next char.
+    /// Consume the reader and set [`Self::current_char`] and
+    /// [`Self::peeked_char`]. Returns the current character.
     fn advance(&mut self) -> Result<Option<u8>, Error> {
-        let mut cur_char = self.peeked_char;
+        self.current_char = self.peeked_char;
         self.peeked_char = self.read_one()?;
 
         // We need to read two chars to boot the process and fill the peeked
         // char.
         if self.current_pos == 0 {
-            cur_char = self.peeked_char;
+            self.current_char = self.peeked_char;
             self.peeked_char = self.read_one()?;
         }
 
-        if cur_char.is_some() {
+        if self.current_char.is_some() {
             self.current_pos += 1;
         }
 
-        Ok(cur_char)
+        Ok(self.current_char)
     }
 
     /// From Apple doc:
@@ -91,7 +95,8 @@ impl<R: Read> AsciiReader<R> {
             }
         } {
             // consuming the string itself
-            match self.advance()? {
+            self.advance()?;
+            match self.current_char {
                 Some(c) => acc.push(c),
                 None => return Err(self.error(ErrorKind::UnclosedString)),
             };
@@ -107,39 +112,134 @@ impl<R: Read> AsciiReader<R> {
         }
     }
 
-    fn quoted_string_literal(&mut self) -> Result<Option<OwnedEvent>, Error> {
-        let mut acc: Vec<u8> = Vec::new();
-        let mut cur_char = b'"';
+    /// The process for decoding utf-16 escapes to utf-8 is:
+    /// 1. Convert the 4 hex characters to utf-16 code units (u16s).
+    ///    '\u006d' becomes 0x6d.
+    /// 2. Based on the first code unit, determine whether another code unit is
+    ///    required to form the complete code point.
+    ///    "\uD83D\uDCA9" becomes `[0xd73d, 0xdca9]`
+    /// 3. Convert the 1 or 2 u16 code point to utf-8.
+    ///    `[0xd73d, 0xdca9]` becomes '💩'.
+    ///
+    /// The standard library has some useful functions behind unstable feature
+    /// flags, we can simplify and optimize this a bit once they're stable.
+    /// - str_from_utf16_endian
+    /// - is_utf16_surrogate
+    fn utf16_escape(&mut self) -> Result<String, Error> {
+        let mut code_units: &mut [u16] = &mut [0u16; 2];
 
-        while {
-            match self.peeked_char {
-                // do not stop if the quote is escaped
-                Some(c) => c != b'"' || cur_char == b'\\',
-                None => false,
+        let Some(code_unit) = self.utf16_code_unit()? else {
+            return Err(self.error(ErrorKind::InvalidUtf16String));
+        };
+
+        code_units[0] = code_unit;
+
+        // This is the utf-16 surrogate range, indicating another code unit is
+        // necessary to form a complete code point.
+        if !matches!(code_unit, 0xD800..=0xDFFF) {
+            code_units = &mut code_units[0..1];
+        } else {
+            self.advance_quoted_string()?;
+
+            if self.current_char != Some(b'\\')
+                || !matches!(self.peeked_char, Some(b'u') | Some(b'U'))
+            {
+                return Err(self.error(ErrorKind::InvalidUtf16String));
             }
-        } {
-            // consuming the string itself
-            match self.advance()? {
-                Some(c) => {
-                    cur_char = c;
-                    acc.push(c)
-                }
-                None => return Err(self.error(ErrorKind::UnclosedString)),
-            };
+
+            self.advance_quoted_string()?;
+
+            if let Some(code_unit) = self.utf16_code_unit()? {
+                code_units[1] = code_unit;
+            }
         }
 
-        // Match the closing quote.
+        let utf8 = String::from_utf16(code_units)
+            .map_err(|_| self.error(ErrorKind::InvalidUtf16String))?;
+
+        Ok(utf8)
+    }
+
+    /// Expects the reader's next read to return the first hex character of the
+    /// utf-16 hex string.
+    fn utf16_code_unit(&mut self) -> Result<Option<u16>, Error> {
+        let hex_chars = [
+            self.advance_quoted_string()?,
+            self.advance_quoted_string()?,
+            self.advance_quoted_string()?,
+            self.advance_quoted_string()?,
+        ];
+
+        let hex_str = std::str::from_utf8(&hex_chars)
+            .map_err(|_| self.error(ErrorKind::InvalidUtf16String))?;
+
+        let code_unit = u16::from_str_radix(hex_str, 16)
+            .map_err(|_| self.error(ErrorKind::InvalidUtf16String))?;
+
+        Ok(Some(code_unit))
+    }
+
+    #[inline]
+    fn advance_quoted_string(&mut self) -> Result<u8, Error> {
         match self.advance()? {
-            Some(c) => {
-                if c as char == '"' {
-                    let string_literal = String::from_utf8(acc)
-                        .map_err(|_e| self.error(ErrorKind::InvalidUtf8AsciiStream))?;
-                    Ok(Some(Event::String(string_literal.into())))
-                } else {
-                    Err(self.error(ErrorKind::UnclosedString))
-                }
-            }
+            Some(c) => Ok(c),
             None => Err(self.error(ErrorKind::UnclosedString)),
+        }
+    }
+
+    fn quoted_string_literal(&mut self, quote: u8) -> Result<Option<OwnedEvent>, Error> {
+        let mut acc = String::new();
+
+        loop {
+            let c = self.advance_quoted_string()?;
+
+            if c == quote {
+                return Ok(Some(Event::String(acc.into())));
+            }
+
+            let replacement = if c == b'\\' {
+                let c = self.advance_quoted_string()?;
+
+                match c {
+                    b'\\' | b'"' => c as char,
+                    b'a' => '\u{7}',
+                    b'b' => '\u{8}',
+                    b'f' => '\u{c}',
+                    b'n' => '\n',
+                    b'r' => '\r',
+                    b't' => '\t',
+                    b'U' => {
+                        let utf8 = self.utf16_escape()?;
+                        acc.push_str(utf8.as_str());
+                        continue;
+                    }
+                    b'v' => '\u{b}',
+                    b'0' | b'1' | b'2' | b'3' | b'4' | b'5' | b'6' | b'7' => {
+                        let value = [
+                            c,
+                            self.advance_quoted_string()?,
+                            self.advance_quoted_string()?,
+                        ];
+
+                        let value = std::str::from_utf8(&value)
+                            .map_err(|_| self.error(ErrorKind::InvalidOctalString))?;
+
+                        let value = u16::from_str_radix(value, 8)
+                            .map_err(|_| self.error(ErrorKind::InvalidOctalString))?
+                            as u32;
+
+                        let value = char::from_u32(value)
+                            .ok_or(self.error(ErrorKind::InvalidOctalString))?;
+
+                        map_next_step_to_unicode(value)
+                    }
+                    _ => return Err(self.error(ErrorKind::InvalidUtf8AsciiStream)),
+                }
+            } else {
+                c as char
+            };
+
+            acc.push(replacement);
         }
     }
 
@@ -203,7 +303,7 @@ impl<R: Read> AsciiReader<R> {
                 b')' => return Ok(Some(Event::EndCollection)),
                 b'{' => return Ok(Some(Event::StartDictionary(None))),
                 b'}' => return Ok(Some(Event::EndCollection)),
-                b'"' => return self.quoted_string_literal(),
+                b'\'' | b'"' => return self.quoted_string_literal(c),
                 b'/' => {
                     match self.potential_comment() {
                         Ok(Some(event)) => return Ok(Some(event)),
@@ -231,6 +331,38 @@ impl<R: Read> Iterator for AsciiReader<R> {
             Err(err) => Some(Err(err)),
         }
     }
+}
+
+/// Maps NextStep encoding to Unicode, see:
+/// - https://github.com/fonttools/openstep-plist/blob/master/src/openstep_plist/parser.pyx#L87-L106
+/// - ftp://ftp.unicode.org/Public/MAPPINGS/VENDORS/NEXT/NEXTSTEP.TXT
+fn map_next_step_to_unicode(c: char) -> char {
+    const NEXT_UNICODE_MAPPING: &[char] = &[
+        '\u{A0}', '\u{C0}', '\u{C1}', '\u{C2}', '\u{C3}', '\u{C4}', '\u{C5}', '\u{C7}', '\u{C8}',
+        '\u{C9}', '\u{CA}', '\u{CB}', '\u{CC}', '\u{CD}', '\u{CE}', '\u{CF}', '\u{D0}', '\u{D1}',
+        '\u{D2}', '\u{D3}', '\u{D4}', '\u{D5}', '\u{D6}', '\u{D9}', '\u{DA}', '\u{DB}', '\u{DC}',
+        '\u{DD}', '\u{DE}', '\u{B5}', '\u{D7}', '\u{F7}', '\u{A9}', '\u{A1}', '\u{A2}', '\u{A3}',
+        '\u{2044}', '\u{A5}', '\u{192}', '\u{A7}', '\u{A4}', '\u{2019}', '\u{201C}', '\u{AB}',
+        '\u{2039}', '\u{203A}', '\u{FB01}', '\u{FB02}', '\u{AE}', '\u{2013}', '\u{2020}',
+        '\u{2021}', '\u{B7}', '\u{A6}', '\u{B6}', '\u{2022}', '\u{201A}', '\u{201E}', '\u{201D}',
+        '\u{BB}', '\u{2026}', '\u{2030}', '\u{AC}', '\u{BF}', '\u{B9}', '\u{2CB}', '\u{B4}',
+        '\u{2C6}', '\u{2DC}', '\u{AF}', '\u{2D8}', '\u{2D9}', '\u{A8}', '\u{B2}', '\u{2DA}',
+        '\u{B8}', '\u{B3}', '\u{2DD}', '\u{2DB}', '\u{2C7}', '\u{2014}', '\u{B1}', '\u{BC}',
+        '\u{BD}', '\u{BE}', '\u{E0}', '\u{E1}', '\u{E2}', '\u{E3}', '\u{E4}', '\u{E5}', '\u{E7}',
+        '\u{E8}', '\u{E9}', '\u{EA}', '\u{EB}', '\u{EC}', '\u{C6}', '\u{ED}', '\u{AA}', '\u{EE}',
+        '\u{EF}', '\u{F0}', '\u{F1}', '\u{141}', '\u{D8}', '\u{152}', '\u{BA}', '\u{F2}', '\u{F3}',
+        '\u{F4}', '\u{F5}', '\u{F6}', '\u{E6}', '\u{F9}', '\u{FA}', '\u{FB}', '\u{131}', '\u{FC}',
+        '\u{FD}', '\u{142}', '\u{F8}', '\u{153}', '\u{DF}', '\u{FE}', '\u{FF}', '\u{FFFD}',
+        '\u{FFFD}',
+    ];
+
+    let index = c as usize;
+
+    if index < 128 || index > 0xff {
+        return c;
+    }
+
+    NEXT_UNICODE_MAPPING[index - 128]
 }
 
 #[cfg(test)]
@@ -348,16 +480,74 @@ mod tests {
     }
 
     #[test]
-    fn escaped_quotes_in_strings() {
-        let plist = r#"{ key = "va\"lue" }"#;
-        let cursor = Cursor::new(plist.as_bytes());
+    fn invalid_utf16_escapes() {
+        let plist = br#"{
+            key1 = "\U123";
+            key2 = "\UD83D";
+            key3 = "\u0080";
+        }"#;
+        let cursor = Cursor::new(plist);
+        let streaming_parser = AsciiReader::new(cursor);
+        let events: Vec<Result<Event, Error>> = streaming_parser.collect();
+
+        // key1's value
+        assert!(events[2].is_err());
+        // key2's value
+        assert!(events[4].is_err());
+        // key3's value
+        assert!(events[6].is_err());
+    }
+
+    #[test]
+    fn invalid_octal_escapes() {
+        let plist = br#"{
+            key1 = "\1";
+            key2 = "\12";
+        }"#;
+        let cursor = Cursor::new(plist);
+        let streaming_parser = AsciiReader::new(cursor);
+        let events: Vec<Result<Event, Error>> = streaming_parser.collect();
+
+        // key1's value
+        assert!(events[2].is_err());
+        // key2's value
+        assert!(events[4].is_err());
+    }
+
+    #[test]
+    fn escaped_sequences_in_strings() {
+        let plist = br#"{
+            key1 = "va\"lue";
+            key2 = 'va"lue';
+            key3 = "va\a\b\f\n\r\t\v\"\nlue";
+            key4 = "a\012b";
+            key5 = "\\UD83D\\UDCA9";
+            key6 = "\UD83D\UDCA9";
+            key7 = "\U0080";
+            key8 = "\200\377";
+        }"#;
+        let cursor = Cursor::new(plist);
         let streaming_parser = AsciiReader::new(cursor);
         let events: Vec<Event> = streaming_parser.map(|e| e.unwrap()).collect();
 
         let comparison = &[
             StartDictionary(None),
-            String("key".into()),
-            String(r#"va\"lue"#.into()),
+            String("key1".into()),
+            String(r#"va"lue"#.into()),
+            String("key2".into()),
+            String(r#"va"lue"#.into()),
+            String("key3".into()),
+            String("va\u{7}\u{8}\u{c}\n\r\t\u{b}\"\nlue".into()),
+            String("key4".into()),
+            String("a\nb".into()),
+            String("key5".into()),
+            String("\\UD83D\\UDCA9".into()),
+            String("key6".into()),
+            String("💩".into()),
+            String("key7".into()),
+            String("\u{80}".into()),
+            String("key8".into()),
+            String("\u{a0}\u{fffd}".into()),
             EndCollection,
         ];
 
