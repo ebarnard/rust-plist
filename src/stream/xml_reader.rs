@@ -210,7 +210,7 @@ impl<R: Read> ReaderState<R> {
 
 #[cfg(test)]
 mod tests {
-    use std::fs::File;
+    use std::{fs::File, path::Path};
 
     use super::*;
     use crate::stream::Event::*;
