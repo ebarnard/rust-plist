@@ -264,40 +264,35 @@ mod tests {
 
         let comparison = &[
             StartDictionary(None),
-
-            String("AnimalColors".to_owned()),
+            String("AnimalColors".into()),
             StartDictionary(None),
-            String("lamb".to_owned()), // key
-            String("black".to_owned()),
-            String("pig".to_owned()), // key
-            String("pink".to_owned()),
-            String("worm".to_owned()), // key
-            String("pink".to_owned()),
+            String("lamb".into()), // key
+            String("black".into()),
+            String("pig".into()), // key
+            String("pink".into()),
+            String("worm".into()), // key
+            String("pink".into()),
             EndCollection,
-
-
-            String("AnimalSmells".to_owned()),
+            String("AnimalSmells".into()),
             StartDictionary(None),
-            String("lamb".to_owned()), // key
-            String("lambish".to_owned()),
-            String("pig".to_owned()), // key
-            String("piggish".to_owned()),
-            String("worm".to_owned()), // key
-            String("wormy".to_owned()),
+            String("lamb".into()), // key
+            String("lambish".into()),
+            String("pig".into()), // key
+            String("piggish".into()),
+            String("worm".into()), // key
+            String("wormy".into()),
             EndCollection,
-
-            String("AnimalSounds".to_owned()),
+            String("AnimalSounds".into()),
             StartDictionary(None),
-            String("Lisa".to_owned()), // key
-            String("Why is the worm talking like a lamb?".to_owned()),
-            String("lamb".to_owned()), // key
-            String("baa".to_owned()),
-            String("pig".to_owned()), // key
-            String("oink".to_owned()),
-            String("worm".to_owned()), // key
-            String("baa".to_owned()),
+            String("Lisa".into()), // key
+            String("Why is the worm talking like a lamb?".into()),
+            String("lamb".into()), // key
+            String("baa".into()),
+            String("pig".into()), // key
+            String("oink".into()),
+            String("worm".into()), // key
+            String("baa".into()),
             EndCollection,
-
             EndCollection,
         ];
 
