@@ -6,10 +6,9 @@
 /// However this reader also support Integers as first class datatype.
 /// This reader will accept certain ill-formed ascii plist without complaining.
 /// It does not check the integrity of the plist format.
-
 use crate::{
     error::{Error, ErrorKind},
-    stream::Event,
+    stream::{Event, OwnedEvent},
     Integer,
 };
 use std::io::Read;
@@ -51,7 +50,7 @@ impl<R: Read> AsciiReader<R> {
 
     /// Consume the reader and return the next char.
     fn advance(&mut self) -> Result<Option<u8>, Error> {
-        let mut cur_char =  self.peeked_char;
+        let mut cur_char = self.peeked_char;
         self.peeked_char = self.read_one()?;
 
         // We need to read two chars to boot the process and fill the peeked
@@ -65,7 +64,7 @@ impl<R: Read> AsciiReader<R> {
             self.current_pos += 1;
         }
 
-        return Ok(cur_char);
+        Ok(cur_char)
     }
 
     /// From Apple doc:
@@ -79,7 +78,7 @@ impl<R: Read> AsciiReader<R> {
     /// > ASCII characters; these are used to represent Unicode characters
     ///
     /// This function will naively try to convert the string to Integer.
-    fn unquoted_string_literal(&mut self, first: u8) -> Result<Option<Event>, Error> {
+    fn unquoted_string_literal(&mut self, first: u8) -> Result<Option<OwnedEvent>, Error> {
         let mut acc: Vec<u8> = Vec::new();
         acc.push(first);
 
@@ -108,7 +107,7 @@ impl<R: Read> AsciiReader<R> {
         }
     }
 
-    fn quoted_string_literal(&mut self) -> Result<Option<Event>, Error> {
+    fn quoted_string_literal(&mut self) -> Result<Option<OwnedEvent>, Error> {
         let mut acc: Vec<u8> = Vec::new();
         let mut cur_char = b'"';
 
@@ -178,7 +177,7 @@ impl<R: Read> AsciiReader<R> {
     /// Returns:
     /// - Some(string) if '/' was the first character of a string
     /// - None if '/' was the beginning of a comment.
-    fn potential_comment(&mut self) -> Result<Option<Event>, Error> {
+    fn potential_comment(&mut self) -> Result<Option<OwnedEvent>, Error> {
         match self.peeked_char {
             Some(c) => match c {
                 b'/' => self.line_comment().map(|_| None),
@@ -196,7 +195,7 @@ impl<R: Read> AsciiReader<R> {
     ///  - StartDictionary(Option<u64>),
     ///  - EndCollection,
     ///  - Data(Vec<u8>),
-    fn read_next(&mut self) -> Result<Option<Event>, Error> {
+    fn read_next(&mut self) -> Result<Option<OwnedEvent>, Error> {
         while let Some(c) = self.advance()? {
             match c {
                 // Single char tokens
@@ -218,14 +217,14 @@ impl<R: Read> AsciiReader<R> {
             }
         }
 
-        return Ok(None);
+        Ok(None)
     }
 }
 
 impl<R: Read> Iterator for AsciiReader<R> {
-    type Item = Result<Event, Error>;
+    type Item = Result<OwnedEvent, Error>;
 
-    fn next(&mut self) -> Option<Result<Event, Error>> {
+    fn next(&mut self) -> Option<Result<OwnedEvent, Error>> {
         match self.read_next() {
             Ok(Some(event)) => Some(Ok(event)),
             Ok(None) => None,
@@ -240,7 +239,6 @@ mod tests {
     use crate::stream::Event::{self, *};
     use std::io::Cursor;
     use std::{fs::File, path::Path};
-
 
     #[test]
     fn empty_test() {
