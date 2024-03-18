@@ -38,7 +38,6 @@ pub(crate) enum ErrorKind {
     IncompleteComment,
     InvalidUtf8AsciiStream,
     InvalidOctalString,
-    IoReadError,
 
     // Xml format-specific errors
     UnclosedXmlElement,

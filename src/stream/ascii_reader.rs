@@ -45,7 +45,7 @@ impl<R: Read> AsciiReader<R> {
                 if err.kind() == std::io::ErrorKind::UnexpectedEof {
                     Ok(None)
                 } else {
-                    Err(self.error(ErrorKind::IoReadError))
+                    Err(self.error(ErrorKind::Io(err)))
                 }
             }
         }
@@ -325,11 +325,7 @@ impl<R: Read> Iterator for AsciiReader<R> {
     type Item = Result<OwnedEvent, Error>;
 
     fn next(&mut self) -> Option<Result<OwnedEvent, Error>> {
-        match self.read_next() {
-            Ok(Some(event)) => Some(Ok(event)),
-            Ok(None) => None,
-            Err(err) => Some(Err(err)),
-        }
+        self.read_next().transpose()
     }
 }
 
