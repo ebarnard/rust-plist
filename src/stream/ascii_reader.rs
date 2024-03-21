@@ -268,7 +268,9 @@ impl<R: Read> AsciiReader<R> {
                     None => false,
                 }
         } {
-            latest_consume = self.advance()?.unwrap_or(b' ');
+            latest_consume = self
+                .advance()?
+                .ok_or(self.error(ErrorKind::IncompleteComment))?;
         }
 
         Ok(())
