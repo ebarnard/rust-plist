@@ -61,11 +61,17 @@ pub(crate) enum ErrorKind {
     InfiniteOrNanDate,
     InvalidUtf8String,
     InvalidUtf16String,
-    UnknownObjectType(u8),
+    UnknownObjectType(
+        // Used by the `Debug` implementation.
+        #[allow(dead_code)] u8,
+    ),
 
     Io(io::Error),
     #[cfg(feature = "serde")]
-    Serde(String),
+    Serde(
+        // Used by the `Debug` implementation.
+        #[allow(dead_code)] String,
+    ),
 }
 
 #[derive(Debug, Clone, Copy)]

@@ -7,7 +7,6 @@
 use indexmap::{map, IndexMap};
 use std::{
     fmt::{self, Debug},
-    iter::FromIterator,
     ops,
 };
 
@@ -67,7 +66,7 @@ impl Dictionary {
     /// in the dictionary.
     #[inline]
     pub fn remove(&mut self, key: &str) -> Option<Value> {
-        self.map.remove(key)
+        self.map.swap_remove(key)
     }
 
     /// Scan through each key-value pair in the map and keep those where the
@@ -540,7 +539,7 @@ impl<'a> OccupiedEntry<'a> {
     /// ```
     #[inline]
     pub fn remove(self) -> Value {
-        self.occupied.remove()
+        self.occupied.swap_remove()
     }
 }
 
