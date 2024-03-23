@@ -19,7 +19,7 @@ enable_unstable_features_that_may_break_with_minor_version_bumps = []
 base64 = "0.21.0"
 time = { version = "0.3.30", features = ["parsing", "formatting"] }
 indexmap = "2.1.0"
-line-wrap = "0.1.1"
+line-wrap = "0.2.0"
 quick_xml = { package = "quick-xml", version = "0.31.0" }
 serde = { version = "1.0.2", optional = true }
 
