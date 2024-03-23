@@ -770,7 +770,7 @@ mod tests {
     use std::time::SystemTime;
 
     use super::*;
-    use crate::{stream::Event::*, Date, Dictionary, Value};
+    use crate::{stream::Event::*, Date};
 
     #[test]
     fn value_accessors() {

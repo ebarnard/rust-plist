@@ -211,7 +211,7 @@ mod tests {
     use std::fs::File;
 
     use super::*;
-    use crate::stream::Event::{self, *};
+    use crate::stream::Event::*;
 
     #[test]
     fn streaming_parser() {

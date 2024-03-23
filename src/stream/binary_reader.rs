@@ -412,7 +412,6 @@ mod tests {
     use std::fs::File;
 
     use super::*;
-    use crate::{stream::Event, Uid};
 
     #[test]
     fn streaming_parser() {
