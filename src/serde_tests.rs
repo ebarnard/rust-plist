@@ -800,6 +800,31 @@ fn deserialize_dictionary_binary_nskeyedarchiver() {
 }
 
 #[test]
+fn xml_with_bom_and_whitespace() {
+    #[derive(Deserialize)]
+    struct LayerinfoData {
+        color: Option<String>,
+    }
+
+    let mut data = Vec::new();
+    // The UTF-8 byte order mark
+    data.extend(b"\xef\xbb\xbf");
+    data.extend(b"\r\n\t ");
+    data.extend(r#"<?xml version="1.0" encoding="UTF-8"?>
+        <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+        <plist version="1.0">
+        <dict>
+            <key>color</key>
+            <string>1,0.75,0,0.7</string>
+        </dict>
+        </plist>
+        "#.as_bytes());
+
+    let lib_dict: LayerinfoData = crate::from_bytes(&data).unwrap();
+    assert_eq!(lib_dict.color.unwrap(), "1,0.75,0,0.7");
+}
+
+#[test]
 fn dictionary_deserialize_dictionary_in_struct() {
     // Example from <https://github.com/ebarnard/rust-plist/issues/54>
     #[derive(Deserialize)]
@@ -808,7 +833,8 @@ fn dictionary_deserialize_dictionary_in_struct() {
         lib: Option<Dictionary>,
     }
 
-    let lib_dict: LayerinfoData = crate::from_bytes(r#"<?xml version="1.0" encoding="UTF-8"?>
+    let lib_dict: LayerinfoData = crate::from_bytes(r#"
+        <?xml version="1.0" encoding="UTF-8"?>
         <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
         <plist version="1.0">
         <dict>
