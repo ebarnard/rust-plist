@@ -14,9 +14,12 @@ pub use self::xml_writer::XmlWriter;
 #[cfg(feature = "serde")]
 pub(crate) use xml_writer::base64_encode_plist;
 
+mod ascii_reader;
+pub use self::ascii_reader::AsciiReader;
+
 use std::{
     borrow::Cow,
-    io::{self, Read, Seek, SeekFrom},
+    io::{Read, Seek},
     vec,
 };
 
@@ -235,6 +238,7 @@ enum ReaderInner<R: Read + Seek> {
     Uninitialized(Option<R>),
     Xml(XmlReader<R>),
     Binary(BinaryReader<R>),
+    Ascii(AsciiReader<R>),
 }
 
 impl<R: Read + Seek> Reader<R> {
@@ -243,16 +247,90 @@ impl<R: Read + Seek> Reader<R> {
     }
 
     fn is_binary(reader: &mut R) -> Result<bool, Error> {
-        fn from_io_offset_0(err: io::Error) -> Error {
-            ErrorKind::Io(err).with_byte_offset(0)
+        Self::rewind(reader)?;
+        let is_binary = Self::reader_matches(reader, b"bplist00")?;
+        Self::rewind(reader)?;
+        Ok(is_binary)
+    }
+
+    fn is_xml(reader: &mut R) -> Result<bool, Error> {
+        const UTF32_BE_BOM: [u8; 4] = [0, 0, 0xfe, 0xff];
+        const UTF32_LE_BOM: [u8; 4] = [0xff, 0xfe, 0, 0];
+        const UTF32_2143_BOM: [u8; 4] = [0, 0, 0xff, 0xfe];
+        const UTF32_3412_BOM: [u8; 4] = [0xfe, 0xff, 0, 0];
+        const UTF8_BOM: [u8; 3] = [0xef, 0xbb, 0xbf];
+        const UTF16_BE_BOM: [u8; 2] = [0xfe, 0xff];
+        const UTF16_LE_BOM: [u8; 2] = [0xff, 0xfe];
+
+        const BOMS: [&[u8]; 7] = [
+            UTF32_BE_BOM.as_slice(),
+            UTF32_LE_BOM.as_slice(),
+            UTF32_2143_BOM.as_slice(),
+            UTF32_3412_BOM.as_slice(),
+            UTF8_BOM.as_slice(),
+            UTF16_BE_BOM.as_slice(),
+            UTF16_LE_BOM.as_slice(),
+        ];
+
+        for bom in BOMS {
+            Self::rewind(reader)?;
+            let matches = Self::reader_matches(reader, bom)?;
+
+            if matches {
+                Self::rewind(reader)?;
+                return Ok(true);
+            }
         }
 
-        reader.seek(SeekFrom::Start(0)).map_err(from_io_offset_0)?;
-        let mut magic = [0; 8];
-        reader.read_exact(&mut magic).map_err(from_io_offset_0)?;
-        reader.seek(SeekFrom::Start(0)).map_err(from_io_offset_0)?;
+        Self::rewind(reader)?;
 
-        Ok(&magic == b"bplist00")
+        let is_xml = loop {
+            let byte = Self::next_byte(reader)?;
+            if byte.is_ascii_whitespace() {
+                continue;
+            }
+
+            if byte == b'<' && Self::reader_matches(reader, b"?xml")? {
+                break true;
+            }
+
+            break false;
+        };
+
+        Self::rewind(reader)?;
+
+        Ok(is_xml)
+    }
+
+    fn from_io_offset_0(err: std::io::Error) -> Error {
+        ErrorKind::Io(err).with_byte_offset(0)
+    }
+
+    fn rewind(reader: &mut R) -> Result<(), Error> {
+        reader.rewind().map_err(Self::from_io_offset_0)
+    }
+
+    fn next_byte(reader: &mut R) -> Result<u8, Error> {
+        let mut buf = [0u8];
+
+        reader
+            .read_exact(&mut buf)
+            .map_err(|err| match reader.stream_position() {
+                Err(pos_err) => ErrorKind::Io(pos_err).without_position(),
+                Ok(pos) => ErrorKind::Io(err).with_byte_offset(pos),
+            })?;
+
+        Ok(buf[0])
+    }
+
+    fn reader_matches(reader: &mut R, input: &[u8]) -> Result<bool, Error> {
+        for byte in input {
+            if *byte != Self::next_byte(reader)? {
+                return Ok(false);
+            }
+        }
+
+        Ok(true)
     }
 }
 
@@ -263,12 +341,20 @@ impl<R: Read + Seek> Iterator for Reader<R> {
         let mut reader = match self.0 {
             ReaderInner::Xml(ref mut parser) => return parser.next(),
             ReaderInner::Binary(ref mut parser) => return parser.next(),
+            ReaderInner::Ascii(ref mut parser) => return parser.next(),
             ReaderInner::Uninitialized(ref mut reader) => reader.take().unwrap(),
         };
 
         match Reader::is_binary(&mut reader) {
             Ok(true) => self.0 = ReaderInner::Binary(BinaryReader::new(reader)),
-            Ok(false) => self.0 = ReaderInner::Xml(XmlReader::new(reader)),
+            Ok(false) => match Reader::is_xml(&mut reader) {
+                Ok(true) => self.0 = ReaderInner::Xml(XmlReader::new(reader)),
+                Ok(false) => self.0 = ReaderInner::Ascii(AsciiReader::new(reader)),
+                Err(err) => {
+                    self.0 = ReaderInner::Uninitialized(Some(reader));
+                    return Some(Err(err));
+                }
+            },
             Err(err) => {
                 self.0 = ReaderInner::Uninitialized(Some(reader));
                 return Some(Err(err));
