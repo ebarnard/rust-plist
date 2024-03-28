@@ -1,15 +1,21 @@
-use base64::{engine::general_purpose::STANDARD as base64_standard, Engine};
+use base64::{engine::general_purpose::STANDARD as BASE64_STANDARD, Engine};
 use quick_xml::{
     events::{BytesEnd, BytesStart, BytesText, Event as XmlEvent},
     Error as XmlWriterError, Writer as EventWriter,
 };
-use std::{borrow::Cow, io::Write};
+use std::{
+    borrow::Cow,
+    io::{self, Write},
+};
 
 use crate::{
-    error::{self, Error, ErrorKind, EventKind},
+    error::{self, from_io_without_position, Error, ErrorKind, EventKind},
     stream::{Writer, XmlWriteOptions},
     Date, Integer, Uid,
 };
+
+const DATA_MAX_LINE_CHARS: usize = 68;
+const DATA_MAX_LINE_BYTES: usize = 51;
 
 static XML_PROLOGUE: &[u8] = br#"<?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
@@ -25,6 +31,8 @@ enum Element {
 pub struct XmlWriter<W: Write> {
     xml_writer: EventWriter<W>,
     write_root_element: bool,
+    indent_char: u8,
+    indent_count: usize,
     started_plist: bool,
     stack: Vec<Element>,
     expecting_key: bool,
@@ -44,15 +52,17 @@ impl<W: Write> XmlWriter<W> {
     }
 
     pub fn new_with_options(writer: W, opts: &XmlWriteOptions) -> XmlWriter<W> {
-        let xml_writer = if opts.indent_amount == 0 {
+        let xml_writer = if opts.indent_count == 0 {
             EventWriter::new(writer)
         } else {
-            EventWriter::new_with_indent(writer, opts.indent_char, opts.indent_amount)
+            EventWriter::new_with_indent(writer, opts.indent_char, opts.indent_count)
         };
 
         XmlWriter {
             xml_writer,
             write_root_element: opts.root_element,
+            indent_char: opts.indent_char,
+            indent_count: opts.indent_count,
             started_plist: false,
             stack: Vec::new(),
             expecting_key: false,
@@ -66,9 +76,9 @@ impl<W: Write> XmlWriter<W> {
     }
 
     fn write_element_and_value(&mut self, name: &str, value: &str) -> Result<(), Error> {
-        self.start_element(name)?;
-        self.write_value(value)?;
-        self.end_element(name)?;
+        self.xml_writer
+            .create_element(name)
+            .write_text_content(BytesText::new(value))?;
         Ok(())
     }
 
@@ -81,12 +91,6 @@ impl<W: Write> XmlWriter<W> {
     fn end_element(&mut self, name: &str) -> Result<(), Error> {
         self.xml_writer
             .write_event(XmlEvent::End(BytesEnd::new(name)))?;
-        Ok(())
-    }
-
-    fn write_value(&mut self, value: &str) -> Result<(), Error> {
-        self.xml_writer
-            .write_event(XmlEvent::Text(BytesText::new(value)))?;
         Ok(())
     }
 
@@ -232,8 +236,19 @@ impl<W: Write> Writer for XmlWriter<W> {
 
     fn write_data(&mut self, value: Cow<[u8]>) -> Result<(), Error> {
         self.write_value_event(EventKind::Data, |this| {
-            let base64_data = base64_encode_plist(&value, this.stack.len());
-            this.write_element_and_value("data", &base64_data)
+            this.xml_writer
+                .create_element("data")
+                .write_inner_content(|xml_writer| {
+                    write_data_base64(
+                        &value,
+                        true,
+                        this.indent_char,
+                        this.stack.len() * this.indent_count,
+                        xml_writer.get_mut(),
+                    )
+                    .map_err(from_io_without_position)
+                })
+                .map(|_| ())
         })
     }
 
@@ -287,50 +302,47 @@ impl From<XmlWriterError> for Error {
     }
 }
 
-pub(crate) fn base64_encode_plist(data: &[u8], indent: usize) -> String {
+#[cfg(feature = "serde")]
+pub(crate) fn encode_data_base64(data: &[u8]) -> String {
+    // Pre-allocate space for the base64 encoded data.
+    let num_lines = (data.len() + DATA_MAX_LINE_BYTES - 1) / DATA_MAX_LINE_BYTES;
+    let max_len = num_lines * (DATA_MAX_LINE_CHARS + 1);
+
+    let mut base64 = Vec::with_capacity(max_len);
+    write_data_base64(data, false, b'\t', 0, &mut base64).expect("writing to a vec cannot fail");
+    String::from_utf8(base64).expect("encoded base64 is ascii")
+}
+
+fn write_data_base64(
+    data: &[u8],
+    write_initial_newline: bool,
+    indent_char: u8,
+    indent_repeat: usize,
+    mut writer: impl Write,
+) -> io::Result<()> {
     // XML plist data elements are always formatted by apple tools as
     // <data>
     // AAAA..AA (68 characters per line)
     // </data>
-    // Allocate space for base 64 string and line endings up front
-    const LINE_LEN: usize = 68;
-    let mut line_ending = Vec::with_capacity(1 + indent);
-    line_ending.push(b'\n');
-    (0..indent).for_each(|_| line_ending.push(b'\t'));
+    let mut encoded = [0; DATA_MAX_LINE_CHARS];
+    for (i, line) in data.chunks(DATA_MAX_LINE_BYTES).enumerate() {
+        // Write newline
+        if write_initial_newline || i > 0 {
+            writer.write_all(&[b'\n'])?;
+        }
 
-    // Find the max length of `data` encoded as a base 64 string with padding
-    let base64_max_string_len = data.len() * 4 / 3 + 4;
+        // Write indent
+        for _ in 0..indent_repeat {
+            writer.write_all(&[indent_char])?;
+        }
 
-    // Find the max length of the formatted base 64 string as: max length of the base 64 string
-    // + line endings and indents at the start of the string and after every line
-    let base64_max_string_len_with_formatting =
-        base64_max_string_len + (2 + base64_max_string_len / LINE_LEN) * line_ending.len();
-
-    let mut output = vec![0; base64_max_string_len_with_formatting];
-
-    // Start output with a line ending and indent
-    output[..line_ending.len()].copy_from_slice(&line_ending);
-
-    // Encode `data` as a base 64 string
-    let base64_string_len = base64_standard
-        .encode_slice(data, &mut output[line_ending.len()..])
-        .expect("encoding slice fits base64 buffer");
-
-    // Line wrap the base 64 encoded string
-    let line_wrap_len = line_wrap::line_wrap(
-        &mut output[line_ending.len()..],
-        base64_string_len,
-        LINE_LEN,
-        &line_wrap::SliceLineEnding::new(&line_ending).expect("not empty"),
-    );
-
-    // Add the final line ending and indent
-    output[line_ending.len() + base64_string_len + line_wrap_len..][..line_ending.len()]
-        .copy_from_slice(&line_ending);
-
-    // Ensure output is the correct length
-    output.truncate(base64_string_len + line_wrap_len + 2 * line_ending.len());
-    String::from_utf8(output).expect("base 64 string must be valid utf8")
+        // Write bytes
+        let encoded_len = BASE64_STANDARD
+            .encode_slice(line, &mut encoded)
+            .expect("encoded base64 max line length is known");
+        writer.write_all(&encoded[..encoded_len])?;
+    }
+    Ok(())
 }
 
 #[cfg(test)]

@@ -1,6 +1,8 @@
 use std::fmt;
 
-use base64::{engine::general_purpose::STANDARD as base64_standard, Engine};
+use base64::{engine::general_purpose::STANDARD as BASE64_STANDARD, Engine};
+
+use crate::stream::xml_encode_data_base64;
 
 /// A byte buffer used for serialization to and from the plist data type.
 ///
@@ -48,7 +50,7 @@ impl Data {
 
     /// Create a `Data` object from an XML plist (Base-64) encoded string.
     pub fn from_xml_format(b64_str: &str) -> Result<Self, InvalidXmlData> {
-        base64_standard
+        BASE64_STANDARD
             .decode(b64_str)
             .map_err(InvalidXmlData)
             .map(Data::new)
@@ -56,7 +58,7 @@ impl Data {
 
     /// Converts the `Data` to an XML plist (Base-64) string.
     pub fn to_xml_format(&self) -> String {
-        crate::stream::base64_encode_plist(&self.inner, 0)
+        xml_encode_data_base64(&self.inner)
     }
 }
 

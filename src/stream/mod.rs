@@ -12,7 +12,7 @@ pub use self::xml_reader::XmlReader;
 mod xml_writer;
 pub use self::xml_writer::XmlWriter;
 #[cfg(feature = "serde")]
-pub(crate) use xml_writer::base64_encode_plist;
+pub(crate) use xml_writer::encode_data_base64 as xml_encode_data_base64;
 
 use std::{
     borrow::Cow,
@@ -90,7 +90,7 @@ enum StackItem<'a> {
 pub struct XmlWriteOptions {
     root_element: bool,
     indent_char: u8,
-    indent_amount: usize,
+    indent_count: usize,
 }
 
 impl XmlWriteOptions {
@@ -127,10 +127,12 @@ impl XmlWriteOptions {
 
     /// Specifies the character and amount used for indentation.
     ///
+    /// `indent_char` must be a valid UTF8 character.
+    ///
     /// The default is indenting with a single tab.
-    pub fn indent(mut self, indent_char: u8, indent_amount: usize) -> Self {
+    pub fn indent(mut self, indent_char: u8, indent_count: usize) -> Self {
         self.indent_char = indent_char;
-        self.indent_amount = indent_amount;
+        self.indent_count = indent_count;
         self
     }
 
@@ -156,7 +158,7 @@ impl Default for XmlWriteOptions {
     fn default() -> Self {
         XmlWriteOptions {
             indent_char: b'\t',
-            indent_amount: 1,
+            indent_count: 1,
             root_element: true,
         }
     }
