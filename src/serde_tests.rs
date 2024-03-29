@@ -799,29 +799,67 @@ fn deserialize_dictionary_binary_nskeyedarchiver() {
     assert_eq!(version, 100000);
 }
 
-#[test]
-fn xml_with_bom_and_whitespace() {
+fn try_parse_xml(bom: bool, whitespace: bool, decl: bool, comment: bool, doctype: bool) -> bool {
     #[derive(Deserialize)]
     struct LayerinfoData {
         color: Option<String>,
     }
 
     let mut data = Vec::new();
-    // The UTF-8 byte order mark
-    data.extend(b"\xef\xbb\xbf");
-    data.extend(b"\r\n\t ");
-    data.extend(r#"<?xml version="1.0" encoding="UTF-8"?>
-        <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-        <plist version="1.0">
+    if bom {
+        // The UTF-8 byte order mark
+        data.extend(b"\xef\xbb\xbf");
+    }
+
+    if whitespace {
+        data.extend(b"\r\n\t ");
+    }
+
+    if decl {
+        data.extend(br#"<?xml version="1.0" encoding="UTF-8"?>"#);
+    }
+
+    if comment {
+        data.extend(br#"<!-- hello -->"#);
+    }
+
+    if doctype {
+        data.extend(br#"<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">"#);
+    }
+
+    data.extend(
+        br#"<plist version="1.0">
         <dict>
             <key>color</key>
             <string>1,0.75,0,0.7</string>
         </dict>
         </plist>
-        "#.as_bytes());
+        "#,
+    );
 
-    let lib_dict: LayerinfoData = crate::from_bytes(&data).unwrap();
-    assert_eq!(lib_dict.color.unwrap(), "1,0.75,0,0.7");
+    if let Ok(lib_dict) = crate::from_bytes::<LayerinfoData>(&data) {
+        lib_dict.color.unwrap() == "1,0.75,0,0.7"
+    } else {
+        false
+    }
+}
+
+#[test]
+fn xml_detection() {
+    for bom in [true, false] {
+        for whitespace in [true, false] {
+            for decl in [true, false] {
+                for comment in [true, false] {
+                    for doctype in [true, false] {
+                        assert!(
+                        try_parse_xml(bom, whitespace, decl, comment, doctype),
+                        "bom={bom}, whitespace={whitespace}, decl={decl}, comment={comment}, doctype={doctype}"
+                    );
+                    }
+                }
+            }
+        }
+    }
 }
 
 #[test]

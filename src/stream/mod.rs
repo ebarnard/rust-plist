@@ -19,7 +19,7 @@ pub use self::ascii_reader::AsciiReader;
 
 use std::{
     borrow::Cow,
-    io::{Read, Seek},
+    io::{Read, Seek, SeekFrom},
     vec,
 };
 
@@ -255,36 +255,37 @@ impl<R: Read + Seek> Reader<R> {
         Ok(is_binary)
     }
 
-    fn is_xml(reader: &mut R) -> Result<bool, Error> {
-        const UTF32_BE_BOM: [u8; 4] = [0, 0, 0xfe, 0xff];
-        const UTF32_LE_BOM: [u8; 4] = [0xff, 0xfe, 0, 0];
-        const UTF32_2143_BOM: [u8; 4] = [0, 0, 0xff, 0xfe];
-        const UTF32_3412_BOM: [u8; 4] = [0xfe, 0xff, 0, 0];
-        const UTF8_BOM: [u8; 3] = [0xef, 0xbb, 0xbf];
-        const UTF16_BE_BOM: [u8; 2] = [0xfe, 0xff];
-        const UTF16_LE_BOM: [u8; 2] = [0xff, 0xfe];
+    fn skip_bom(reader: &mut R) -> Result<(), Error> {
+        const UTF32_BE_BOM: &[u8] = &[0, 0, 0xfe, 0xff];
+        const UTF32_LE_BOM: &[u8] = &[0xff, 0xfe, 0, 0];
+        const UTF32_2143_BOM: &[u8] = &[0, 0, 0xff, 0xfe];
+        const UTF32_3412_BOM: &[u8] = &[0xfe, 0xff, 0, 0];
+        const UTF8_BOM: &[u8] = &[0xef, 0xbb, 0xbf];
+        const UTF16_BE_BOM: &[u8] = &[0xfe, 0xff];
+        const UTF16_LE_BOM: &[u8] = &[0xff, 0xfe];
 
-        const BOMS: [&[u8]; 7] = [
-            UTF32_BE_BOM.as_slice(),
-            UTF32_LE_BOM.as_slice(),
-            UTF32_2143_BOM.as_slice(),
-            UTF32_3412_BOM.as_slice(),
-            UTF8_BOM.as_slice(),
-            UTF16_BE_BOM.as_slice(),
-            UTF16_LE_BOM.as_slice(),
+        const BOMS: &[&[u8]] = &[
+            UTF32_BE_BOM,
+            UTF32_LE_BOM,
+            UTF32_2143_BOM,
+            UTF32_3412_BOM,
+            UTF8_BOM,
+            UTF16_BE_BOM,
+            UTF16_LE_BOM,
         ];
 
         for bom in BOMS {
             Self::rewind(reader)?;
-            let matches = Self::reader_matches(reader, bom)?;
-
-            if matches {
-                Self::rewind(reader)?;
-                return Ok(true);
+            if Self::reader_matches(reader, bom)? {
+                return Ok(());
             }
         }
 
-        Self::rewind(reader)?;
+        Self::rewind(reader)
+    }
+
+    fn is_xml(reader: &mut R) -> Result<bool, Error> {
+        Self::skip_bom(reader)?;
 
         let is_xml = loop {
             let byte = Self::next_byte(reader)?;
@@ -292,8 +293,11 @@ impl<R: Read + Seek> Reader<R> {
                 continue;
             }
 
-            if byte == b'<' && Self::reader_matches(reader, b"?xml")? {
-                break true;
+            if byte == b'<' {
+                break Self::reader_matches(reader, b"?xml")?
+                    || Self::reader_matches(reader, b"!--")?
+                    || Self::reader_matches(reader, b"!DOCTYPE")?
+                    || Self::reader_matches(reader, b"plist")?;
             }
 
             break false;
@@ -312,6 +316,15 @@ impl<R: Read + Seek> Reader<R> {
         reader.rewind().map_err(Self::from_io_offset_0)
     }
 
+    fn seek(reader: &mut R, pos: SeekFrom) -> Result<u64, Error> {
+        reader
+            .seek(pos)
+            .map_err(|err| match reader.stream_position() {
+                Err(pos_err) => ErrorKind::Io(pos_err).without_position(),
+                Ok(pos) => ErrorKind::Io(err).with_byte_offset(pos),
+            })
+    }
+
     fn next_byte(reader: &mut R) -> Result<u8, Error> {
         let mut buf = [0u8];
 
@@ -325,9 +338,11 @@ impl<R: Read + Seek> Reader<R> {
         Ok(buf[0])
     }
 
+    // On failure the reader's position remains where it was.
     fn reader_matches(reader: &mut R, input: &[u8]) -> Result<bool, Error> {
-        for byte in input {
+        for (index, byte) in input.iter().enumerate() {
             if *byte != Self::next_byte(reader)? {
+                Self::seek(reader, SeekFrom::Current(-(index as i64 + 1)))?;
                 return Ok(false);
             }
         }

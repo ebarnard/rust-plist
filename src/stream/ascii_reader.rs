@@ -1,8 +1,8 @@
 /// Ascii property lists are used in legacy settings and only support four
 /// datatypes: Array, Dictionary, String and Data.
 /// See [Apple
-/// Documentation](https://developer.apple.com/library/archive/documentation/Cocoa/Conceptual/PropertyLists/OldStylePlists/OldStylePLists.htf
-/// for more infos.
+/// Documentation](https://developer.apple.com/library/archive/documentation/Cocoa/Conceptual/PropertyLists/OldStylePlists/OldStylePLists.html)
+/// for more info.
 /// However this reader also support Integers as first class datatype.
 /// This reader will accept certain ill-formed ascii plist without complaining.
 /// It does not check the integrity of the plist format.
@@ -293,10 +293,10 @@ impl<R: Read> AsciiReader<R> {
 
     /// Consumes the reader until it finds a valid Event
     /// Possible events for Ascii plists:
-    ///  - StartArray(Option<u64>),
-    ///  - StartDictionary(Option<u64>),
-    ///  - EndCollection,
-    ///  - Data(Vec<u8>),
+    ///  - `StartArray(Option<u64>)`,
+    ///  - `StartDictionary(Option<u64>)`,
+    ///  - `EndCollection`,
+    ///  - `Data(Vec<u8>)`,
     fn read_next(&mut self) -> Result<Option<OwnedEvent>, Error> {
         while let Some(c) = self.advance()? {
             match c {
@@ -332,8 +332,8 @@ impl<R: Read> Iterator for AsciiReader<R> {
 }
 
 /// Maps NextStep encoding to Unicode, see:
-/// - https://github.com/fonttools/openstep-plist/blob/master/src/openstep_plist/parser.pyx#L87-L106
-/// - ftp://ftp.unicode.org/Public/MAPPINGS/VENDORS/NEXT/NEXTSTEP.TXT
+/// - <https://github.com/fonttools/openstep-plist/blob/master/src/openstep_plist/parser.pyx#L87-L106>
+/// - <ftp://ftp.unicode.org/Public/MAPPINGS/VENDORS/NEXT/NEXTSTEP.TXT>
 fn map_next_step_to_unicode(c: char) -> char {
     const NEXT_UNICODE_MAPPING: &[char] = &[
         '\u{A0}', '\u{C0}', '\u{C1}', '\u{C2}', '\u{C3}', '\u{C4}', '\u{C5}', '\u{C7}', '\u{C8}',
@@ -366,7 +366,7 @@ fn map_next_step_to_unicode(c: char) -> char {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::stream::Event::{self, *};
+    use crate::stream::Event::*;
     use std::io::Cursor;
     use std::{fs::File, path::Path};
 
