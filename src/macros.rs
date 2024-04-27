@@ -36,8 +36,11 @@ macro_rules! plist_dict {
 ///
 /// ```
 /// # use plist::{plist_array, Value};
-/// let array = plist_array! [1, 2, 3];
-/// assert_eq!(array, Value::Array(vec![Value::from(1), Value::from(2), Value::from(3)]));
+/// let array = plist_array![1, 2];
+/// assert_eq!(array, Value::Array(vec![Value::from(1), Value::from(2)]));
+///
+/// let other_array = plist_array!["hi"; 2];
+/// assert_eq!(other_array, Value::Array(vec![Value::from("hi"), Value::from("hi")]));
 /// ```
 #[macro_export]
 macro_rules! plist_array {
