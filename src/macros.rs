@@ -30,8 +30,37 @@ macro_rules! plist_dict {
     };
 }
 
+/// Create a [`Value::Array`](crate::Value::Array) from a list of values
+///
+/// ## Example
+///
+/// ```
+/// # use plist::{plist_array, Value};
+/// let array = plist_array! [1, 2, 3];
+/// assert_eq!(array, Value::Array(vec![Value::from(1), Value::from(2), Value::from(3)]));
+/// ```
+#[macro_export]
+macro_rules! plist_array {
+    (@single $($x:tt)*) => (());
+    (@count $($rest:expr),*) => (<[()]>::len(&[$($crate::plist_array!(@single $rest)),*]));
+
+    ($($value:expr,)+) => { $crate::plist_array!($($value),+) };
+    ($($value:expr),*) => {
+        {
+            let item_count = $crate::plist_array!(@count $($value),*);
+            let mut _array = ::std::vec::Vec::with_capacity(item_count);
+            $(
+                _array.push($crate::Value::from($value));
+            )*
+            $crate::Value::Array(_array)
+        }
+    };
+}
+
 #[cfg(test)]
 mod tests {
+    use crate::Value;
+
     #[test]
     fn test_plist_dict() {
         let digits = plist_dict! {
@@ -51,5 +80,25 @@ mod tests {
                 "two" => 2,
             },
         };
+    }
+
+    #[test]
+    fn test_plist_array() {
+        let digits = plist_array![1, 2, 3];
+        let Value::Array(digits) = &digits else {
+            panic!("wrong plist::Value variant, expected Value::Array, got {digits:?}");
+        };
+        assert_eq!(
+            digits,
+            &vec![Value::from(1), Value::from(2), Value::from(3)],
+        );
+
+        let empty = plist_array![];
+        let Value::Array(empty) = &empty else {
+            panic!("wrong plist::Value variant, expected Value::Array, got {empty:?}");
+        };
+        assert!(empty.is_empty());
+
+        let _nested_compiles = plist_array![plist_array![1, 2, 3]];
     }
 }
