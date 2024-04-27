@@ -55,6 +55,8 @@ macro_rules! plist_array {
             $crate::Value::Array(_array)
         }
     };
+
+    ($value:expr; $n:expr) => ($crate::Value::Array(::std::vec![$crate::Value::from($value); $n]));
 }
 
 #[cfg(test)]
@@ -92,6 +94,12 @@ mod tests {
             digits,
             &vec![Value::from(1), Value::from(2), Value::from(3)],
         );
+
+        let repeated = plist_array![1; 5];
+        let Value::Array(repeated) = &repeated else {
+            panic!("wrong plist::Value variant, expected Value::Array, got {repeated:?}");
+        };
+        assert_eq!(repeated, &vec![Value::from(1); 5]);
 
         let empty = plist_array![];
         let Value::Array(empty) = &empty else {
