@@ -34,9 +34,10 @@ struct ReaderState<R: Read>(EventReader<BufReader<R>>);
 impl<R: Read> XmlReader<R> {
     pub fn new(reader: R) -> XmlReader<R> {
         let mut xml_reader = EventReader::from_reader(BufReader::new(reader));
-        xml_reader.trim_text(false);
-        xml_reader.check_end_names(true);
-        xml_reader.expand_empty_elements(true);
+        let config = xml_reader.config_mut();
+        config.trim_text(false);
+        config.check_end_names = true;
+        config.expand_empty_elements = true;
 
         XmlReader {
             buffer: Vec::new(),
@@ -56,7 +57,8 @@ impl From<XmlReaderError> for ErrorKind {
                 Ok(err) => ErrorKind::Io(err),
                 Err(err) => ErrorKind::Io(std::io::Error::from(err.kind())),
             },
-            XmlReaderError::UnexpectedEof(_) => ErrorKind::UnexpectedEof,
+            XmlReaderError::Syntax(_) => ErrorKind::UnexpectedEof,
+            XmlReaderError::IllFormed(_) => ErrorKind::InvalidXmlSyntax,
             XmlReaderError::NonDecodable(_) => ErrorKind::InvalidXmlUtf8,
             _ => ErrorKind::InvalidXmlSyntax,
         }
