@@ -89,8 +89,6 @@ mod error;
 mod integer;
 mod uid;
 mod value;
-#[macro_use]
-#[cfg(feature = "serde")]
 mod macros;
 
 #[cfg(feature = "serde")]
