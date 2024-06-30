@@ -1,6 +1,6 @@
 use base64::{engine::general_purpose::STANDARD as base64_standard, Engine};
 use quick_xml::{events::Event as XmlEvent, Error as XmlReaderError, Reader as EventReader};
-use std::io::{self, BufReader, Read};
+use std::io::{self, BufRead};
 
 use crate::{
     error::{Error, ErrorKind, FilePosition},
@@ -23,14 +23,14 @@ impl AsRef<[u8]> for ElmName {
     }
 }
 
-pub struct XmlReader<R: Read> {
+pub struct XmlReader<R: BufRead> {
     buffer: Vec<u8>,
     started: bool,
     finished: bool,
     state: ReaderState<R>,
 }
 
-struct ReaderState<R: Read>(EventReader<BufReader<R>>);
+struct ReaderState<R: BufRead>(EventReader<R>);
 
 enum ReadResult {
     XmlDecl,
@@ -38,9 +38,9 @@ enum ReadResult {
     Eof,
 }
 
-impl<R: Read> XmlReader<R> {
+impl<R: BufRead> XmlReader<R> {
     pub fn new(reader: R) -> XmlReader<R> {
-        let mut xml_reader = EventReader::from_reader(BufReader::new(reader));
+        let mut xml_reader = EventReader::from_reader(reader);
         let config = xml_reader.config_mut();
         config.trim_text(false);
         config.check_end_names = true;
@@ -54,8 +54,8 @@ impl<R: Read> XmlReader<R> {
         }
     }
 
-    pub(crate) fn into_inner(self) -> R {
-        self.state.0.into_inner().into_inner()
+    pub fn into_inner(self) -> R {
+        self.state.0.into_inner()
     }
 
     pub(crate) fn xml_doc_started(&self) -> bool {
@@ -81,7 +81,7 @@ impl From<XmlReaderError> for ErrorKind {
     }
 }
 
-impl<R: Read> Iterator for XmlReader<R> {
+impl<R: BufRead> Iterator for XmlReader<R> {
     type Item = Result<OwnedEvent, Error>;
 
     fn next(&mut self) -> Option<Result<OwnedEvent, Error>> {
@@ -112,7 +112,7 @@ impl<R: Read> Iterator for XmlReader<R> {
     }
 }
 
-impl<R: Read> ReaderState<R> {
+impl<R: BufRead> ReaderState<R> {
     fn xml_reader_pos(&self) -> FilePosition {
         let pos = self.0.buffer_position();
         FilePosition(pos as u64)
@@ -239,7 +239,7 @@ impl<R: Read> ReaderState<R> {
 
 #[cfg(test)]
 mod tests {
-    use std::fs::File;
+    use std::{fs::File, io::BufReader};
 
     use super::*;
     use crate::stream::Event::*;
@@ -247,7 +247,7 @@ mod tests {
     #[test]
     fn streaming_parser() {
         let reader = File::open("./tests/data/xml.plist").unwrap();
-        let streaming_parser = XmlReader::new(reader);
+        let streaming_parser = XmlReader::new(BufReader::new(reader));
         let events: Result<Vec<_>, _> = streaming_parser.collect();
 
         let comparison = &[
@@ -288,7 +288,7 @@ mod tests {
     #[test]
     fn bad_data() {
         let reader = File::open("./tests/data/xml_error.plist").unwrap();
-        let streaming_parser = XmlReader::new(reader);
+        let streaming_parser = XmlReader::new(BufReader::new(reader));
         let events: Vec<_> = streaming_parser.collect();
 
         assert!(events.last().unwrap().is_err());

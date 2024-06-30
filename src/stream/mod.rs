@@ -19,7 +19,7 @@ pub use self::ascii_reader::AsciiReader;
 
 use std::{
     borrow::Cow,
-    io::{self, Read, Seek},
+    io::{self, BufReader, Read, Seek},
     vec,
 };
 
@@ -238,9 +238,9 @@ pub struct Reader<R: Read + Seek>(ReaderInner<R>);
 
 enum ReaderInner<R: Read + Seek> {
     Uninitialized(Option<R>),
-    Xml(XmlReader<R>),
     Binary(BinaryReader<R>),
-    Ascii(AsciiReader<R>),
+    Xml(XmlReader<BufReader<R>>),
+    Ascii(AsciiReader<BufReader<R>>),
 }
 
 impl<R: Read + Seek> Reader<R> {
@@ -248,9 +248,12 @@ impl<R: Read + Seek> Reader<R> {
         Reader(ReaderInner::Uninitialized(Some(reader)))
     }
 
-    fn init(&mut self, reader: R) -> Result<Option<OwnedEvent>, Error> {
+    fn init(&mut self, mut reader: R) -> Result<Option<OwnedEvent>, Error> {
         // Rewind reader back to the start.
-        let mut reader = self.rewind(reader)?;
+        if let Err(err) = reader.rewind().map_err(from_io_offset_0) {
+            self.0 = ReaderInner::Uninitialized(Some(reader));
+            return Err(err);
+        }
 
         // A plist is binary if it starts with magic bytes.
         match Reader::is_binary(&mut reader) {
@@ -266,19 +269,26 @@ impl<R: Read + Seek> Reader<R> {
         };
 
         // If a plist is not binary, try to parse as XML.
-        let mut xml_reader = XmlReader::new(reader);
-        let reader = match xml_reader.next() {
+        // Use a `BufReader` for XML and ASCII plists as it is required by `quick-xml` and will
+        // definitely speed up ASCII parsing as well.
+        let mut xml_reader = XmlReader::new(BufReader::new(reader));
+        let mut reader = match xml_reader.next() {
             res @ Some(Ok(_)) | res @ None => {
                 self.0 = ReaderInner::Xml(xml_reader);
                 return res.transpose();
             }
             Some(Err(err)) if xml_reader.xml_doc_started() => {
-                self.0 = ReaderInner::Uninitialized(Some(xml_reader.into_inner()));
+                self.0 = ReaderInner::Uninitialized(Some(xml_reader.into_inner().into_inner()));
                 return Err(err);
             }
             Some(Err(_)) => xml_reader.into_inner(),
         };
-        let reader = self.rewind(reader)?;
+
+        // Rewind reader back to the start.
+        if let Err(err) = reader.rewind().map_err(from_io_offset_0) {
+            self.0 = ReaderInner::Uninitialized(Some(reader.into_inner()));
+            return Err(err);
+        }
 
         // If no valid XML markup is found, try to parse as ASCII.
         let mut ascii_reader = AsciiReader::new(reader);
@@ -288,7 +298,7 @@ impl<R: Read + Seek> Reader<R> {
                 res.transpose()
             }
             Some(Err(err)) => {
-                self.0 = ReaderInner::Uninitialized(Some(ascii_reader.into_inner()));
+                self.0 = ReaderInner::Uninitialized(Some(ascii_reader.into_inner().into_inner()));
                 Err(err)
             }
         }
@@ -300,14 +310,6 @@ impl<R: Read + Seek> Reader<R> {
         reader.rewind().map_err(from_io_offset_0)?;
 
         Ok(&magic == b"bplist00")
-    }
-
-    fn rewind(&mut self, mut reader: R) -> Result<R, Error> {
-        if let Err(err) = reader.rewind().map_err(from_io_offset_0) {
-            self.0 = ReaderInner::Uninitialized(Some(reader));
-            return Err(err);
-        }
-        Ok(reader)
     }
 }
 
