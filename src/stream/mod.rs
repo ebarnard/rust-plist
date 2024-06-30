@@ -369,3 +369,75 @@ pub(crate) mod private {
     impl<W: Write> Sealed for super::BinaryWriter<W> {}
     impl<W: Write> Sealed for super::XmlWriter<W> {}
 }
+
+#[cfg(test)]
+mod tests {
+    use std::fs::File;
+
+    use super::{Event::*, *};
+
+    const ANIMALS_PLIST_EVENTS: &[Event] = &[
+        StartDictionary(None),
+        String(Cow::Borrowed("AnimalColors")),
+        StartDictionary(None),
+        String(Cow::Borrowed("lamb")), // key
+        String(Cow::Borrowed("black")),
+        String(Cow::Borrowed("pig")), // key
+        String(Cow::Borrowed("pink")),
+        String(Cow::Borrowed("worm")), // key
+        String(Cow::Borrowed("pink")),
+        EndCollection,
+        String(Cow::Borrowed("AnimalSmells")),
+        StartDictionary(None),
+        String(Cow::Borrowed("lamb")), // key
+        String(Cow::Borrowed("lambish")),
+        String(Cow::Borrowed("pig")), // key
+        String(Cow::Borrowed("piggish")),
+        String(Cow::Borrowed("worm")), // key
+        String(Cow::Borrowed("wormy")),
+        EndCollection,
+        String(Cow::Borrowed("AnimalSounds")),
+        StartDictionary(None),
+        String(Cow::Borrowed("Lisa")), // key
+        String(Cow::Borrowed("Why is the worm talking like a lamb?")),
+        String(Cow::Borrowed("lamb")), // key
+        String(Cow::Borrowed("baa")),
+        String(Cow::Borrowed("pig")), // key
+        String(Cow::Borrowed("oink")),
+        String(Cow::Borrowed("worm")), // key
+        String(Cow::Borrowed("baa")),
+        EndCollection,
+        EndCollection,
+    ];
+
+    #[test]
+    fn autodetect_binary() {
+        let reader = File::open("./tests/data/binary.plist").unwrap();
+        let mut streaming_parser = Reader::new(reader);
+        let events: Result<Vec<_>, _> = streaming_parser.by_ref().collect();
+
+        assert!(matches!(streaming_parser.0, ReaderInner::Binary(_)));
+        // The contents of this plist are tested for elsewhere.
+        assert!(events.is_ok());
+    }
+
+    #[test]
+    fn autodetect_xml() {
+        let reader = File::open("./tests/data/xml-animals.plist").unwrap();
+        let mut streaming_parser = Reader::new(reader);
+        let events: Result<Vec<_>, _> = streaming_parser.by_ref().collect();
+
+        assert!(matches!(streaming_parser.0, ReaderInner::Xml(_)));
+        assert_eq!(events.unwrap(), ANIMALS_PLIST_EVENTS);
+    }
+
+    #[test]
+    fn autodetect_ascii() {
+        let reader = File::open("./tests/data/ascii-animals.plist").unwrap();
+        let mut streaming_parser = Reader::new(reader);
+        let events: Result<Vec<_>, _> = streaming_parser.by_ref().collect();
+
+        assert!(matches!(streaming_parser.0, ReaderInner::Ascii(_)));
+        assert_eq!(events.unwrap(), ANIMALS_PLIST_EVENTS);
+    }
+}

@@ -239,7 +239,7 @@ impl<R: Read> ReaderState<R> {
 
 #[cfg(test)]
 mod tests {
-    use std::{fs::File, path::Path};
+    use std::fs::File;
 
     use super::*;
     use crate::stream::Event::*;
@@ -248,7 +248,7 @@ mod tests {
     fn streaming_parser() {
         let reader = File::open("./tests/data/xml.plist").unwrap();
         let streaming_parser = XmlReader::new(reader);
-        let events: Vec<Event> = streaming_parser.map(|e| e.unwrap()).collect();
+        let events: Result<Vec<_>, _> = streaming_parser.collect();
 
         let comparison = &[
             StartDictionary(None),
@@ -282,50 +282,7 @@ mod tests {
             EndCollection,
         ];
 
-        assert_eq!(events, comparison);
-    }
-
-    #[test]
-    fn streaming_animals() {
-        let reader = File::open(&Path::new("./tests/data/xml-animals.plist")).unwrap();
-        let streaming_parser = XmlReader::new(reader);
-        let events: Vec<Event> = streaming_parser.map(|e| e.unwrap()).collect();
-
-        let comparison = &[
-            StartDictionary(None),
-            String("AnimalColors".into()),
-            StartDictionary(None),
-            String("lamb".into()), // key
-            String("black".into()),
-            String("pig".into()), // key
-            String("pink".into()),
-            String("worm".into()), // key
-            String("pink".into()),
-            EndCollection,
-            String("AnimalSmells".into()),
-            StartDictionary(None),
-            String("lamb".into()), // key
-            String("lambish".into()),
-            String("pig".into()), // key
-            String("piggish".into()),
-            String("worm".into()), // key
-            String("wormy".into()),
-            EndCollection,
-            String("AnimalSounds".into()),
-            StartDictionary(None),
-            String("Lisa".into()), // key
-            String("Why is the worm talking like a lamb?".into()),
-            String("lamb".into()), // key
-            String("baa".into()),
-            String("pig".into()), // key
-            String("oink".into()),
-            String("worm".into()), // key
-            String("baa".into()),
-            EndCollection,
-            EndCollection,
-        ];
-
-        assert_eq!(events, comparison);
+        assert_eq!(events.unwrap(), comparison);
     }
 
     #[test]
