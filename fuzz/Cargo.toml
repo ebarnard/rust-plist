@@ -20,6 +20,10 @@ git = "https://github.com/rust-fuzz/libfuzzer-sys.git"
 members = ["."]
 
 [[bin]]
+name = "ascii_reader"
+path = "fuzz_targets/ascii_reader.rs"
+
+[[bin]]
 name = "binary_reader"
 path = "fuzz_targets/binary_reader.rs"
 

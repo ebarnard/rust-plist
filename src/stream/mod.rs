@@ -14,9 +14,12 @@ pub use self::xml_writer::XmlWriter;
 #[cfg(feature = "serde")]
 pub(crate) use xml_writer::encode_data_base64 as xml_encode_data_base64;
 
+mod ascii_reader;
+pub use self::ascii_reader::AsciiReader;
+
 use std::{
     borrow::Cow,
-    io::{self, Read, Seek, SeekFrom},
+    io::{self, Read, Seek},
     vec,
 };
 
@@ -237,6 +240,7 @@ enum ReaderInner<R: Read + Seek> {
     Uninitialized(Option<R>),
     Xml(XmlReader<R>),
     Binary(BinaryReader<R>),
+    Ascii(AsciiReader<R>),
 }
 
 impl<R: Read + Seek> Reader<R> {
@@ -244,17 +248,66 @@ impl<R: Read + Seek> Reader<R> {
         Reader(ReaderInner::Uninitialized(Some(reader)))
     }
 
-    fn is_binary(reader: &mut R) -> Result<bool, Error> {
-        fn from_io_offset_0(err: io::Error) -> Error {
-            ErrorKind::Io(err).with_byte_offset(0)
-        }
+    fn init(&mut self, reader: R) -> Result<Option<OwnedEvent>, Error> {
+        // Rewind reader back to the start.
+        let mut reader = self.rewind(reader)?;
 
-        reader.seek(SeekFrom::Start(0)).map_err(from_io_offset_0)?;
+        // A plist is binary if it starts with magic bytes.
+        match Reader::is_binary(&mut reader) {
+            Ok(true) => {
+                self.0 = ReaderInner::Binary(BinaryReader::new(reader));
+                return self.next().transpose();
+            }
+            Ok(false) => (),
+            Err(err) => {
+                self.0 = ReaderInner::Uninitialized(Some(reader));
+                return Err(err);
+            }
+        };
+
+        // If a plist is not binary, try to parse as XML.
+        let mut xml_reader = XmlReader::new(reader);
+        let reader = match xml_reader.next() {
+            res @ Some(Ok(_)) | res @ None => {
+                self.0 = ReaderInner::Xml(xml_reader);
+                return res.transpose();
+            }
+            Some(Err(err)) if xml_reader.xml_doc_started() => {
+                self.0 = ReaderInner::Uninitialized(Some(xml_reader.into_inner()));
+                return Err(err);
+            }
+            Some(Err(_)) => xml_reader.into_inner(),
+        };
+        let reader = self.rewind(reader)?;
+
+        // If no valid XML markup is found, try to parse as ASCII.
+        let mut ascii_reader = AsciiReader::new(reader);
+        match ascii_reader.next() {
+            res @ Some(Ok(_)) | res @ None => {
+                self.0 = ReaderInner::Ascii(ascii_reader);
+                res.transpose()
+            }
+            Some(Err(err)) => {
+                self.0 = ReaderInner::Uninitialized(Some(ascii_reader.into_inner()));
+                Err(err)
+            }
+        }
+    }
+
+    fn is_binary(reader: &mut R) -> Result<bool, Error> {
         let mut magic = [0; 8];
         reader.read_exact(&mut magic).map_err(from_io_offset_0)?;
-        reader.seek(SeekFrom::Start(0)).map_err(from_io_offset_0)?;
+        reader.rewind().map_err(from_io_offset_0)?;
 
         Ok(&magic == b"bplist00")
+    }
+
+    fn rewind(&mut self, mut reader: R) -> Result<R, Error> {
+        if let Err(err) = reader.rewind().map_err(from_io_offset_0) {
+            self.0 = ReaderInner::Uninitialized(Some(reader));
+            return Err(err);
+        }
+        Ok(reader)
     }
 }
 
@@ -262,23 +315,20 @@ impl<R: Read + Seek> Iterator for Reader<R> {
     type Item = Result<OwnedEvent, Error>;
 
     fn next(&mut self) -> Option<Result<OwnedEvent, Error>> {
-        let mut reader = match self.0 {
-            ReaderInner::Xml(ref mut parser) => return parser.next(),
-            ReaderInner::Binary(ref mut parser) => return parser.next(),
-            ReaderInner::Uninitialized(ref mut reader) => reader.take().unwrap(),
-        };
-
-        match Reader::is_binary(&mut reader) {
-            Ok(true) => self.0 = ReaderInner::Binary(BinaryReader::new(reader)),
-            Ok(false) => self.0 = ReaderInner::Xml(XmlReader::new(reader)),
-            Err(err) => {
-                self.0 = ReaderInner::Uninitialized(Some(reader));
-                return Some(Err(err));
+        match self.0 {
+            ReaderInner::Xml(ref mut parser) => parser.next(),
+            ReaderInner::Binary(ref mut parser) => parser.next(),
+            ReaderInner::Ascii(ref mut parser) => parser.next(),
+            ReaderInner::Uninitialized(ref mut reader) => {
+                let reader = reader.take().unwrap();
+                self.init(reader).transpose()
             }
         }
-
-        self.next()
     }
+}
+
+fn from_io_offset_0(err: io::Error) -> Error {
+    ErrorKind::Io(err).with_byte_offset(0)
 }
 
 /// Supports writing event streams in different plist encodings.
@@ -318,4 +368,76 @@ pub(crate) mod private {
 
     impl<W: Write> Sealed for super::BinaryWriter<W> {}
     impl<W: Write> Sealed for super::XmlWriter<W> {}
+}
+
+#[cfg(test)]
+mod tests {
+    use std::fs::File;
+
+    use super::{Event::*, *};
+
+    const ANIMALS_PLIST_EVENTS: &[Event] = &[
+        StartDictionary(None),
+        String(Cow::Borrowed("AnimalColors")),
+        StartDictionary(None),
+        String(Cow::Borrowed("lamb")), // key
+        String(Cow::Borrowed("black")),
+        String(Cow::Borrowed("pig")), // key
+        String(Cow::Borrowed("pink")),
+        String(Cow::Borrowed("worm")), // key
+        String(Cow::Borrowed("pink")),
+        EndCollection,
+        String(Cow::Borrowed("AnimalSmells")),
+        StartDictionary(None),
+        String(Cow::Borrowed("lamb")), // key
+        String(Cow::Borrowed("lambish")),
+        String(Cow::Borrowed("pig")), // key
+        String(Cow::Borrowed("piggish")),
+        String(Cow::Borrowed("worm")), // key
+        String(Cow::Borrowed("wormy")),
+        EndCollection,
+        String(Cow::Borrowed("AnimalSounds")),
+        StartDictionary(None),
+        String(Cow::Borrowed("Lisa")), // key
+        String(Cow::Borrowed("Why is the worm talking like a lamb?")),
+        String(Cow::Borrowed("lamb")), // key
+        String(Cow::Borrowed("baa")),
+        String(Cow::Borrowed("pig")), // key
+        String(Cow::Borrowed("oink")),
+        String(Cow::Borrowed("worm")), // key
+        String(Cow::Borrowed("baa")),
+        EndCollection,
+        EndCollection,
+    ];
+
+    #[test]
+    fn autodetect_binary() {
+        let reader = File::open("./tests/data/binary.plist").unwrap();
+        let mut streaming_parser = Reader::new(reader);
+        let events: Result<Vec<_>, _> = streaming_parser.by_ref().collect();
+
+        assert!(matches!(streaming_parser.0, ReaderInner::Binary(_)));
+        // The contents of this plist are tested for elsewhere.
+        assert!(events.is_ok());
+    }
+
+    #[test]
+    fn autodetect_xml() {
+        let reader = File::open("./tests/data/xml-animals.plist").unwrap();
+        let mut streaming_parser = Reader::new(reader);
+        let events: Result<Vec<_>, _> = streaming_parser.by_ref().collect();
+
+        assert!(matches!(streaming_parser.0, ReaderInner::Xml(_)));
+        assert_eq!(events.unwrap(), ANIMALS_PLIST_EVENTS);
+    }
+
+    #[test]
+    fn autodetect_ascii() {
+        let reader = File::open("./tests/data/ascii-animals.plist").unwrap();
+        let mut streaming_parser = Reader::new(reader);
+        let events: Result<Vec<_>, _> = streaming_parser.by_ref().collect();
+
+        assert!(matches!(streaming_parser.0, ReaderInner::Ascii(_)));
+        assert_eq!(events.unwrap(), ANIMALS_PLIST_EVENTS);
+    }
 }

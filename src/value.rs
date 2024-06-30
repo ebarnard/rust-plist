@@ -8,7 +8,8 @@ use std::{
 use crate::{
     error::{self, Error, ErrorKind, EventKind},
     stream::{
-        private, BinaryWriter, Event, Events, Reader, Writer, XmlReader, XmlWriteOptions, XmlWriter,
+        private, AsciiReader, BinaryWriter, Event, Events, Reader, Writer, XmlReader,
+        XmlWriteOptions, XmlWriter,
     },
     u64_to_usize, Date, Dictionary, Integer, Uid,
 };
@@ -41,7 +42,13 @@ impl Value {
         Value::from_events(reader)
     }
 
-    /// Reads a `Value` from a seekable byte stream containing an XML encoded plist.
+    /// Reads a `Value` from a byte stream containing an ASCII encoded plist.
+    pub fn from_reader_ascii<R: Read>(reader: R) -> Result<Value, Error> {
+        let reader = AsciiReader::new(reader);
+        Value::from_events(reader)
+    }
+
+    /// Reads a `Value` from a byte stream containing an XML encoded plist.
     pub fn from_reader_xml<R: Read>(reader: R) -> Result<Value, Error> {
         let reader = XmlReader::new(reader);
         Value::from_events(reader)
