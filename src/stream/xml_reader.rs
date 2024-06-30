@@ -25,11 +25,18 @@ impl AsRef<[u8]> for ElmName {
 
 pub struct XmlReader<R: Read> {
     buffer: Vec<u8>,
+    started: bool,
     finished: bool,
     state: ReaderState<R>,
 }
 
 struct ReaderState<R: Read>(EventReader<BufReader<R>>);
+
+enum ReadResult {
+    XmlDecl,
+    Event(OwnedEvent),
+    Eof,
+}
 
 impl<R: Read> XmlReader<R> {
     pub fn new(reader: R) -> XmlReader<R> {
@@ -41,9 +48,18 @@ impl<R: Read> XmlReader<R> {
 
         XmlReader {
             buffer: Vec::new(),
+            started: false,
             finished: false,
             state: ReaderState(xml_reader),
         }
+    }
+
+    pub(crate) fn into_inner(self) -> R {
+        self.state.0.into_inner().into_inner()
+    }
+
+    pub(crate) fn xml_doc_started(&self) -> bool {
+        self.started
     }
 }
 
@@ -72,15 +88,25 @@ impl<R: Read> Iterator for XmlReader<R> {
         if self.finished {
             return None;
         }
-        match self.state.read_next(&mut self.buffer) {
-            Ok(Some(event)) => Some(Ok(event)),
-            Ok(None) => {
-                self.finished = true;
-                None
-            }
-            Err(err) => {
-                self.finished = true;
-                Some(Err(err))
+
+        loop {
+            match self.state.read_next(&mut self.buffer) {
+                Ok(ReadResult::XmlDecl) => {
+                    self.started = true;
+                }
+                Ok(ReadResult::Event(event)) => {
+                    self.started = true;
+                    return Some(Ok(event));
+                }
+                Ok(ReadResult::Eof) => {
+                    self.started = true;
+                    self.finished = true;
+                    return None;
+                }
+                Err(err) => {
+                    self.finished = true;
+                    return Some(Err(err));
+                }
             }
         }
     }
@@ -129,16 +155,19 @@ impl<R: Read> ReaderState<R> {
         }
     }
 
-    fn read_next(&mut self, buffer: &mut Vec<u8>) -> Result<Option<OwnedEvent>, Error> {
+    fn read_next(&mut self, buffer: &mut Vec<u8>) -> Result<ReadResult, Error> {
         loop {
             match self.read_xml_event(buffer)? {
+                XmlEvent::Decl(_) | XmlEvent::DocType(_) => return Ok(ReadResult::XmlDecl),
                 XmlEvent::Start(name) => {
                     match name.local_name().as_ref() {
                         b"plist" => {}
-                        b"array" => return Ok(Some(Event::StartArray(None))),
-                        b"dict" => return Ok(Some(Event::StartDictionary(None))),
+                        b"array" => return Ok(ReadResult::Event(Event::StartArray(None))),
+                        b"dict" => return Ok(ReadResult::Event(Event::StartDictionary(None))),
                         b"key" => {
-                            return Ok(Some(Event::String(self.read_content(buffer)?.into())))
+                            return Ok(ReadResult::Event(Event::String(
+                                self.read_content(buffer)?.into(),
+                            )))
                         }
                         b"data" => {
                             let mut encoded = self.read_content(buffer)?;
@@ -147,18 +176,18 @@ impl<R: Read> ReaderState<R> {
                             let data = base64_standard
                                 .decode(&encoded)
                                 .map_err(|_| self.with_pos(ErrorKind::InvalidDataString))?;
-                            return Ok(Some(Event::Data(data.into())));
+                            return Ok(ReadResult::Event(Event::Data(data.into())));
                         }
                         b"date" => {
                             let s = self.read_content(buffer)?;
                             let date = Date::from_xml_format(&s)
                                 .map_err(|_| self.with_pos(ErrorKind::InvalidDateString))?;
-                            return Ok(Some(Event::Date(date)));
+                            return Ok(ReadResult::Event(Event::Date(date)));
                         }
                         b"integer" => {
                             let s = self.read_content(buffer)?;
                             match Integer::from_str(&s) {
-                                Ok(i) => return Ok(Some(Event::Integer(i))),
+                                Ok(i) => return Ok(ReadResult::Event(Event::Integer(i))),
                                 Err(_) => {
                                     return Err(self.with_pos(ErrorKind::InvalidIntegerString))
                                 }
@@ -167,23 +196,25 @@ impl<R: Read> ReaderState<R> {
                         b"real" => {
                             let s = self.read_content(buffer)?;
                             match s.parse() {
-                                Ok(f) => return Ok(Some(Event::Real(f))),
+                                Ok(f) => return Ok(ReadResult::Event(Event::Real(f))),
                                 Err(_) => return Err(self.with_pos(ErrorKind::InvalidRealString)),
                             }
                         }
                         b"string" => {
-                            return Ok(Some(Event::String(self.read_content(buffer)?.into())))
+                            return Ok(ReadResult::Event(Event::String(
+                                self.read_content(buffer)?.into(),
+                            )))
                         }
-                        b"true" => return Ok(Some(Event::Boolean(true))),
-                        b"false" => return Ok(Some(Event::Boolean(false))),
+                        b"true" => return Ok(ReadResult::Event(Event::Boolean(true))),
+                        b"false" => return Ok(ReadResult::Event(Event::Boolean(false))),
                         _ => return Err(self.with_pos(ErrorKind::UnknownXmlElement)),
                     }
                 }
                 XmlEvent::End(name) => match name.local_name().as_ref() {
-                    b"array" | b"dict" => return Ok(Some(Event::EndCollection)),
+                    b"array" | b"dict" => return Ok(ReadResult::Event(Event::EndCollection)),
                     _ => (),
                 },
-                XmlEvent::Eof => return Ok(None),
+                XmlEvent::Eof => return Ok(ReadResult::Eof),
                 XmlEvent::Text(text) => {
                     let unescaped = text
                         .unescape()
@@ -196,8 +227,6 @@ impl<R: Read> ReaderState<R> {
                     }
                 }
                 XmlEvent::PI(_)
-                | XmlEvent::Decl(_)
-                | XmlEvent::DocType(_)
                 | XmlEvent::CData(_)
                 | XmlEvent::Comment(_)
                 | XmlEvent::Empty(_) => {

@@ -19,7 +19,7 @@ pub use self::ascii_reader::AsciiReader;
 
 use std::{
     borrow::Cow,
-    io::{Read, Seek, SeekFrom},
+    io::{self, Read, Seek},
     vec,
 };
 
@@ -248,106 +248,66 @@ impl<R: Read + Seek> Reader<R> {
         Reader(ReaderInner::Uninitialized(Some(reader)))
     }
 
-    fn is_binary(reader: &mut R) -> Result<bool, Error> {
-        Self::rewind(reader)?;
-        let is_binary = Self::reader_matches(reader, b"bplist00")?;
-        Self::rewind(reader)?;
-        Ok(is_binary)
-    }
+    fn init(&mut self, reader: R) -> Result<Option<OwnedEvent>, Error> {
+        // Rewind reader back to the start.
+        let mut reader = self.rewind(reader)?;
 
-    fn skip_bom(reader: &mut R) -> Result<(), Error> {
-        const UTF32_BE_BOM: &[u8] = &[0, 0, 0xfe, 0xff];
-        const UTF32_LE_BOM: &[u8] = &[0xff, 0xfe, 0, 0];
-        const UTF32_2143_BOM: &[u8] = &[0, 0, 0xff, 0xfe];
-        const UTF32_3412_BOM: &[u8] = &[0xfe, 0xff, 0, 0];
-        const UTF8_BOM: &[u8] = &[0xef, 0xbb, 0xbf];
-        const UTF16_BE_BOM: &[u8] = &[0xfe, 0xff];
-        const UTF16_LE_BOM: &[u8] = &[0xff, 0xfe];
-
-        const BOMS: &[&[u8]] = &[
-            UTF32_BE_BOM,
-            UTF32_LE_BOM,
-            UTF32_2143_BOM,
-            UTF32_3412_BOM,
-            UTF8_BOM,
-            UTF16_BE_BOM,
-            UTF16_LE_BOM,
-        ];
-
-        for bom in BOMS {
-            Self::rewind(reader)?;
-            if Self::reader_matches(reader, bom)? {
-                return Ok(());
+        // A plist is binary if it starts with magic bytes.
+        match Reader::is_binary(&mut reader) {
+            Ok(true) => {
+                self.0 = ReaderInner::Binary(BinaryReader::new(reader));
+                return self.next().transpose();
             }
-        }
-
-        Self::rewind(reader)
-    }
-
-    fn is_xml(reader: &mut R) -> Result<bool, Error> {
-        Self::skip_bom(reader)?;
-
-        let is_xml = loop {
-            let byte = Self::next_byte(reader)?;
-            if byte.is_ascii_whitespace() {
-                continue;
+            Ok(false) => (),
+            Err(err) => {
+                self.0 = ReaderInner::Uninitialized(Some(reader));
+                return Err(err);
             }
-
-            if byte == b'<' {
-                break Self::reader_matches(reader, b"?xml")?
-                    || Self::reader_matches(reader, b"!--")?
-                    || Self::reader_matches(reader, b"!DOCTYPE")?
-                    || Self::reader_matches(reader, b"plist")?;
-            }
-
-            break false;
         };
 
-        Self::rewind(reader)?;
+        // If a plist is not binary, try to parse as XML.
+        let mut xml_reader = XmlReader::new(reader);
+        let reader = match xml_reader.next() {
+            res @ Some(Ok(_)) | res @ None => {
+                self.0 = ReaderInner::Xml(xml_reader);
+                return res.transpose();
+            }
+            Some(Err(err)) if xml_reader.xml_doc_started() => {
+                self.0 = ReaderInner::Uninitialized(Some(xml_reader.into_inner()));
+                return Err(err);
+            }
+            Some(Err(_)) => xml_reader.into_inner(),
+        };
+        let reader = self.rewind(reader)?;
 
-        Ok(is_xml)
-    }
-
-    fn from_io_offset_0(err: std::io::Error) -> Error {
-        ErrorKind::Io(err).with_byte_offset(0)
-    }
-
-    fn rewind(reader: &mut R) -> Result<(), Error> {
-        reader.rewind().map_err(Self::from_io_offset_0)
-    }
-
-    fn seek(reader: &mut R, pos: SeekFrom) -> Result<u64, Error> {
-        reader
-            .seek(pos)
-            .map_err(|err| match reader.stream_position() {
-                Err(pos_err) => ErrorKind::Io(pos_err).without_position(),
-                Ok(pos) => ErrorKind::Io(err).with_byte_offset(pos),
-            })
-    }
-
-    fn next_byte(reader: &mut R) -> Result<u8, Error> {
-        let mut buf = [0u8];
-
-        reader
-            .read_exact(&mut buf)
-            .map_err(|err| match reader.stream_position() {
-                Err(pos_err) => ErrorKind::Io(pos_err).without_position(),
-                Ok(pos) => ErrorKind::Io(err).with_byte_offset(pos),
-            })?;
-
-        Ok(buf[0])
-    }
-
-    // On failure the reader's position remains where it was.
-    fn reader_matches(reader: &mut R, input: &[u8]) -> Result<bool, Error> {
-        for (index, byte) in input.iter().enumerate() {
-            if *byte != Self::next_byte(reader)? {
-                Self::seek(reader, SeekFrom::Current(-(index as i64 + 1)))?;
-                return Ok(false);
+        // If no valid XML markup is found, try to parse as ASCII.
+        let mut ascii_reader = AsciiReader::new(reader);
+        match ascii_reader.next() {
+            res @ Some(Ok(_)) | res @ None => {
+                self.0 = ReaderInner::Ascii(ascii_reader);
+                res.transpose()
+            }
+            Some(Err(err)) => {
+                self.0 = ReaderInner::Uninitialized(Some(ascii_reader.into_inner()));
+                Err(err)
             }
         }
+    }
 
-        Ok(true)
+    fn is_binary(reader: &mut R) -> Result<bool, Error> {
+        let mut magic = [0; 8];
+        reader.read_exact(&mut magic).map_err(from_io_offset_0)?;
+        reader.rewind().map_err(from_io_offset_0)?;
+
+        Ok(&magic == b"bplist00")
+    }
+
+    fn rewind(&mut self, mut reader: R) -> Result<R, Error> {
+        if let Err(err) = reader.rewind().map_err(from_io_offset_0) {
+            self.0 = ReaderInner::Uninitialized(Some(reader));
+            return Err(err);
+        }
+        Ok(reader)
     }
 }
 
@@ -355,31 +315,20 @@ impl<R: Read + Seek> Iterator for Reader<R> {
     type Item = Result<OwnedEvent, Error>;
 
     fn next(&mut self) -> Option<Result<OwnedEvent, Error>> {
-        let mut reader = match self.0 {
-            ReaderInner::Xml(ref mut parser) => return parser.next(),
-            ReaderInner::Binary(ref mut parser) => return parser.next(),
-            ReaderInner::Ascii(ref mut parser) => return parser.next(),
-            ReaderInner::Uninitialized(ref mut reader) => reader.take().unwrap(),
-        };
-
-        match Reader::is_binary(&mut reader) {
-            Ok(true) => self.0 = ReaderInner::Binary(BinaryReader::new(reader)),
-            Ok(false) => match Reader::is_xml(&mut reader) {
-                Ok(true) => self.0 = ReaderInner::Xml(XmlReader::new(reader)),
-                Ok(false) => self.0 = ReaderInner::Ascii(AsciiReader::new(reader)),
-                Err(err) => {
-                    self.0 = ReaderInner::Uninitialized(Some(reader));
-                    return Some(Err(err));
-                }
-            },
-            Err(err) => {
-                self.0 = ReaderInner::Uninitialized(Some(reader));
-                return Some(Err(err));
+        match self.0 {
+            ReaderInner::Xml(ref mut parser) => parser.next(),
+            ReaderInner::Binary(ref mut parser) => parser.next(),
+            ReaderInner::Ascii(ref mut parser) => parser.next(),
+            ReaderInner::Uninitialized(ref mut reader) => {
+                let reader = reader.take().unwrap();
+                self.init(reader).transpose()
             }
         }
-
-        self.next()
     }
+}
+
+fn from_io_offset_0(err: io::Error) -> Error {
+    ErrorKind::Io(err).with_byte_offset(0)
 }
 
 /// Supports writing event streams in different plist encodings.

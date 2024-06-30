@@ -33,6 +33,10 @@ impl<R: Read> AsciiReader<R> {
         }
     }
 
+    pub fn into_inner(self) -> R {
+        self.reader
+    }
+
     fn error(&self, kind: ErrorKind) -> Error {
         kind.with_byte_offset(self.current_pos)
     }
@@ -367,8 +371,7 @@ fn map_next_step_to_unicode(c: char) -> char {
 mod tests {
     use super::*;
     use crate::stream::Event::*;
-    use std::io::Cursor;
-    use std::{fs::File, path::Path};
+    use std::{fs::File, io::Cursor, path::Path};
 
     #[test]
     fn empty_test() {
