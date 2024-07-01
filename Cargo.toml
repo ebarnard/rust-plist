@@ -25,3 +25,6 @@ serde = { version = "1.0.2", optional = true }
 [dev-dependencies]
 serde_derive = { version = "1.0.2" }
 serde_yaml = "0.8.21"
+trybuild = { version = "1.0.81", features = ["diff"] }
+macrotest = "1.0.12"
+
