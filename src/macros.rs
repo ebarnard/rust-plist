@@ -9,8 +9,7 @@
 ///     "payload": {
 ///         "features": [
 ///             "serde",
-///         ],
-///         "homepage": null
+///         ]
 ///     }
 /// });
 /// ```
@@ -84,11 +83,6 @@ macro_rules! plist_internal {
         plist_internal_vec![$($elems),*]
     };
 
-    // Next element is `null`.
-    (@array [$($elems:expr,)*] null $($rest:tt)*) => {
-        plist_internal!(@array [$($elems,)* plist_internal!(null)] $($rest)*)
-    };
-
     // Next element is `true`.
     (@array [$($elems:expr,)*] true $($rest:tt)*) => {
         plist_internal!(@array [$($elems,)* plist_internal!(true)] $($rest)*)
@@ -156,11 +150,6 @@ macro_rules! plist_internal {
     // Insert the last entry without trailing comma.
     (@object $object:ident [$($key:tt)+] ($value:expr)) => {
         let _ = $object.insert(($($key)+).into(), $value);
-    };
-
-    // Next value is `null`.
-    (@object $object:ident ($($key:tt)+) (: null $($rest:tt)*) $copy:tt) => {
-        plist_internal!(@object $object [$($key)+] (plist_internal!(null)) $($rest)*);
     };
 
     // Next value is `true`.
@@ -240,16 +229,12 @@ macro_rules! plist_internal {
     // Must be invoked as: plist_internal!($($plist)+)
     //////////////////////////////////////////////////////////////////////////
 
-    (null) => {
-        $crate::Value::Null
-    };
-
     (true) => {
-        $crate::Value::Bool(true)
+        $crate::Value::Boolean(true)
     };
 
     (false) => {
-        $crate::Value::Bool(false)
+        $crate::Value::Boolean(false)
     };
 
     ([]) => {
