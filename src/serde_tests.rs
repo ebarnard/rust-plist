@@ -84,9 +84,7 @@ fn new_serializer() -> Serializer<VecWriter> {
     Serializer::new(VecWriter::new())
 }
 
-fn new_deserializer<'event>(
-    events: Vec<Event<'event>>,
-) -> Deserializer<'event, Vec<Result<Event<'event>, Error>>> {
+fn new_deserializer(events: Vec<Event>) -> Deserializer<Vec<Result<Event, Error>>> {
     let result_events = events.into_iter().map(Ok).collect();
     Deserializer::new(result_events)
 }
@@ -105,7 +103,7 @@ where
         Value::Boolean(false)
     };
 
-    assert_eq!(&events[..], &expected_events[..]);
+    assert_eq!(&events[..], expected_events);
 
     if roundtrip_value {
         let expected_value = Value::from_events(expected_events.iter().cloned().map(Ok))
