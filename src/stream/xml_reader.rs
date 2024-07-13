@@ -8,21 +8,6 @@ use crate::{
     Date, Integer,
 };
 
-#[derive(Clone, PartialEq, Eq)]
-struct ElmName(Box<[u8]>);
-
-impl From<&[u8]> for ElmName {
-    fn from(bytes: &[u8]) -> Self {
-        ElmName(Box::from(bytes))
-    }
-}
-
-impl AsRef<[u8]> for ElmName {
-    fn as_ref(&self) -> &[u8] {
-        &self.0
-    }
-}
-
 pub struct XmlReader<R: BufRead> {
     buffer: Vec<u8>,
     started: bool,
