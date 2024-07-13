@@ -175,7 +175,7 @@ impl Dictionary {
 /// }
 /// # ;
 /// ```
-impl<'a> ops::Index<&'a str> for Dictionary {
+impl ops::Index<&str> for Dictionary {
     type Output = Value;
 
     fn index(&self, index: &str) -> &Value {
@@ -192,7 +192,7 @@ impl<'a> ops::Index<&'a str> for Dictionary {
 /// #
 /// dict["key"] = "value".into();
 /// ```
-impl<'a> ops::IndexMut<&'a str> for Dictionary {
+impl ops::IndexMut<&str> for Dictionary {
     fn index_mut(&mut self, index: &str) -> &mut Value {
         self.map.get_mut(index).expect("no entry found for key")
     }

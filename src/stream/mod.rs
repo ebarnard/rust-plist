@@ -115,10 +115,7 @@ impl XmlWriteOptions {
             return self.indent(0, 0);
         }
 
-        assert!(
-            indent_str.chars().all(|chr| chr.is_ascii()),
-            "indent str must be ascii"
-        );
+        assert!(indent_str.is_ascii(), "indent str must be ascii");
         let indent_str = indent_str.as_bytes();
         assert!(
             indent_str.iter().all(|chr| chr == &indent_str[0]),
