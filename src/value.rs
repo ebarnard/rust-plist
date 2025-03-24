@@ -802,7 +802,7 @@ mod tests {
         );
 
         let date: Date = SystemTime::now().into();
-        assert_eq!(Value::Date(date.clone()).as_date(), Some(date));
+        assert_eq!(Value::Date(date).as_date(), Some(date));
 
         assert_eq!(Value::Real(0.0).as_real(), Some(0.0));
         assert_eq!(Value::Integer(1.into()).as_signed_integer(), Some(1));
@@ -838,7 +838,7 @@ mod tests {
             EndCollection,
         ];
 
-        let value = Builder::build(events.into_iter().map(|e| Ok(e)));
+        let value = Builder::build(events.into_iter().map(Ok));
 
         // Expected output
         let lines = vec![

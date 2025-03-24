@@ -715,7 +715,7 @@ mod tests {
         let streaming_parser = BinaryReader::new(Cursor::new(buf_inner));
 
         let events: Vec<Result<_, _>> = streaming_parser.collect();
-        let value_decoded_from_encode = Value::from_events(events.into_iter()).unwrap();
+        let value_decoded_from_encode = Value::from_events(events).unwrap();
 
         assert_eq!(value_to_encode, value_decoded_from_encode);
     }
