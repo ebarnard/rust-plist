@@ -75,7 +75,7 @@ impl From<XmlReaderError> for ErrorKind {
             },
             XmlReaderError::Syntax(_) => ErrorKind::UnexpectedEof,
             XmlReaderError::IllFormed(_) => ErrorKind::InvalidXmlSyntax,
-            XmlReaderError::NonDecodable(_) => ErrorKind::InvalidXmlUtf8,
+            XmlReaderError::Encoding(_) => ErrorKind::InvalidXmlUtf8,
             _ => ErrorKind::InvalidXmlSyntax,
         }
     }
