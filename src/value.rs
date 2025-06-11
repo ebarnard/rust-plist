@@ -141,19 +141,19 @@ impl Value {
     #[cfg(feature = "enable_unstable_features_that_may_break_with_minor_version_bumps")]
     #[doc(hidden)]
     #[deprecated(since = "1.2.0", note = "use Value::events instead")]
-    pub fn into_events(&self) -> Events {
+    pub fn into_events(&self) -> Events<'_> {
         self.events()
     }
 
     /// Creates an `Event` iterator for this `Value`.
     #[cfg(not(feature = "enable_unstable_features_that_may_break_with_minor_version_bumps"))]
-    pub(crate) fn events(&self) -> Events {
+    pub(crate) fn events(&self) -> Events<'_> {
         Events::new(self)
     }
 
     /// Creates an `Event` iterator for this `Value`.
     #[cfg(feature = "enable_unstable_features_that_may_break_with_minor_version_bumps")]
-    pub fn events(&self) -> Events {
+    pub fn events(&self) -> Events<'_> {
         Events::new(self)
     }
 
