@@ -45,13 +45,8 @@ impl<R: Read> AsciiReader<R> {
         let mut buf: [u8; 1] = [0; 1];
         match self.reader.read_exact(&mut buf) {
             Ok(()) => Ok(Some(buf[0])),
-            Err(err) => {
-                if err.kind() == std::io::ErrorKind::UnexpectedEof {
-                    Ok(None)
-                } else {
-                    Err(self.error(ErrorKind::Io(err)))
-                }
-            }
+            Err(err) if err.kind() == std::io::ErrorKind::UnexpectedEof => Ok(None),
+            Err(err) => Err(self.error(ErrorKind::Io(err))),
         }
     }
 
@@ -369,16 +364,15 @@ fn map_next_step_to_unicode(c: char) -> char {
 
 #[cfg(test)]
 mod tests {
-    use std::{fs::File, io::Cursor};
+    use std::fs::File;
 
     use super::*;
     use crate::stream::Event::*;
 
     #[test]
     fn empty_test() {
-        let plist = "".to_owned();
-        let cursor = Cursor::new(plist.as_bytes());
-        let streaming_parser = AsciiReader::new(cursor);
+        let plist = "";
+        let streaming_parser = AsciiReader::new(plist.as_bytes());
         let events: Vec<Event> = streaming_parser.map(|e| e.unwrap()).collect();
         assert_eq!(events, &[]);
     }
@@ -418,9 +412,8 @@ mod tests {
 
     #[test]
     fn utf8_strings() {
-        let plist = "{ names = (Léa, François, Żaklina, 王芳); }".to_owned();
-        let cursor = Cursor::new(plist.as_bytes());
-        let streaming_parser = AsciiReader::new(cursor);
+        let plist = "{ names = (Léa, François, Żaklina, 王芳); }";
+        let streaming_parser = AsciiReader::new(plist.as_bytes());
         let events: Vec<Event> = streaming_parser.map(|e| e.unwrap()).collect();
 
         let comparison = &[
@@ -445,8 +438,7 @@ mod tests {
             key2 = "\UD83D";
             key3 = "\u0080";
         }"#;
-        let cursor = Cursor::new(plist);
-        let streaming_parser = AsciiReader::new(cursor);
+        let streaming_parser = AsciiReader::new(&plist[..]);
         let events: Vec<Result<Event, Error>> = streaming_parser.collect();
 
         // key1's value
@@ -463,8 +455,7 @@ mod tests {
             key1 = "\1";
             key2 = "\12";
         }"#;
-        let cursor = Cursor::new(plist);
-        let streaming_parser = AsciiReader::new(cursor);
+        let streaming_parser = AsciiReader::new(&plist[..]);
         let events: Vec<Result<Event, Error>> = streaming_parser.collect();
 
         // key1's value
@@ -485,8 +476,7 @@ mod tests {
             key7 = "\U0080";
             key8 = "\200\377";
         }"#;
-        let cursor = Cursor::new(plist);
-        let streaming_parser = AsciiReader::new(cursor);
+        let streaming_parser = AsciiReader::new(&plist[..]);
         let events: Vec<Event> = streaming_parser.map(|e| e.unwrap()).collect();
 
         let comparison = &[
@@ -515,9 +505,8 @@ mod tests {
 
     #[test]
     fn integers_and_strings() {
-        let plist = "{ name = James, age = 42 }".to_owned();
-        let cursor = Cursor::new(plist.as_bytes());
-        let streaming_parser = AsciiReader::new(cursor);
+        let plist = b"{ name = James, age = 42 }";
+        let streaming_parser = AsciiReader::new(&plist[..]);
         let events: Vec<Event> = streaming_parser.map(|e| e.unwrap()).collect();
 
         let comparison = &[
@@ -541,5 +530,21 @@ mod tests {
         let events: Vec<Event> = streaming_parser.map(|e| e.unwrap()).collect();
 
         assert!(!events.is_empty());
+    }
+
+    // TODO: This should return `Err` after the first string
+    #[test]
+    fn multiple_unquoted_strings() {
+        let plist = b"not a plist";
+        let streaming_parser = AsciiReader::new(&plist[..]);
+        let events: Vec<Event> = streaming_parser.map(|e| e.unwrap()).collect();
+
+        let comparison = &[
+            String("not".into()),
+            String("a".into()),
+            String("plist".into()),
+        ];
+
+        assert_eq!(events, comparison);
     }
 }
