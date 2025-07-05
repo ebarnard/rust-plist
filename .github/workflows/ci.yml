@@ -1,10 +1,10 @@
 on:
   push:
     branches:
-    - master
+      - master
   pull_request:
     branches:
-    - master
+      - master
 
 name: CI
 
@@ -83,6 +83,9 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v3
 
+      - name: Run cargo-semver-checks
+        uses: obi1kenobi/cargo-semver-checks-action@v2
+
       - name: Check if Release Needed
         id: release_check
         run: |
@@ -106,12 +109,6 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v3
-
-      - name: Install cargo-semver-checks
-        run: cargo install cargo-semver-checks --locked
-
-      - name: Run cargo-semver-checks
-        run: cargo semver-checks check-release
 
       - name: Publish Crate
         run: |
