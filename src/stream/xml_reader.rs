@@ -74,7 +74,6 @@ impl From<XmlReaderError> for ErrorKind {
                 Err(err) => ErrorKind::Io(std::io::Error::from(err.kind())),
             },
             XmlReaderError::Syntax(_) => ErrorKind::UnexpectedEof,
-            XmlReaderError::IllFormed(_) => ErrorKind::InvalidXmlSyntax,
             XmlReaderError::Encoding(_) => ErrorKind::InvalidXmlUtf8,
             _ => ErrorKind::InvalidXmlSyntax,
         }
@@ -115,7 +114,7 @@ impl<R: BufRead> Iterator for XmlReader<R> {
 impl<R: BufRead> ReaderState<R> {
     fn xml_reader_pos(&self) -> FilePosition {
         let pos = self.0.buffer_position();
-        FilePosition(pos as u64)
+        FilePosition(pos)
     }
 
     fn with_pos(&self, kind: ErrorKind) -> Error {
@@ -139,7 +138,7 @@ impl<R: BufRead> ReaderState<R> {
                         .map_err(|_| self.with_pos(ErrorKind::InvalidUtf8String));
                 }
                 XmlEvent::End(_) => {
-                    return Ok("".to_owned());
+                    return Ok(String::new());
                 }
                 XmlEvent::Eof => return Err(self.with_pos(ErrorKind::UnclosedXmlElement)),
                 XmlEvent::Start(_) => return Err(self.with_pos(ErrorKind::UnexpectedXmlOpeningTag)),

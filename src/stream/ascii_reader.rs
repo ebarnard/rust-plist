@@ -103,7 +103,7 @@ impl<R: Read> AsciiReader<R> {
             match self.current_char {
                 Some(c) => acc.push(c),
                 None => return Err(self.error(ErrorKind::UnclosedString)),
-            };
+            }
         }
 
         let string_literal =
@@ -127,8 +127,8 @@ impl<R: Read> AsciiReader<R> {
     ///
     /// The standard library has some useful functions behind unstable feature
     /// flags, we can simplify and optimize this a bit once they're stable.
-    /// - str_from_utf16_endian
-    /// - is_utf16_surrogate
+    /// - `str_from_utf16_endian`
+    /// - `is_utf16_surrogate`
     fn utf16_escape(&mut self) -> Result<String, Error> {
         let mut code_units: &mut [u16] = &mut [0u16; 2];
 
@@ -140,13 +140,11 @@ impl<R: Read> AsciiReader<R> {
 
         // This is the utf-16 surrogate range, indicating another code unit is
         // necessary to form a complete code point.
-        if !matches!(code_unit, 0xD800..=0xDFFF) {
-            code_units = &mut code_units[0..1];
-        } else {
+        if matches!(code_unit, 0xD800..=0xDFFF) {
             self.advance_quoted_string()?;
 
             if self.current_char != Some(b'\\')
-                || !matches!(self.peeked_char, Some(b'u') | Some(b'U'))
+                || !matches!(self.peeked_char, Some(b'u' | b'U'))
             {
                 return Err(self.error(ErrorKind::InvalidUtf16String));
             }
@@ -156,6 +154,8 @@ impl<R: Read> AsciiReader<R> {
             if let Some(code_unit) = self.utf16_code_unit()? {
                 code_units[1] = code_unit;
             }
+        } else {
+            code_units = &mut code_units[0..1];
         }
 
         let utf8 = String::from_utf16(code_units)
@@ -228,9 +228,8 @@ impl<R: Read> AsciiReader<R> {
                         let value = std::str::from_utf8(&value)
                             .map_err(|_| self.error(ErrorKind::InvalidOctalString))?;
 
-                        let value = u16::from_str_radix(value, 8)
-                            .map_err(|_| self.error(ErrorKind::InvalidOctalString))?
-                            as u32;
+                        let value = u32::from(u16::from_str_radix(value, 8)
+                            .map_err(|_| self.error(ErrorKind::InvalidOctalString))?);
 
                         let value = char::from_u32(value)
                             .ok_or(self.error(ErrorKind::InvalidOctalString))?;
@@ -286,8 +285,8 @@ impl<R: Read> AsciiReader<R> {
     fn potential_comment(&mut self) -> Result<Option<OwnedEvent>, Error> {
         match self.peeked_char {
             Some(c) => match c {
-                b'/' => self.line_comment().map(|_| None),
-                b'*' => self.block_comment().map(|_| None),
+                b'/' => self.line_comment().map(|()| None),
+                b'*' => self.block_comment().map(|()| None),
                 _ => self.unquoted_string_literal(c),
             },
             // EOF
@@ -306,9 +305,8 @@ impl<R: Read> AsciiReader<R> {
             match c {
                 // Single char tokens
                 b'(' => return Ok(Some(Event::StartArray(None))),
-                b')' => return Ok(Some(Event::EndCollection)),
                 b'{' => return Ok(Some(Event::StartDictionary(None))),
-                b'}' => return Ok(Some(Event::EndCollection)),
+                b')' | b'}' => return Ok(Some(Event::EndCollection)),
                 b'\'' | b'"' => return self.quoted_string_literal(c),
                 b'/' => {
                     match self.potential_comment() {
@@ -335,7 +333,7 @@ impl<R: Read> Iterator for AsciiReader<R> {
     }
 }
 
-/// Maps NextStep encoding to Unicode, see:
+/// Maps `NextStep` encoding to Unicode, see:
 /// - <https://github.com/fonttools/openstep-plist/blob/master/src/openstep_plist/parser.pyx#L87-L106>
 /// - <ftp://ftp.unicode.org/Public/MAPPINGS/VENDORS/NEXT/NEXTSTEP.TXT>
 fn map_next_step_to_unicode(c: char) -> char {
