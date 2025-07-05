@@ -132,11 +132,17 @@ impl<R: BufRead> ReaderState<R> {
         loop {
             match self.read_xml_event(buffer)? {
                 XmlEvent::Text(text) => {
-                    let unescaped = text
-                        .unescape()
+                    let decoded = text
+                        .decode()
                         .map_err(|err| self.with_pos(ErrorKind::from(err)))?;
-                    return String::from_utf8(unescaped.as_ref().into())
+                    return String::from_utf8(decoded.as_ref().into())
                         .map_err(|_| self.with_pos(ErrorKind::InvalidUtf8String));
+                }
+                XmlEvent::GeneralRef(bytes) => {
+                    if let Some(char) = bytes.resolve_char_ref()
+                        .map_err(|err| self.with_pos(ErrorKind::from(err)))? {
+                        return Ok(char.to_string());
+                    }
                 }
                 XmlEvent::End(_) => {
                     return Ok("".to_owned());
@@ -216,15 +222,19 @@ impl<R: BufRead> ReaderState<R> {
                 },
                 XmlEvent::Eof => return Ok(ReadResult::Eof),
                 XmlEvent::Text(text) => {
-                    let unescaped = text
-                        .unescape()
+                    let decoded = text
+                        .decode()
                         .map_err(|err| self.with_pos(ErrorKind::from(err)))?;
 
-                    if !unescaped.chars().all(char::is_whitespace) {
+                    if !decoded.chars().all(char::is_whitespace) {
                         return Err(
                             self.with_pos(ErrorKind::UnexpectedXmlCharactersExpectedElement)
                         );
                     }
+                }
+                XmlEvent::GeneralRef(bytes) => {
+                    bytes.resolve_char_ref()
+                        .map_err(|err| self.with_pos(ErrorKind::from(err)))?;
                 }
                 XmlEvent::PI(_)
                 | XmlEvent::CData(_)
