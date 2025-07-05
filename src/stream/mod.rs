@@ -207,6 +207,8 @@ impl<'a> Iterator for Events<'a> {
         }
 
         Some(match self.stack.pop()? {
+            StackItem::Root(value)
+            | StackItem::DictValue(value) => handle_value(value, &mut self.stack),
             StackItem::Array(mut array) => {
                 if let Some(value) = array.next() {
                     // There might still be more items in the array so return it to the stack.
@@ -228,7 +230,6 @@ impl<'a> Iterator for Events<'a> {
                     Event::EndCollection
                 }
             }
-            StackItem::DictValue(value) | StackItem::Root(value) => handle_value(value, &mut self.stack),
         })
     }
 }

@@ -1,4 +1,4 @@
-//! A map of String to `plist::Value`.
+//! A map of `String` to ``plist::Value``.
 //!
 //! The map is currently backed by an [`IndexMap`]. This may be changed in a future minor release.
 //!

@@ -59,8 +59,13 @@ impl From<XmlReaderError> for ErrorKind {
                 Err(err) => ErrorKind::Io(std::io::Error::from(err.kind())),
             },
             XmlReaderError::Syntax(_) => ErrorKind::UnexpectedEof,
+            XmlReaderError::IllFormed(_)
+            | XmlReaderError::InvalidAttr(_)
+            | XmlReaderError::Escape(_)
+            | XmlReaderError::Namespace(_) => {
+                ErrorKind::InvalidXmlSyntax
+            },
             XmlReaderError::Encoding(_) => ErrorKind::InvalidXmlUtf8,
-            _ => ErrorKind::InvalidXmlSyntax,
         }
     }
 }

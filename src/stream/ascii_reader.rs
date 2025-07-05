@@ -328,7 +328,7 @@ impl<R: Read> Iterator for AsciiReader<R> {
     }
 }
 
-/// Maps `NextStep` encoding to Unicode, see:
+/// Maps NeXTSTEP encoding to Unicode, see:
 /// - <https://github.com/fonttools/openstep-plist/blob/master/src/openstep_plist/parser.pyx#L87-L106>
 /// - <ftp://ftp.unicode.org/Public/MAPPINGS/VENDORS/NEXT/NEXTSTEP.TXT>
 fn map_next_step_to_unicode(c: char) -> char {
