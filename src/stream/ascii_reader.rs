@@ -360,7 +360,7 @@ fn map_next_step_to_unicode(c: char) -> char {
 
     let index = c as usize;
 
-    if index < 128 || index > 0xff {
+    if !(128..=0xff).contains(&index) {
         return c;
     }
 

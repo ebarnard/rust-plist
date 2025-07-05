@@ -334,7 +334,7 @@ fn write_data_base64(
     for (i, line) in data.chunks(DATA_MAX_LINE_BYTES).enumerate() {
         // Write newline
         if write_initial_newline || i > 0 {
-            writer.write_all(&[b'\n'])?;
+            writer.write_all(b"\n")?;
         }
 
         // Write indent

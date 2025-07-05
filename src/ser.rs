@@ -326,13 +326,13 @@ struct DateSerializer<'a, W: 'a + Writer> {
     ser: &'a mut Serializer<W>,
 }
 
-impl<'a, W: Writer> DateSerializer<'a, W> {
+impl<W: Writer> DateSerializer<'_, W> {
     fn expecting_date_error(&self) -> Error {
         ser::Error::custom("plist date string expected")
     }
 }
 
-impl<'a, W: Writer> ser::Serializer for DateSerializer<'a, W> {
+impl<W: Writer> ser::Serializer for DateSerializer<'_, W> {
     type Ok = ();
     type Error = Error;
 
@@ -488,13 +488,13 @@ struct UidSerializer<'a, W: 'a + Writer> {
     ser: &'a mut Serializer<W>,
 }
 
-impl<'a, W: Writer> UidSerializer<'a, W> {
+impl<W: Writer> UidSerializer<'_, W> {
     fn expecting_uid_error(&self) -> Error {
         ser::Error::custom("plist uid expected")
     }
 }
 
-impl<'a, W: Writer> ser::Serializer for UidSerializer<'a, W> {
+impl<W: Writer> ser::Serializer for UidSerializer<'_, W> {
     type Ok = ();
     type Error = Error;
 
@@ -650,7 +650,7 @@ pub struct Compound<'a, W: 'a + Writer> {
     ser: &'a mut Serializer<W>,
 }
 
-impl<'a, W: Writer> ser::SerializeSeq for Compound<'a, W> {
+impl<W: Writer> ser::SerializeSeq for Compound<'_, W> {
     type Ok = ();
     type Error = Error;
 
@@ -664,7 +664,7 @@ impl<'a, W: Writer> ser::SerializeSeq for Compound<'a, W> {
     }
 }
 
-impl<'a, W: Writer> ser::SerializeTuple for Compound<'a, W> {
+impl<W: Writer> ser::SerializeTuple for Compound<'_, W> {
     type Ok = ();
     type Error = Error;
 
@@ -678,7 +678,7 @@ impl<'a, W: Writer> ser::SerializeTuple for Compound<'a, W> {
     }
 }
 
-impl<'a, W: Writer> ser::SerializeTupleStruct for Compound<'a, W> {
+impl<W: Writer> ser::SerializeTupleStruct for Compound<'_, W> {
     type Ok = ();
     type Error = Error;
 
@@ -692,7 +692,7 @@ impl<'a, W: Writer> ser::SerializeTupleStruct for Compound<'a, W> {
     }
 }
 
-impl<'a, W: Writer> ser::SerializeTupleVariant for Compound<'a, W> {
+impl<W: Writer> ser::SerializeTupleVariant for Compound<'_, W> {
     type Ok = ();
     type Error = Error;
 
@@ -707,7 +707,7 @@ impl<'a, W: Writer> ser::SerializeTupleVariant for Compound<'a, W> {
     }
 }
 
-impl<'a, W: Writer> ser::SerializeMap for Compound<'a, W> {
+impl<W: Writer> ser::SerializeMap for Compound<'_, W> {
     type Ok = ();
     type Error = Error;
 
@@ -726,7 +726,7 @@ impl<'a, W: Writer> ser::SerializeMap for Compound<'a, W> {
     }
 }
 
-impl<'a, W: Writer> ser::SerializeStruct for Compound<'a, W> {
+impl<W: Writer> ser::SerializeStruct for Compound<'_, W> {
     type Ok = ();
     type Error = Error;
 
@@ -746,7 +746,7 @@ impl<'a, W: Writer> ser::SerializeStruct for Compound<'a, W> {
     }
 }
 
-impl<'a, W: Writer> ser::SerializeStructVariant for Compound<'a, W> {
+impl<W: Writer> ser::SerializeStructVariant for Compound<'_, W> {
     type Ok = ();
     type Error = Error;
 
