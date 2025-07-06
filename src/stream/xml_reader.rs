@@ -274,6 +274,8 @@ mod tests {
             Boolean(true),
             String("IsNotFalse".into()),
             Boolean(false),
+            String("Pets".into()),
+            String("A cat & a dog.".into()),
             EndCollection,
         ];
 

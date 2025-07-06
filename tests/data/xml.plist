@@ -32,5 +32,7 @@
     <true/>
     <key>IsNotFalse</key>
     <false/>
+	<key>Pets</key>
+    <string>A cat &amp; a dog.</string>
 </dict>
 </plist>
