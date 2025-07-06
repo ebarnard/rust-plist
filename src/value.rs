@@ -683,7 +683,7 @@ impl Builder {
                 self.stack.push(StackItem::Array(array));
             }
             (Some(StackItem::Dict(dict)), Value::String(key)) => {
-                self.stack.push(StackItem::DictAndKey(dict, key))
+                self.stack.push(StackItem::DictAndKey(dict, key));
             }
             (Some(StackItem::Dict(_)), value) => {
                 return Err(ErrorKind::UnexpectedEventType {
@@ -809,7 +809,7 @@ mod tests {
         assert_eq!(Value::Integer(1.into()).as_unsigned_integer(), Some(1));
         assert_eq!(Value::Integer((-1).into()).as_unsigned_integer(), None);
         assert_eq!(
-            Value::Integer((i64::max_value() as u64 + 1).into()).as_signed_integer(),
+            Value::Integer((i64::MAX as u64 + 1).into()).as_signed_integer(),
             None
         );
         assert_eq!(Value::String("2".to_owned()).as_string(), Some("2"));

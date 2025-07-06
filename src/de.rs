@@ -103,7 +103,7 @@ where
     }
 }
 
-impl<'de, 'a, 'event, I> de::Deserializer<'de> for &'a mut Deserializer<'event, I>
+impl<'de, 'event, I> de::Deserializer<'de> for &mut Deserializer<'event, I>
 where
     I: IntoIterator<Item = Result<Event<'event>, Error>>,
 {
@@ -268,7 +268,7 @@ where
     }
 }
 
-impl<'de, 'a, 'event, I> de::EnumAccess<'de> for &'a mut Deserializer<'event, I>
+impl<'de, 'event, I> de::EnumAccess<'de> for &mut Deserializer<'event, I>
 where
     I: IntoIterator<Item = Result<Event<'event>, Error>>,
 {
@@ -283,7 +283,7 @@ where
     }
 }
 
-impl<'de, 'a, 'event, I> de::VariantAccess<'de> for &'a mut Deserializer<'event, I>
+impl<'de, 'event, I> de::VariantAccess<'de> for &mut Deserializer<'event, I>
 where
     I: IntoIterator<Item = Result<Event<'event>, Error>>,
 {
