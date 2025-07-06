@@ -857,4 +857,13 @@ mod tests {
 
         assert_eq!(value.unwrap(), Value::Dictionary(dict));
     }
+
+    #[test]
+    fn builder_fails_if_all_events_have_not_been_read() {
+        let events = vec![String("Item 1".into()), String("Item 2".into())];
+
+        let value = Builder::build(events.into_iter().map(Ok));
+
+        assert!(value.is_err());
+    }
 }
