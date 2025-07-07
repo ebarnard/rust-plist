@@ -1,5 +1,5 @@
 use base64::{engine::general_purpose::STANDARD as base64_standard, Engine};
-use quick_xml::{events::Event as XmlEvent, Error as XmlReaderError, Reader as EventReader};
+use quick_xml::{escape::resolve_predefined_entity, events::Event as XmlEvent, Error as XmlReaderError, Reader as EventReader};
 use std::io::{self, BufRead};
 
 use crate::{
@@ -118,23 +118,30 @@ impl<R: BufRead> ReaderState<R> {
     }
 
     fn read_content(&mut self, buffer: &mut Vec<u8>) -> Result<String, Error> {
+        let mut content = String::new();
         loop {
             match self.read_xml_event(buffer)? {
                 XmlEvent::Text(text) => {
                     let decoded = text
                         .decode()
                         .map_err(|err| self.with_pos(ErrorKind::from(err)))?;
-                    return String::from_utf8(decoded.as_ref().into())
-                        .map_err(|_| self.with_pos(ErrorKind::InvalidUtf8String));
+                    content.push_str(&decoded);
                 }
                 XmlEvent::GeneralRef(bytes) => {
-                    if let Some(char) = bytes.resolve_char_ref()
+                    if let Some(ch) = bytes.resolve_char_ref()
                         .map_err(|err| self.with_pos(ErrorKind::from(err)))? {
-                        return Ok(char.to_string());
+                        content.push(ch);
+                    } else {
+                        let decoded = bytes
+                            .decode()
+                            .map_err(|err| self.with_pos(ErrorKind::from(err)))?;
+                        if let Some(entity) = resolve_predefined_entity(&decoded) {
+                            content.push_str(entity);
+                        }
                     }
                 }
                 XmlEvent::End(_) => {
-                    return Ok(String::new());
+                    break;
                 }
                 XmlEvent::Eof => return Err(self.with_pos(ErrorKind::UnclosedXmlElement)),
                 XmlEvent::Start(_) => return Err(self.with_pos(ErrorKind::UnexpectedXmlOpeningTag)),
@@ -148,6 +155,7 @@ impl<R: BufRead> ReaderState<R> {
                 }
             }
         }
+        Ok(content)
     }
 
     fn read_next(&mut self, buffer: &mut Vec<u8>) -> Result<ReadResult, Error> {
@@ -221,14 +229,11 @@ impl<R: BufRead> ReaderState<R> {
                         );
                     }
                 }
-                XmlEvent::GeneralRef(bytes) => {
-                    bytes.resolve_char_ref()
-                        .map_err(|err| self.with_pos(ErrorKind::from(err)))?;
-                }
                 XmlEvent::PI(_)
                 | XmlEvent::CData(_)
                 | XmlEvent::Comment(_)
-                | XmlEvent::Empty(_) => {
+                | XmlEvent::Empty(_)
+                | XmlEvent::GeneralRef(_) => {
                     // skip
                 }
             }
