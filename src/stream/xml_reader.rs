@@ -1,5 +1,5 @@
 use base64::{engine::general_purpose::STANDARD as base64_standard, Engine};
-use quick_xml::{escape::resolve_predefined_entity, events::Event as XmlEvent, Error as XmlReaderError, Reader as EventReader};
+use quick_xml::{escape::resolve_xml_entity, events::Event as XmlEvent, Error as XmlReaderError, Reader as EventReader};
 use std::io::{self, BufRead};
 
 use crate::{
@@ -128,14 +128,16 @@ impl<R: BufRead> ReaderState<R> {
                     content.push_str(&decoded);
                 }
                 XmlEvent::GeneralRef(bytes) => {
-                    if let Some(ch) = bytes.resolve_char_ref()
-                        .map_err(|err| self.with_pos(ErrorKind::from(err)))? {
+                    if let Some(ch) = bytes
+                        .resolve_char_ref()
+                        .map_err(|err| self.with_pos(ErrorKind::from(err)))?
+                    {
                         content.push(ch);
                     } else {
                         let decoded = bytes
                             .decode()
                             .map_err(|err| self.with_pos(ErrorKind::from(err)))?;
-                        if let Some(entity) = resolve_predefined_entity(&decoded) {
+                        if let Some(entity) = resolve_xml_entity(&decoded) {
                             content.push_str(entity);
                         }
                     }
@@ -229,11 +231,32 @@ impl<R: BufRead> ReaderState<R> {
                         );
                     }
                 }
+                XmlEvent::GeneralRef(bytes) => {
+                    if let Some(ch) = bytes
+                        .resolve_char_ref()
+                        .map_err(|err| self.with_pos(ErrorKind::from(err)))?
+                    {
+                        if ch.is_whitespace() {
+                            continue;
+                        }
+                    } else {
+                        let decoded = bytes
+                            .decode()
+                            .map_err(|err| self.with_pos(ErrorKind::from(err)))?;
+                        if let Some(entity) = resolve_xml_entity(&decoded) {
+                            if entity.chars().all(char::is_whitespace) {
+                                continue;
+                            }
+                        }
+                    }
+                    return Err(
+                        self.with_pos(ErrorKind::UnexpectedXmlCharactersExpectedElement)
+                    );
+                }
                 XmlEvent::PI(_)
                 | XmlEvent::CData(_)
                 | XmlEvent::Comment(_)
-                | XmlEvent::Empty(_)
-                | XmlEvent::GeneralRef(_) => {
+                | XmlEvent::Empty(_) => {
                     // skip
                 }
             }
@@ -298,5 +321,19 @@ mod tests {
         let events: Vec<_> = streaming_parser.collect();
 
         assert!(events.last().unwrap().is_err());
+    }
+
+    #[test]
+    fn entity_error() {
+        let reader = File::open("./tests/data/xml_entity_error.plist").unwrap();
+        let streaming_parser = XmlReader::new(BufReader::new(reader));
+        let events: Vec<_> = streaming_parser.collect();
+        let event = events.last().unwrap();
+
+        assert!(event.is_err());
+        assert_eq!(
+            event.as_ref().unwrap_err().to_string(),
+            "UnexpectedXmlCharactersExpectedElement (offset 174)".to_string()
+        );
     }
 }
