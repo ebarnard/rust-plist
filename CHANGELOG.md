@@ -10,6 +10,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 - Bump MSRV to v1.81 as required by `time-core` v0.1.6.
 
+### Fixed
+- Read binary plists with 24-bit integer offset tables.
+
 ## [1.7.4] - 2025-07-07
 
 ### Changed
