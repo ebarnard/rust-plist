@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 - Bump MSRV to v1.81 as required by `time-core` v0.1.6.
 - Don't publish test data to crates.io (#164).
+- Publish using crates.io Trusted Publishing.
 
 ### Fixed
 - Read binary plists with 24-bit integer offset tables (#165).
