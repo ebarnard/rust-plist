@@ -59,7 +59,7 @@ impl<R: Read> Read for PosReader<R> {
         let count = self.reader.read(buf)?;
         self.pos
             .checked_add(count as u64)
-            .expect("file cannot be larger than `u64::max_value()` bytes");
+            .expect("file cannot be larger than `u64::MAX` bytes");
         Ok(count)
     }
 }
@@ -249,10 +249,11 @@ impl<R: Read + Seek> BinaryReader<R> {
             (0x1, 3) => Some(Event::Integer(self.read_be_i64()?.into())),
             (0x1, 4) => {
                 let value = self.read_be_i128()?;
-                if value < 0 || value > u64::max_value().into() {
+                if let Ok(value) = u64::try_from(value) {
+                    Some(Event::Integer(value.into()))
+                } else {
                     return Err(self.with_pos(ErrorKind::IntegerOutOfRange));
                 }
-                Some(Event::Integer((value as u64).into()))
             }
             (0x1, _) => return Err(self.with_pos(ErrorKind::UnknownObjectType(token))), // variable length int
             (0x2, 2) => Some(Event::Real(f32::from_bits(self.read_be_u32()?).into())),

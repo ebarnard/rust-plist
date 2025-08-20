@@ -78,19 +78,22 @@ impl<W: Write> XmlWriter<W> {
     fn write_element_and_value(&mut self, name: &str, value: &str) -> Result<(), Error> {
         self.xml_writer
             .create_element(name)
-            .write_text_content(BytesText::new(value))?;
+            .write_text_content(BytesText::new(value))
+            .map_err(from_io_without_position)?;
         Ok(())
     }
 
     fn start_element(&mut self, name: &str) -> Result<(), Error> {
         self.xml_writer
-            .write_event(XmlEvent::Start(BytesStart::new(name)))?;
+            .write_event(XmlEvent::Start(BytesStart::new(name)))
+            .map_err(from_io_without_position)?;
         Ok(())
     }
 
     fn end_element(&mut self, name: &str) -> Result<(), Error> {
         self.xml_writer
-            .write_event(XmlEvent::End(BytesEnd::new(name)))?;
+            .write_event(XmlEvent::End(BytesEnd::new(name)))
+            .map_err(from_io_without_position)?;
         Ok(())
     }
 
@@ -193,18 +196,20 @@ impl<W: Write> Writer for XmlWriter<W> {
             match this.pending_collection.take() {
                 Some(PendingCollection::Array) => {
                     this.xml_writer
-                        .write_event(XmlEvent::Empty(BytesStart::new("array")))?;
+                        .write_event(XmlEvent::Empty(BytesStart::new("array")))
+                        .map_err(from_io_without_position)?;
                     this.expecting_key = this.stack.last() == Some(&Element::Dictionary);
                     return Ok(());
                 }
                 Some(PendingCollection::Dictionary) => {
                     this.xml_writer
-                        .write_event(XmlEvent::Empty(BytesStart::new("dict")))?;
+                        .write_event(XmlEvent::Empty(BytesStart::new("dict")))
+                        .map_err(from_io_without_position)?;
                     this.expecting_key = this.stack.last() == Some(&Element::Dictionary);
                     return Ok(());
                 }
                 _ => {}
-            };
+            }
             match (this.stack.pop(), this.expecting_key) {
                 (Some(Element::Dictionary), true) => {
                     this.end_element("dict")?;
@@ -228,9 +233,10 @@ impl<W: Write> Writer for XmlWriter<W> {
     fn write_boolean(&mut self, value: bool) -> Result<(), Error> {
         self.write_value_event(EventKind::Boolean, |this| {
             let value = if value { "true" } else { "false" };
-            Ok(this
-                .xml_writer
-                .write_event(XmlEvent::Empty(BytesStart::new(value)))?)
+            this.xml_writer
+                .write_event(XmlEvent::Empty(BytesStart::new(value)))
+                .map_err(from_io_without_position)?;
+            Ok(())
         })
     }
 
@@ -246,8 +252,8 @@ impl<W: Write> Writer for XmlWriter<W> {
                         this.stack.len() * this.indent_count,
                         xml_writer.get_mut(),
                     )
-                    .map_err(from_io_without_position)
                 })
+                .map_err(from_io_without_position)
                 .map(|_| ())
         })
     }
@@ -328,7 +334,7 @@ fn write_data_base64(
     for (i, line) in data.chunks(DATA_MAX_LINE_BYTES).enumerate() {
         // Write newline
         if write_initial_newline || i > 0 {
-            writer.write_all(&[b'\n'])?;
+            writer.write_all(b"\n")?;
         }
 
         // Write indent

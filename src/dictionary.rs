@@ -1,4 +1,4 @@
-//! A map of String to plist::Value.
+//! A map of `String` to `plist::Value`.
 //!
 //! The map is currently backed by an [`IndexMap`]. This may be changed in a future minor release.
 //!
@@ -30,7 +30,7 @@ impl Dictionary {
     /// Clears the dictionary, removing all values.
     #[inline]
     pub fn clear(&mut self) {
-        self.map.clear()
+        self.map.clear();
     }
 
     /// Returns a reference to the value corresponding to the key.
@@ -76,7 +76,7 @@ impl Dictionary {
     where
         F: FnMut(&String, &mut Value) -> bool,
     {
-        self.map.retain(keep)
+        self.map.retain(keep);
     }
 
     /// Sort the dictionary keys.
@@ -87,7 +87,7 @@ impl Dictionary {
     /// ensure a consistent key order.
     #[inline]
     pub fn sort_keys(&mut self) {
-        self.map.sort_keys()
+        self.map.sort_keys();
     }
 
     /// Gets the given key's corresponding entry in the dictionary for in-place manipulation.
@@ -97,7 +97,7 @@ impl Dictionary {
         test,
         feature = "enable_unstable_features_that_may_break_with_minor_version_bumps"
     ))]
-    pub fn entry<S>(&mut self, key: S) -> Entry
+    pub fn entry<S>(&mut self, key: S) -> Entry<'_>
     where
         S: Into<String>,
     {
@@ -121,7 +121,7 @@ impl Dictionary {
 
     /// Gets an iterator over the entries of the dictionary.
     #[inline]
-    pub fn iter(&self) -> Iter {
+    pub fn iter(&self) -> Iter<'_> {
         Iter {
             iter: self.map.iter(),
         }
@@ -129,7 +129,7 @@ impl Dictionary {
 
     /// Gets a mutable iterator over the entries of the dictionary.
     #[inline]
-    pub fn iter_mut(&mut self) -> IterMut {
+    pub fn iter_mut(&mut self) -> IterMut<'_> {
         IterMut {
             iter: self.map.iter_mut(),
         }
@@ -137,7 +137,7 @@ impl Dictionary {
 
     /// Gets an iterator over the keys of the dictionary.
     #[inline]
-    pub fn keys(&self) -> Keys {
+    pub fn keys(&self) -> Keys<'_> {
         Keys {
             iter: self.map.keys(),
         }
@@ -145,7 +145,7 @@ impl Dictionary {
 
     /// Gets an iterator over the values of the dictionary.
     #[inline]
-    pub fn values(&self) -> Values {
+    pub fn values(&self) -> Values<'_> {
         Values {
             iter: self.map.values(),
         }
@@ -153,7 +153,7 @@ impl Dictionary {
 
     /// Gets an iterator over mutable values of the dictionary.
     #[inline]
-    pub fn values_mut(&mut self) -> ValuesMut {
+    pub fn values_mut(&mut self) -> ValuesMut<'_> {
         ValuesMut {
             iter: self.map.values_mut(),
         }
@@ -175,7 +175,7 @@ impl Dictionary {
 /// }
 /// # ;
 /// ```
-impl<'a> ops::Index<&'a str> for Dictionary {
+impl ops::Index<&str> for Dictionary {
     type Output = Value;
 
     fn index(&self, index: &str) -> &Value {
@@ -192,7 +192,7 @@ impl<'a> ops::Index<&'a str> for Dictionary {
 /// #
 /// dict["key"] = "value".into();
 /// ```
-impl<'a> ops::IndexMut<&'a str> for Dictionary {
+impl ops::IndexMut<&str> for Dictionary {
     fn index_mut(&mut self, index: &str) -> &mut Value {
         self.map.get_mut(index).expect("no entry found for key")
     }
@@ -556,7 +556,7 @@ impl<'a> IntoIterator for &'a Dictionary {
     }
 }
 
-/// An iterator over a plist::Dictionary's entries.
+/// An iterator over a `plist::Dictionary`'s entries.
 pub struct Iter<'a> {
     iter: IterImpl<'a>,
 }
@@ -578,7 +578,7 @@ impl<'a> IntoIterator for &'a mut Dictionary {
     }
 }
 
-/// A mutable iterator over a plist::Dictionary's entries.
+/// A mutable iterator over a `plist::Dictionary`'s entries.
 pub struct IterMut<'a> {
     iter: map::IterMut<'a, String, Value>,
 }
@@ -598,7 +598,7 @@ impl IntoIterator for Dictionary {
     }
 }
 
-/// An owning iterator over a plist::Dictionary's entries.
+/// An owning iterator over a `plist::Dictionary`'s entries.
 pub struct IntoIter {
     iter: map::IntoIter<String, Value>,
 }
@@ -607,7 +607,7 @@ delegate_iterator!((IntoIter) => (String, Value));
 
 //////////////////////////////////////////////////////////////////////////////
 
-/// An iterator over a plist::Dictionary's keys.
+/// An iterator over a `plist::Dictionary`'s keys.
 pub struct Keys<'a> {
     iter: map::Keys<'a, String, Value>,
 }
@@ -616,7 +616,7 @@ delegate_iterator!((Keys<'a>) => &'a String);
 
 //////////////////////////////////////////////////////////////////////////////
 
-/// An iterator over a plist::Dictionary's values.
+/// An iterator over a `plist::Dictionary`'s values.
 pub struct Values<'a> {
     iter: map::Values<'a, String, Value>,
 }
@@ -625,7 +625,7 @@ delegate_iterator!((Values<'a>) => &'a Value);
 
 //////////////////////////////////////////////////////////////////////////////
 
-/// A mutable iterator over a plist::Dictionary's values.
+/// A mutable iterator over a `plist::Dictionary`'s values.
 pub struct ValuesMut<'a> {
     iter: map::ValuesMut<'a, String, Value>,
 }

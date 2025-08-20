@@ -141,19 +141,19 @@ impl Value {
     #[cfg(feature = "enable_unstable_features_that_may_break_with_minor_version_bumps")]
     #[doc(hidden)]
     #[deprecated(since = "1.2.0", note = "use Value::events instead")]
-    pub fn into_events(&self) -> Events {
+    pub fn into_events(&self) -> Events<'_> {
         self.events()
     }
 
     /// Creates an `Event` iterator for this `Value`.
     #[cfg(not(feature = "enable_unstable_features_that_may_break_with_minor_version_bumps"))]
-    pub(crate) fn events(&self) -> Events {
+    pub(crate) fn events(&self) -> Events<'_> {
         Events::new(self)
     }
 
     /// Creates an `Event` iterator for this `Value`.
     #[cfg(feature = "enable_unstable_features_that_may_break_with_minor_version_bumps")]
-    pub fn events(&self) -> Events {
+    pub fn events(&self) -> Events<'_> {
         Events::new(self)
     }
 
@@ -683,7 +683,7 @@ impl Builder {
                 self.stack.push(StackItem::Array(array));
             }
             (Some(StackItem::Dict(dict)), Value::String(key)) => {
-                self.stack.push(StackItem::DictAndKey(dict, key))
+                self.stack.push(StackItem::DictAndKey(dict, key));
             }
             (Some(StackItem::Dict(_)), value) => {
                 return Err(ErrorKind::UnexpectedEventType {
@@ -809,7 +809,7 @@ mod tests {
         assert_eq!(Value::Integer(1.into()).as_unsigned_integer(), Some(1));
         assert_eq!(Value::Integer((-1).into()).as_unsigned_integer(), None);
         assert_eq!(
-            Value::Integer((i64::max_value() as u64 + 1).into()).as_signed_integer(),
+            Value::Integer((i64::MAX as u64 + 1).into()).as_signed_integer(),
             None
         );
         assert_eq!(Value::String("2".to_owned()).as_string(), Some("2"));
@@ -856,5 +856,14 @@ mod tests {
         dict.insert("Height".to_owned(), Value::Real(1.60));
 
         assert_eq!(value.unwrap(), Value::Dictionary(dict));
+    }
+
+    #[test]
+    fn builder_fails_if_all_events_have_not_been_read() {
+        let events = vec![String("Item 1".into()), String("Item 2".into())];
+
+        let value = Builder::build(events.into_iter().map(Ok));
+
+        assert!(value.is_err());
     }
 }
