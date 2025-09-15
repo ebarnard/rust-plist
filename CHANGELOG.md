@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+- Bump MSRV to v1.81 as required by `time-core` v0.1.6.
+
 ## [1.7.4] - 2025-07-07
 
 ### Changed

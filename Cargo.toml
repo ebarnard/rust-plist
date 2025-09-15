@@ -9,7 +9,7 @@ documentation = "https://docs.rs/plist/"
 keywords = ["plist", "parser"]
 categories = ["config", "encoding", "parser-implementations"]
 edition = "2021"
-rust-version = "1.68"
+rust-version = "1.81"
 
 [features]
 default = ["serde"]
