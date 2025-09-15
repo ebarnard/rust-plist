@@ -10,6 +10,7 @@ keywords = ["plist", "parser"]
 categories = ["config", "encoding", "parser-implementations"]
 edition = "2021"
 rust-version = "1.81"
+exclude = ["/tests/data"]
 
 [features]
 default = ["serde"]
