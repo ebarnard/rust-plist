@@ -27,6 +27,15 @@ impl Dictionary {
         }
     }
 
+    /// Create a new map with capacity for `n` key-value pairs. (Does not allocate if `n` is zero.)
+    ///
+    /// Computes in **O(n)** time.
+    pub fn with_capacity(n: usize) -> Self {
+        Dictionary {
+            map: IndexMap::with_capacity(n),
+        }
+    }
+
     /// Clears the dictionary, removing all values.
     #[inline]
     pub fn clear(&mut self) {
