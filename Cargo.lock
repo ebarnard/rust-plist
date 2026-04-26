@@ -87,7 +87,7 @@ checksum = "c6673768db2d862beb9b39a78fdcb1a69439615d5794a1be50caa9bc92c81967"
 
 [[package]]
 name = "plist"
-version = "1.8.0"
+version = "1.9.0"
 dependencies = [
  "base64",
  "indexmap 2.10.0",
