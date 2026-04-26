@@ -42,20 +42,20 @@ jobs:
           TOOLCHAIN: ${{ matrix.channel }}-${{ matrix.target }}
 
       - name: Build and Test (Debug, No Default Features)
-        run: cargo test --no-default-features
+        run: cargo test --locked --no-default-features
 
       - name: Build and Test (Debug, enable_unstable_features_that_may_break_with_minor_version_bumps)
-        run: cargo test --no-default-features --features enable_unstable_features_that_may_break_with_minor_version_bumps
+        run: cargo test --locked --no-default-features --features enable_unstable_features_that_may_break_with_minor_version_bumps
 
       - name: Build and Test (Debug, serde)
-        run: cargo test --no-default-features --features serde
+        run: cargo test --locked --no-default-features --features serde
 
       - name: Build and Test (Release, All Features)
-        run: cargo test --release --all-features
+        run: cargo test --locked --release --all-features
 
       - name: Build and Test (Minimal Versions, All Features)
         if: matrix.channel == 'nightly'
-        run: cargo test --all-features -Z minimal-versions
+        run: cargo test --locked --all-features -Z minimal-versions
 
   lint:
     name: Lint
