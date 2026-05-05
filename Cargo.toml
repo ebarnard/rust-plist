@@ -25,4 +25,4 @@ serde = { version = "1.0.2", optional = true }
 
 [dev-dependencies]
 serde_derive = { version = "1.0.2" }
-serde_yaml = "0.8.21"
+yaml_serde = "0.10.3"

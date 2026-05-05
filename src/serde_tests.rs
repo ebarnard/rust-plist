@@ -997,7 +997,7 @@ fn empty_array_and_dictionary_serialize_to_xml() {
 
 #[test]
 fn serde_yaml_to_value() {
-    let value: Value = serde_yaml::from_str("true").unwrap();
+    let value: Value = yaml_serde::from_str("true").unwrap();
     assert_eq!(value, Value::Boolean(true));
 }
 
