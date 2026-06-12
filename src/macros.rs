@@ -1,4 +1,4 @@
-/// Construct a `plist::Value` from a JSON literal.
+/// Construct a `plist::Value` from a JSON-like literal.
 ///
 /// ```
 /// # use plist::plist;
@@ -14,12 +14,10 @@
 /// });
 /// ```
 ///
-/// Variables or expressions can be interpolated into the PList literal. Any type
-/// interpolated into an array element or object value must implement Serde's
-/// `Serialize` trait, while any type interpolated into a object key must
-/// implement `Into<String>`. If the `Serialize` implementation of the
-/// interpolated type decides to fail, or if the interpolated type contains a
-/// map with non-string keys, the `plist!` macro will panic.
+/// Variables or expressions can be interpolated into the literal. Any type
+/// interpolated into an array element or object value must implement the
+/// `Into<Value>` trait, while any type interpolated into a object key must
+/// implement `Into<String>`.
 ///
 /// ```
 /// # use plist::plist;
