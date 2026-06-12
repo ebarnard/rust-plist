@@ -257,10 +257,10 @@ macro_rules! plist_internal {
         })
     };
 
-    // Any Serialize type: numbers, strings, struct literals, variables etc.
+    // Any Into<plist::Value> type: numbers, strings, struct literals, variables etc.
     // Must be below every other rule.
     ($other:expr) => {
-        $crate::to_value(&$other).unwrap()
+        $crate::Value::from($other)
     };
 }
 
