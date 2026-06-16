@@ -1,4 +1,4 @@
-/// Construct a `plist::Value` from a JSON-like literal.
+/// Constructs a `plist::Value` from a JSON-like literal.
 ///
 /// ```
 /// # use plist::plist;
@@ -54,13 +54,6 @@ macro_rules! plist {
     };
 }
 
-// Rocket relies on this because they export their own `plist!` with a different
-// doc comment than ours, and various Rust bugs prevent them from calling our
-// `plist!` from their `plist!` so they call `plist_internal!` directly. Check with
-// @SergioBenitez before making breaking changes to this macro.
-//
-// Changes are fine as long as `plist_internal!` does not call any new helper
-// macros and can still be invoked as `plist_internal!($($plist)+)`.
 #[macro_export(local_inner_macros)]
 #[doc(hidden)]
 macro_rules! plist_internal {
