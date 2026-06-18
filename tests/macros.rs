@@ -6,6 +6,7 @@ fn ui() {
 }
 
 #[test]
-pub fn pass() {
+#[ignore = "must be run on MSRV compiler"]
+pub fn macro_expansion() {
     macrotest::expand("tests/expand/*.rs");
 }
