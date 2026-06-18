@@ -41,6 +41,11 @@ jobs:
         env:
           TOOLCHAIN: ${{ matrix.channel }}-${{ matrix.target }}
 
+      - name: Install cargo-expand
+        uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-expand@1
+
       - name: Build and Test (Debug, No Default Features)
         run: cargo test --locked --no-default-features
 
