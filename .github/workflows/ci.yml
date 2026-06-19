@@ -8,8 +8,8 @@ on:
 
 name: CI
 
-env:
-  CARGO_REGISTRIES_CRATES_IO_PROTOCOL: sparse
+permissions:
+  contents: read
 
 jobs:
   build_and_test:
