@@ -89,6 +89,7 @@ mod error;
 mod integer;
 mod uid;
 mod value;
+mod macros;
 
 #[cfg(feature = "serde")]
 pub use data::Data;

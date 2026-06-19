@@ -20,6 +20,8 @@ jobs:
         include:
           - os: ubuntu-22.04
             target: x86_64-unknown-linux-gnu
+            # MSRV. If updating this, also update below for "Test macro
+            # expansion" step
             channel: 1.88.0
           - os: ubuntu-22.04
             target: x86_64-unknown-linux-gnu
@@ -41,6 +43,11 @@ jobs:
         env:
           TOOLCHAIN: ${{ matrix.channel }}-${{ matrix.target }}
 
+      - name: Install cargo-expand
+        uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-expand@1
+
       - name: Build and Test (Debug, No Default Features)
         run: cargo test --locked --no-default-features
 
@@ -56,6 +63,10 @@ jobs:
       - name: Build and Test (Minimal Versions, All Features)
         if: matrix.channel == 'nightly'
         run: cargo test --locked --all-features -Z minimal-versions
+
+      - name: Test macro expansion
+        if: matrix.channel == '1.88.0'
+        run: cargo test macro_expansion -- --ignored
 
   lint:
     name: Lint
