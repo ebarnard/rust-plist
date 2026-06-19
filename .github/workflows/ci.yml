@@ -32,7 +32,7 @@ jobs:
             channel: nightly
     steps:
       - name: Checkout
-        uses: actions/checkout@v3
+        uses: actions/checkout@v7
 
       - name: Install Rust Toolchain
         run: |
@@ -81,7 +81,7 @@ jobs:
     runs-on: ubuntu-22.04
     steps:
       - name: Checkout
-        uses: actions/checkout@v3
+        uses: actions/checkout@v7
 
       - name: Check for broken intra-doc links
         run: cargo doc --all-features --document-private-items --no-deps
@@ -100,7 +100,7 @@ jobs:
         run: exit 1
 
       - name: Checkout
-        uses: actions/checkout@v3
+        uses: actions/checkout@v7
 
       - name: Run cargo-semver-checks
         uses: obi1kenobi/cargo-semver-checks-action@v2
@@ -131,7 +131,7 @@ jobs:
       id-token: write # Required for OIDC token exchange
     steps:
       - name: Checkout
-        uses: actions/checkout@v3
+        uses: actions/checkout@v7
 
       - name: Authenticate with crates.io
         uses: rust-lang/crates-io-auth-action@v1
