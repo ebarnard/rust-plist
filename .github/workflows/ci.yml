@@ -20,9 +20,7 @@ jobs:
         include:
           - os: ubuntu-22.04
             target: x86_64-unknown-linux-gnu
-            # MSRV. If updating this, also update below for "Test macro
-            # expansion" step
-            channel: 1.88.0
+            channel: msrv
           - os: ubuntu-22.04
             target: x86_64-unknown-linux-gnu
             channel: stable
@@ -38,15 +36,19 @@ jobs:
 
       - name: Install Rust Toolchain
         run: |
+          set -euo pipefail
+
+          if [ "$CHANNEL" = "msrv" ]
+          then
+            CHANNEL="$(cargo metadata --no-deps --format-version=1 | jq -er '.packages[] | select(.name=="plist") | .rust_version')"
+          fi
+
+          TOOLCHAIN="${CHANNEL}-${TARGET}"
           rustup default "$TOOLCHAIN"
           rustup update "$TOOLCHAIN"
         env:
-          TOOLCHAIN: ${{ matrix.channel }}-${{ matrix.target }}
-
-      - name: Install cargo-expand
-        uses: taiki-e/install-action@v2
-        with:
-          tool: cargo-expand@1
+          CHANNEL: ${{ matrix.channel }}
+          TARGET: ${{ matrix.target }}
 
       - name: Build and Test (Debug, No Default Features)
         run: cargo test --locked --no-default-features
@@ -64,9 +66,15 @@ jobs:
         if: matrix.channel == 'nightly'
         run: cargo test --locked --all-features -Z minimal-versions
 
+      - name: Install cargo-expand
+        if: matrix.channel == 'msrv'
+        uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-expand@1
+
       - name: Test macro expansion
-        if: matrix.channel == '1.88.0'
-        run: cargo test macro_expansion -- --ignored
+        if: matrix.channel == 'msrv'
+        run: cargo test --locked macro_expansion -- --ignored
 
   lint:
     name: Lint
