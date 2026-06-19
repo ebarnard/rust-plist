@@ -65,7 +65,7 @@ jobs:
         run: cargo test --locked --all-features -Z minimal-versions
 
       - name: Test macro expansion
-        if: matrix.channel == "1.88.0"
+        if: matrix.channel == '1.88.0'
         run: cargo test macro_expansion -- --ignored
 
   lint:
