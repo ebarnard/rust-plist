@@ -117,7 +117,7 @@ impl<R: Read + Seek> BinaryReader<R> {
 
         self.ref_size = self.read_u8()?;
         match self.ref_size {
-            1 | 2 | 4 | 8 => (),
+            1 | 2 | 3 | 4 | 8 => (),
             _ => return Err(self.with_pos(ErrorKind::InvalidTrailerObjectReferenceSize)),
         }
 
