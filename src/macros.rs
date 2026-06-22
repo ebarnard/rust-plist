@@ -1,3 +1,35 @@
+/// Creates a `plist::Value::String` using interpolation of runtime expressions.
+///
+/// This is just the [`format!`] macro wrapped in a `plist::Value::String`.
+///
+/// The first argument `plist_string!` receives is a format string. This must be a string
+/// literal. The power of the formatting string is in the `{}`s contained.
+/// Additional parameters passed to `format!` replace the `{}`s within the
+/// formatting string in the order given unless named or positional parameters
+/// are used.
+///
+/// See [the formatting syntax documentation in `std::fmt`](std::fmt)
+/// for details.
+///
+/// # Examples
+///
+/// ```
+/// # #![allow(unused_must_use)]
+/// # use plist::plist_string;
+/// #
+/// plist_string!("test");                             // => "test"
+/// plist_string!("hello {}", "world!");               // => "hello world!"
+/// plist_string!("x = {}, y = {val}", 10, val = 30);  // => "x = 10, y = 30"
+/// let (x, y) = (1, 2);
+/// plist_string!("{x} + {y} = 3");                    // => "1 + 2 = 3"
+/// ```
+#[macro_export]
+macro_rules! plist_string {
+    ($($tt:tt)*) => {
+        $crate::Value::String(::std::format!($($tt)*))
+    };
+}
+
 /// Constructs a `plist::Value` from a JSON-like literal.
 ///
 /// ```
@@ -351,6 +383,14 @@ macro_rules! plist_expect_expr_comma {
 #[cfg(test)]
 mod tests {
     use crate::Dictionary;
+
+    #[test]
+    fn plist_string() {
+        let a = 10;
+        let b = 20;
+        let actual = plist_string!("{a} + {} = {answer}", b, answer = a + b);
+        assert_eq!(actual, "10 + 20 = 30".into());
+    }
 
     #[test]
     fn plist_dict() {
