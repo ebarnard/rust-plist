@@ -54,6 +54,76 @@ macro_rules! plist {
     };
 }
 
+/// Constructs a `plist::Dictionary` from a JSON-like literal.
+///
+/// ```
+/// # use plist::plist_dict;
+/// #
+/// let value = plist_dict! {
+///     "code": 200,
+///     "success": true,
+///     "payload": {
+///         "features": [
+///             "serde",
+///         ]
+///     }
+/// };
+/// ```
+///
+/// Variables or expressions can be interpolated into the literal. Any type
+/// interpolated into an array element or object value must implement the
+/// `Into<Value>` trait, while any type interpolated into a object key must
+/// implement `Into<String>`.
+///
+/// ```
+/// # use plist::plist_dict;
+/// #
+/// let code = 200;
+/// let features = vec!["serde", "plist"];
+///
+/// let value = plist_dict! {
+///     "code": code,
+///     "success": code == 200,
+///     "payload": {
+///         features[0]: features[1]
+///     }
+/// };
+/// ```
+///
+/// Trailing commas are allowed inside both arrays and objects.
+///
+/// ```
+/// # use plist::plist_dict;
+/// #
+/// let value = plist_dict! {
+///     "notice": 0,
+///     "the": 1,
+///     "trailing": 2,
+///     "comma -->": 3,
+/// };
+/// ```
+#[macro_export(local_inner_macros)]
+macro_rules! plist_dict {
+    () => {
+        $crate::Dictionary::new()
+    };
+    // Allow outer curlies if provided
+    ({$($tt:tt)+}) => {
+        {
+            let mut object = $crate::Dictionary::new();
+            plist_internal!(@object object () ($($tt)+) ($($tt)+));
+            object
+        }
+    };
+    ($($tt:tt)+) => {
+        {
+            let mut object = $crate::Dictionary::new();
+            plist_internal!(@object object () ($($tt)+) ($($tt)+));
+            object
+        }
+    };
+}
+
 #[macro_export(local_inner_macros)]
 #[doc(hidden)]
 macro_rules! plist_internal {
@@ -276,4 +346,24 @@ macro_rules! plist_unexpected {
 #[doc(hidden)]
 macro_rules! plist_expect_expr_comma {
     ($e:expr , $($tt:tt)*) => {};
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::Dictionary;
+
+    #[test]
+    fn plist_dict() {
+        let expected = Dictionary::from_iter([(String::from("foo"), String::from("bar"))]);
+
+        let d = plist_dict! {
+            "foo": "bar",
+        };
+        assert_eq!(&d, &expected);
+
+        let d = plist_dict!({
+            "foo": "bar",
+        });
+        assert_eq!(&d, &expected);
+    }
 }
