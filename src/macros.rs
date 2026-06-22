@@ -1,3 +1,35 @@
+/// Creates a `plist::Value::String` using interpolation of runtime expressions.
+///
+/// This is just the [`format!`] macro wrapped in a `plist::Value::String`.
+///
+/// The first argument `plist_string!` receives is a format string. This must be a string
+/// literal. The power of the formatting string is in the `{}`s contained.
+/// Additional parameters passed to `format!` replace the `{}`s within the
+/// formatting string in the order given unless named or positional parameters
+/// are used.
+///
+/// See [the formatting syntax documentation in `std::fmt`](std::fmt)
+/// for details.
+///
+/// # Examples
+///
+/// ```
+/// # #![allow(unused_must_use)]
+/// # use plist::plist_string;
+/// #
+/// plist_string!("test");                             // => "test"
+/// plist_string!("hello {}", "world!");               // => "hello world!"
+/// plist_string!("x = {}, y = {val}", 10, val = 30);  // => "x = 10, y = 30"
+/// let (x, y) = (1, 2);
+/// plist_string!("{x} + {y} = 3");                    // => "1 + 2 = 3"
+/// ```
+#[macro_export]
+macro_rules! plist_string {
+    ($($tt:tt)*) => {
+        $crate::Value::String(::std::format!($($tt)*))
+    };
+}
+
 /// Constructs a `plist::Value` from a JSON-like literal.
 ///
 /// ```
@@ -51,6 +83,76 @@ macro_rules! plist {
     // Hide distracting implementation details from the generated rustdoc.
     ($($plist:tt)+) => {
         plist_internal!($($plist)+)
+    };
+}
+
+/// Constructs a `plist::Dictionary` from a JSON-like literal.
+///
+/// ```
+/// # use plist::plist_dict;
+/// #
+/// let value = plist_dict! {
+///     "code": 200,
+///     "success": true,
+///     "payload": {
+///         "features": [
+///             "serde",
+///         ]
+///     }
+/// };
+/// ```
+///
+/// Variables or expressions can be interpolated into the literal. Any type
+/// interpolated into an array element or object value must implement the
+/// `Into<Value>` trait, while any type interpolated into a object key must
+/// implement `Into<String>`.
+///
+/// ```
+/// # use plist::plist_dict;
+/// #
+/// let code = 200;
+/// let features = vec!["serde", "plist"];
+///
+/// let value = plist_dict! {
+///     "code": code,
+///     "success": code == 200,
+///     "payload": {
+///         features[0]: features[1]
+///     }
+/// };
+/// ```
+///
+/// Trailing commas are allowed inside both arrays and objects.
+///
+/// ```
+/// # use plist::plist_dict;
+/// #
+/// let value = plist_dict! {
+///     "notice": 0,
+///     "the": 1,
+///     "trailing": 2,
+///     "comma -->": 3,
+/// };
+/// ```
+#[macro_export(local_inner_macros)]
+macro_rules! plist_dict {
+    () => {
+        $crate::Dictionary::new()
+    };
+    // Allow outer curlies if provided
+    ({$($tt:tt)+}) => {
+        {
+            let mut object = $crate::Dictionary::new();
+            plist_internal!(@object object () ($($tt)+) ($($tt)+));
+            object
+        }
+    };
+    ($($tt:tt)+) => {
+        {
+            let mut object = $crate::Dictionary::new();
+            plist_internal!(@object object () ($($tt)+) ($($tt)+));
+            object
+        }
     };
 }
 
@@ -276,4 +378,32 @@ macro_rules! plist_unexpected {
 #[doc(hidden)]
 macro_rules! plist_expect_expr_comma {
     ($e:expr , $($tt:tt)*) => {};
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::Dictionary;
+
+    #[test]
+    fn plist_string() {
+        let a = 10;
+        let b = 20;
+        let actual = plist_string!("{a} + {} = {answer}", b, answer = a + b);
+        assert_eq!(actual, "10 + 20 = 30".into());
+    }
+
+    #[test]
+    fn plist_dict() {
+        let expected = Dictionary::from_iter([(String::from("foo"), String::from("bar"))]);
+
+        let d = plist_dict! {
+            "foo": "bar",
+        };
+        assert_eq!(&d, &expected);
+
+        let d = plist_dict!({
+            "foo": "bar",
+        });
+        assert_eq!(&d, &expected);
+    }
 }
