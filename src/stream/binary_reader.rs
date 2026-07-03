@@ -107,7 +107,7 @@ impl<R: Read + Seek> BinaryReader<R> {
         let mut zeros = [0; 6];
         self.reader.read_all(&mut zeros)?;
 
-        // At least one encoder can use 24-bit integers in the object offset table.
+        // Encoders may use 24-bit integers in the object offset and reference tables.
         // We never write 24-bit integers as not all decoders support them.
         let offset_size = self.read_u8()?;
         match offset_size {
@@ -140,7 +140,7 @@ impl<R: Read + Seek> BinaryReader<R> {
             match size {
                 1 => ints.push(self.read_u8()?.into()),
                 2 => ints.push(self.read_be_u16()?.into()),
-                // At least one encoder can use 24-bit integers in the object offset table.
+                // Encoders may use 24-bit integers in the object offset and reference tables.
                 // We never write 24-bit integers as not all decoders support them.
                 3 => ints.push(self.read_be_u24()?.into()),
                 4 => ints.push(self.read_be_u32()?.into()),
