@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.10.0] - 2026-07-04
+
+### Changed
+- Add `plist!` (#184) and `plist_dict!` (#189) macros.
+- Update `quick-xml` to v0.41.0 to fix RUSTSEC-2026-0194 (#190).
+
+### Fixed
+- Read binary plists with 24-bit references (#188).
+
 ## [1.9.0] - 2026-04-26
 
 ### Changed
@@ -40,7 +49,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 - Update `quick-xml` to v0.37.
 
-[unreleased]: https://github.com/ebarnard/rust-plist/compare/v1.9.0...HEAD
+[unreleased]: https://github.com/ebarnard/rust-plist/compare/v1.10.0...HEAD
+[1.10.0]: https://github.com/ebarnard/rust-plist/compare/v1.9.0...v1.10.0
 [1.9.0]: https://github.com/ebarnard/rust-plist/compare/v1.8.0...v1.9.0
 [1.8.0]: https://github.com/ebarnard/rust-plist/compare/v1.7.4...v1.8.0
 [1.7.4]: https://github.com/ebarnard/rust-plist/compare/v1.7.3...v1.7.4

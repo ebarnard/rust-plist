@@ -1,6 +1,6 @@
 [package]
 name = "plist"
-version = "1.9.0"
+version = "1.10.0"
 authors = ["Ed Barnard <eabarnard@gmail.com>"]
 description = "A rusty plist parser. Supports Serde serialization."
 license = "MIT"
@@ -28,4 +28,3 @@ serde_derive = { version = "1.0.2" }
 serde_yaml = "0.8.21"
 trybuild = { version = "1.0.116", features = ["diff"] }
 macrotest = "1.2.1"
-
