@@ -17,10 +17,10 @@ default = ["serde"]
 enable_unstable_features_that_may_break_with_minor_version_bumps = []
 
 [dependencies]
-base64 = "0.22.0"
+base64 = "0.23.1"
 time = { version = "0.3.47", features = ["parsing", "formatting"] }
-indexmap = "2.1.0"
-quick_xml = { package = "quick-xml", version = "0.41.0" }
+indexmap = "2.14.0"
+quick_xml = { package = "quick-xml", version = "0.42.0" }
 serde = { version = "1.0.2", optional = true }
 
 [dev-dependencies]

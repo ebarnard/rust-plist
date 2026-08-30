@@ -121,12 +121,7 @@ impl<R: BufRead> ReaderState<R> {
         let mut content = String::new();
         loop {
             match self.read_xml_event(buffer)? {
-                XmlEvent::Text(text) => {
-                    let decoded = text
-                        .decode()
-                        .map_err(|err| self.with_pos(ErrorKind::from(err)))?;
-                    content.push_str(&decoded);
-                }
+                XmlEvent::Text(text) => content.push_str(text.as_ref()),
                 XmlEvent::GeneralRef(bytes) => {
                     if let Some(ch) = bytes
                         .resolve_char_ref()
@@ -134,10 +129,7 @@ impl<R: BufRead> ReaderState<R> {
                     {
                         content.push(ch);
                     } else {
-                        let decoded = bytes
-                            .decode()
-                            .map_err(|err| self.with_pos(ErrorKind::from(err)))?;
-                        if let Some(entity) = resolve_xml_entity(&decoded) {
+                        if let Some(entity) = resolve_xml_entity(bytes.as_ref()) {
                             content.push_str(entity);
                         }
                     }
@@ -166,15 +158,15 @@ impl<R: BufRead> ReaderState<R> {
                 XmlEvent::Decl(_) | XmlEvent::DocType(_) => return Ok(ReadResult::XmlDecl),
                 XmlEvent::Start(name) => {
                     match name.local_name().as_ref() {
-                        b"plist" => {}
-                        b"array" => return Ok(ReadResult::Event(Event::StartArray(None))),
-                        b"dict" => return Ok(ReadResult::Event(Event::StartDictionary(None))),
-                        b"key" => {
+                        "plist" => {}
+                        "array" => return Ok(ReadResult::Event(Event::StartArray(None))),
+                        "dict" => return Ok(ReadResult::Event(Event::StartDictionary(None))),
+                        "key" => {
                             return Ok(ReadResult::Event(Event::String(
                                 self.read_content(buffer)?.into(),
                             )))
                         }
-                        b"data" => {
+                        "data" => {
                             let mut encoded = self.read_content(buffer)?;
                             // Strip whitespace and line endings from input string
                             encoded.retain(|c| !c.is_ascii_whitespace());
@@ -183,13 +175,13 @@ impl<R: BufRead> ReaderState<R> {
                                 .map_err(|_| self.with_pos(ErrorKind::InvalidDataString))?;
                             return Ok(ReadResult::Event(Event::Data(data.into())));
                         }
-                        b"date" => {
+                        "date" => {
                             let s = self.read_content(buffer)?;
                             let date = Date::from_xml_format(&s)
                                 .map_err(|_| self.with_pos(ErrorKind::InvalidDateString))?;
                             return Ok(ReadResult::Event(Event::Date(date)));
                         }
-                        b"integer" => {
+                        "integer" => {
                             let s = self.read_content(buffer)?;
                             match Integer::from_str(&s) {
                                 Ok(i) => return Ok(ReadResult::Event(Event::Integer(i))),
@@ -198,34 +190,30 @@ impl<R: BufRead> ReaderState<R> {
                                 }
                             }
                         }
-                        b"real" => {
+                        "real" => {
                             let s = self.read_content(buffer)?;
                             match s.parse() {
                                 Ok(f) => return Ok(ReadResult::Event(Event::Real(f))),
                                 Err(_) => return Err(self.with_pos(ErrorKind::InvalidRealString)),
                             }
                         }
-                        b"string" => {
+                        "string" => {
                             return Ok(ReadResult::Event(Event::String(
                                 self.read_content(buffer)?.into(),
                             )))
                         }
-                        b"true" => return Ok(ReadResult::Event(Event::Boolean(true))),
-                        b"false" => return Ok(ReadResult::Event(Event::Boolean(false))),
+                        "true" => return Ok(ReadResult::Event(Event::Boolean(true))),
+                        "false" => return Ok(ReadResult::Event(Event::Boolean(false))),
                         _ => return Err(self.with_pos(ErrorKind::UnknownXmlElement)),
                     }
                 }
                 XmlEvent::End(name) => match name.local_name().as_ref() {
-                    b"array" | b"dict" => return Ok(ReadResult::Event(Event::EndCollection)),
+                    "array" | "dict" => return Ok(ReadResult::Event(Event::EndCollection)),
                     _ => (),
                 },
                 XmlEvent::Eof => return Ok(ReadResult::Eof),
                 XmlEvent::Text(text) => {
-                    let decoded = text
-                        .decode()
-                        .map_err(|err| self.with_pos(ErrorKind::from(err)))?;
-
-                    if !decoded.chars().all(char::is_whitespace) {
+                    if !text.chars().all(char::is_whitespace) {
                         return Err(
                             self.with_pos(ErrorKind::UnexpectedXmlCharactersExpectedElement)
                         );
@@ -240,10 +228,7 @@ impl<R: BufRead> ReaderState<R> {
                             continue;
                         }
                     } else {
-                        let decoded = bytes
-                            .decode()
-                            .map_err(|err| self.with_pos(ErrorKind::from(err)))?;
-                        if let Some(entity) = resolve_xml_entity(&decoded) {
+                        if let Some(entity) = resolve_xml_entity(bytes.as_ref()) {
                             if entity.chars().all(char::is_whitespace) {
                                 continue;
                             }
