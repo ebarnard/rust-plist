@@ -4,7 +4,7 @@
 //!
 //! [`IndexMap`]: https://docs.rs/indexmap/latest/indexmap/map/struct.IndexMap.html
 
-use indexmap::{map, IndexMap};
+use indexmap::{IndexMap, map};
 use std::{
     fmt::{self, Debug},
     ops,

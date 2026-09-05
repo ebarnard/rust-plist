@@ -7,9 +7,9 @@
 /// This reader will accept certain ill-formed ascii plist without complaining.
 /// It does not check the integrity of the plist format.
 use crate::{
+    Integer,
     error::{Error, ErrorKind},
     stream::{Event, OwnedEvent},
-    Integer,
 };
 use std::io::Read;
 
@@ -138,9 +138,7 @@ impl<R: Read> AsciiReader<R> {
         if matches!(code_unit, 0xD800..=0xDFFF) {
             self.advance_quoted_string()?;
 
-            if self.current_char != Some(b'\\')
-                || !matches!(self.peeked_char, Some(b'u' | b'U'))
-            {
+            if self.current_char != Some(b'\\') || !matches!(self.peeked_char, Some(b'u' | b'U')) {
                 return Err(self.error(ErrorKind::InvalidUtf16String));
             }
 
@@ -223,8 +221,10 @@ impl<R: Read> AsciiReader<R> {
                         let value = std::str::from_utf8(&value)
                             .map_err(|_| self.error(ErrorKind::InvalidOctalString))?;
 
-                        let value = u32::from(u16::from_str_radix(value, 8)
-                            .map_err(|_| self.error(ErrorKind::InvalidOctalString))?);
+                        let value = u32::from(
+                            u16::from_str_radix(value, 8)
+                                .map_err(|_| self.error(ErrorKind::InvalidOctalString))?,
+                        );
 
                         let value = char::from_u32(value)
                             .ok_or(self.error(ErrorKind::InvalidOctalString))?;

@@ -1,6 +1,5 @@
+use quick_xml::{encoding::EncodingError, escape::EscapeError};
 use std::{error, fmt, io};
-use quick_xml::escape::EscapeError;
-use quick_xml::encoding::EncodingError;
 
 #[cfg(feature = "serde")]
 use crate::stream::Event;
@@ -146,7 +145,7 @@ impl error::Error for Error {
 impl fmt::Display for Error {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         if let Some(position) = &self.inner.file_position {
-            write!(f, "{:?} ({})", &self.inner.kind, position)
+            write!(f, "{:?} ({})", self.inner.kind, position)
         } else {
             fmt::Debug::fmt(&self.inner.kind, f)
         }

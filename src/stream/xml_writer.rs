@@ -1,7 +1,7 @@
-use base64::{engine::general_purpose::STANDARD as BASE64_STANDARD, Engine};
+use base64::{Engine, engine::general_purpose::STANDARD as BASE64_STANDARD};
 use quick_xml::{
-    events::{BytesEnd, BytesStart, BytesText, Event as XmlEvent},
     Error as XmlWriterError, Writer as EventWriter,
+    events::{BytesEnd, BytesStart, BytesText, Event as XmlEvent},
 };
 use std::{
     borrow::Cow,
@@ -9,9 +9,9 @@ use std::{
 };
 
 use crate::{
-    error::{self, from_io_without_position, Error, ErrorKind, EventKind},
-    stream::{Writer, XmlWriteOptions},
     Date, Integer, Uid,
+    error::{self, Error, ErrorKind, EventKind, from_io_without_position},
+    stream::{Writer, XmlWriteOptions},
 };
 
 const DATA_MAX_LINE_CHARS: usize = 68;

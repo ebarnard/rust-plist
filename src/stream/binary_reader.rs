@@ -4,10 +4,11 @@ use std::{
 };
 
 use crate::{
+    Uid,
     date::{Date, InfiniteOrNanDate},
     error::{Error, ErrorKind},
     stream::{Event, OwnedEvent},
-    u64_to_usize, Uid,
+    u64_to_usize,
 };
 
 struct StackItem {
@@ -145,7 +146,9 @@ impl<R: Read + Seek> BinaryReader<R> {
                 3 => ints.push(self.read_be_u24()?.into()),
                 4 => ints.push(self.read_be_u32()?.into()),
                 8 => ints.push(self.read_be_u64()?),
-                _ => unreachable!("size is either self.ref_size or offset_size both of which are already validated")
+                _ => unreachable!(
+                    "size is either self.ref_size or offset_size both of which are already validated"
+                ),
             }
         }
         Ok(ints)

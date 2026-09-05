@@ -1,11 +1,14 @@
-use base64::{engine::general_purpose::STANDARD as base64_standard, Engine};
-use quick_xml::{escape::resolve_xml_entity, events::Event as XmlEvent, Error as XmlReaderError, Reader as EventReader};
+use base64::{Engine, engine::general_purpose::STANDARD as base64_standard};
+use quick_xml::{
+    Error as XmlReaderError, Reader as EventReader, escape::resolve_xml_entity,
+    events::Event as XmlEvent,
+};
 use std::io::{self, BufRead};
 
 use crate::{
+    Date, Integer,
     error::{Error, ErrorKind, FilePosition},
     stream::{Event, OwnedEvent},
-    Date, Integer,
 };
 
 pub struct XmlReader<R: BufRead> {
@@ -62,9 +65,7 @@ impl From<XmlReaderError> for ErrorKind {
             XmlReaderError::IllFormed(_)
             | XmlReaderError::InvalidAttr(_)
             | XmlReaderError::Escape(_)
-            | XmlReaderError::Namespace(_) => {
-                ErrorKind::InvalidXmlSyntax
-            },
+            | XmlReaderError::Namespace(_) => ErrorKind::InvalidXmlSyntax,
             XmlReaderError::Encoding(_) => ErrorKind::InvalidXmlUtf8,
         }
     }
@@ -164,7 +165,7 @@ impl<R: BufRead> ReaderState<R> {
                         "key" => {
                             return Ok(ReadResult::Event(Event::String(
                                 self.read_content(buffer)?.into(),
-                            )))
+                            )));
                         }
                         "data" => {
                             let mut encoded = self.read_content(buffer)?;
@@ -186,7 +187,7 @@ impl<R: BufRead> ReaderState<R> {
                             match Integer::from_str(&s) {
                                 Ok(i) => return Ok(ReadResult::Event(Event::Integer(i))),
                                 Err(_) => {
-                                    return Err(self.with_pos(ErrorKind::InvalidIntegerString))
+                                    return Err(self.with_pos(ErrorKind::InvalidIntegerString));
                                 }
                             }
                         }
@@ -200,7 +201,7 @@ impl<R: BufRead> ReaderState<R> {
                         "string" => {
                             return Ok(ReadResult::Event(Event::String(
                                 self.read_content(buffer)?.into(),
-                            )))
+                            )));
                         }
                         "true" => return Ok(ReadResult::Event(Event::Boolean(true))),
                         "false" => return Ok(ReadResult::Event(Event::Boolean(false))),
@@ -228,15 +229,13 @@ impl<R: BufRead> ReaderState<R> {
                             continue;
                         }
                     } else {
-                        if let Some(entity) = resolve_xml_entity(bytes.as_ref()) {
-                            if entity.chars().all(char::is_whitespace) {
-                                continue;
-                            }
+                        if let Some(entity) = resolve_xml_entity(bytes.as_ref())
+                            && entity.chars().all(char::is_whitespace)
+                        {
+                            continue;
                         }
                     }
-                    return Err(
-                        self.with_pos(ErrorKind::UnexpectedXmlCharactersExpectedElement)
-                    );
+                    return Err(self.with_pos(ErrorKind::UnexpectedXmlCharactersExpectedElement));
                 }
                 XmlEvent::PI(_)
                 | XmlEvent::CData(_)

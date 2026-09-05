@@ -5,9 +5,9 @@ use serde::{
 use std::{borrow::Cow, collections::BTreeMap, fmt::Debug, fs::File, io::Cursor};
 
 use crate::{
-    from_value,
-    stream::{private::Sealed, Event, OwnedEvent, Writer},
-    to_value, Data, Date, Deserializer, Dictionary, Error, Integer, Serializer, Uid, Value,
+    Data, Date, Deserializer, Dictionary, Error, Integer, Serializer, Uid, Value, from_value,
+    stream::{Event, OwnedEvent, Writer, private::Sealed},
+    to_value,
 };
 
 struct VecWriter {
@@ -850,9 +850,9 @@ fn xml_detection() {
                 for comment in [true, false] {
                     for doctype in [true, false] {
                         assert!(
-                        try_parse_xml(bom, whitespace, decl, comment, doctype),
-                        "bom={bom}, whitespace={whitespace}, decl={decl}, comment={comment}, doctype={doctype}"
-                    );
+                            try_parse_xml(bom, whitespace, decl, comment, doctype),
+                            "bom={bom}, whitespace={whitespace}, decl={decl}, comment={comment}, doctype={doctype}"
+                        );
                     }
                 }
             }

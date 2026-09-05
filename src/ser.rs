@@ -9,11 +9,11 @@ use std::{
 };
 
 use crate::{
+    Date, Integer, Uid, Value, XmlWriteOptions,
     date::serde_impls::DATE_NEWTYPE_STRUCT_NAME,
     error::{self, Error, ErrorKind},
     stream::{self, Writer},
     uid::serde_impls::UID_NEWTYPE_STRUCT_NAME,
-    Date, Integer, Uid, Value, XmlWriteOptions,
 };
 
 #[doc(hidden)]

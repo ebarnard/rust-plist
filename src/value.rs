@@ -6,12 +6,13 @@ use std::{
 };
 
 use crate::{
+    Date, Dictionary, Integer, Uid,
     error::{self, Error, ErrorKind, EventKind},
     stream::{
-        private, AsciiReader, BinaryWriter, Event, Events, Reader, Writer, XmlReader,
-        XmlWriteOptions, XmlWriter,
+        AsciiReader, BinaryWriter, Event, Events, Reader, Writer, XmlReader, XmlWriteOptions,
+        XmlWriter, private,
     },
-    u64_to_usize, Date, Dictionary, Integer, Uid,
+    u64_to_usize,
 };
 
 /// Represents any plist value.
@@ -352,8 +353,8 @@ pub mod serde_impls {
     };
 
     use crate::{
-        date::serde_impls::DATE_NEWTYPE_STRUCT_NAME, uid::serde_impls::UID_NEWTYPE_STRUCT_NAME,
-        Dictionary, Value,
+        Dictionary, Value, date::serde_impls::DATE_NEWTYPE_STRUCT_NAME,
+        uid::serde_impls::UID_NEWTYPE_STRUCT_NAME,
     };
 
     pub const VALUE_NEWTYPE_STRUCT_NAME: &str = "PLIST-VALUE";
@@ -676,7 +677,7 @@ impl Builder {
                 return Err(ErrorKind::ExpectedEndOfEventStream {
                     found: EventKind::of_value(&value),
                 }
-                .without_position())
+                .without_position());
             }
             (Some(StackItem::Array(mut array)), value) => {
                 array.push(value);
@@ -690,7 +691,7 @@ impl Builder {
                     expected: EventKind::DictionaryKeyOrEndCollection,
                     found: EventKind::of_value(&value),
                 }
-                .without_position())
+                .without_position());
             }
             (Some(StackItem::DictAndKey(mut dict, key)), value) => {
                 dict.insert(key, value);
@@ -726,7 +727,7 @@ impl Writer for Builder {
                 return Err(ErrorKind::ExpectedEndOfEventStream {
                     found: EventKind::EndCollection,
                 }
-                .without_position())
+                .without_position());
             }
             Some(StackItem::Array(array)) => Value::Array(array),
             Some(StackItem::Dict(dict)) => Value::Dictionary(dict),
@@ -735,7 +736,7 @@ impl Writer for Builder {
                     expected: EventKind::ValueOrStartCollection,
                     found: EventKind::EndCollection,
                 }
-                .without_position())
+                .without_position());
             }
         };
         self.write_value(value)
@@ -777,7 +778,7 @@ mod tests {
     use std::time::SystemTime;
 
     use super::*;
-    use crate::{stream::Event::*, Date};
+    use crate::{Date, stream::Event::*};
 
     #[test]
     fn value_accessors() {

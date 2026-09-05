@@ -24,9 +24,8 @@ use std::{
 };
 
 use crate::{
-    dictionary,
+    Date, Integer, Uid, Value, dictionary,
     error::{Error, ErrorKind},
-    Date, Integer, Uid, Value,
 };
 
 /// An encoding of a plist as a flat structure.
@@ -115,10 +114,7 @@ impl XmlWriteOptions {
             return self.indent(0, 0);
         }
 
-        assert!(
-            indent_str.is_ascii(),
-            "indent str must be ascii"
-        );
+        assert!(indent_str.is_ascii(), "indent str must be ascii");
         let indent_str = indent_str.as_bytes();
         assert!(
             indent_str.iter().all(|chr| chr == &indent_str[0]),
@@ -207,8 +203,9 @@ impl<'a> Iterator for Events<'a> {
         }
 
         Some(match self.stack.pop()? {
-            StackItem::Root(value)
-            | StackItem::DictValue(value) => handle_value(value, &mut self.stack),
+            StackItem::Root(value) | StackItem::DictValue(value) => {
+                handle_value(value, &mut self.stack)
+            }
             StackItem::Array(mut array) => {
                 if let Some(value) = array.next() {
                     // There might still be more items in the array so return it to the stack.

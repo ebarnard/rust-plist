@@ -8,7 +8,7 @@ repository = "https://github.com/ebarnard/rust-plist/"
 documentation = "https://docs.rs/plist/"
 keywords = ["plist", "parser"]
 categories = ["config", "encoding", "parser-implementations"]
-edition = "2021"
+edition = "2024"
 rust-version = "1.88.0"
 exclude = ["/tests/data"]
 

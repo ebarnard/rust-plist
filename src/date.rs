@@ -2,7 +2,7 @@ use std::{
     fmt,
     time::{Duration, SystemTime, UNIX_EPOCH},
 };
-use time::{format_description::well_known::Rfc3339, OffsetDateTime, UtcOffset};
+use time::{OffsetDateTime, UtcOffset, format_description::well_known::Rfc3339};
 
 /// A UTC timestamp used for serialization to and from the plist date type.
 ///

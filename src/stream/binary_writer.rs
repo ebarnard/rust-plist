@@ -9,9 +9,9 @@ use std::{
 };
 
 use crate::{
+    Date, Integer, Uid,
     error::{self, Error, ErrorKind, EventKind},
     stream::Writer,
-    Date, Integer, Uid,
 };
 
 pub struct BinaryWriter<W: Write> {
@@ -209,7 +209,7 @@ impl<W: Write> BinaryWriter<W> {
                     expected: EventKind::DictionaryKeyOrEndCollection,
                     found: value.event_kind(),
                 }
-                .without_position())
+                .without_position());
             }
         }
 
@@ -700,7 +700,7 @@ impl Value<'_> {
 mod tests {
     use std::{fs::File, io::Cursor, path::Path};
 
-    use crate::{stream::BinaryReader, Value};
+    use crate::{Value, stream::BinaryReader};
 
     fn test_roundtrip<P: AsRef<Path>>(path: P) {
         let reader = File::open(path).unwrap();
