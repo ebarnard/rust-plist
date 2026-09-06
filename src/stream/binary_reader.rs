@@ -5,7 +5,7 @@ use std::{
 
 use crate::{
     Uid,
-    date::{Date, InfiniteOrNanDate},
+    date::{Date, OverflowOrNanDate},
     error::{Error, ErrorKind},
     stream::{Event, OwnedEvent},
     u64_to_usize,
@@ -271,7 +271,7 @@ impl<R: Read + Seek> BinaryReader<R> {
                 // Date. Seconds since 1/1/2001 00:00:00.
                 let secs = f64::from_bits(self.read_be_u64()?);
                 let date = Date::from_seconds_since_plist_epoch(secs)
-                    .map_err(|InfiniteOrNanDate| self.with_pos(ErrorKind::InfiniteOrNanDate))?;
+                    .map_err(|OverflowOrNanDate| self.with_pos(ErrorKind::OverflowOrNanDate))?;
                 Some(Event::Date(date))
             }
             (0x4, n) => {

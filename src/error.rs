@@ -65,7 +65,7 @@ pub(crate) enum ErrorKind {
     NullObjectUnimplemented,
     FillObjectUnimplemented,
     IntegerOutOfRange,
-    InfiniteOrNanDate,
+    OverflowOrNanDate,
     InvalidUtf8String,
     InvalidUtf16String,
     UnknownObjectType(

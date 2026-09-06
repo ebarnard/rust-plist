@@ -2,7 +2,7 @@ use std::{
     fmt,
     time::{Duration, SystemTime, UNIX_EPOCH},
 };
-use time::{OffsetDateTime, UtcOffset, format_description::well_known::Rfc3339};
+use time::{OffsetDateTime, UtcDateTime, UtcOffset, format_description::well_known::Rfc3339};
 
 /// A UTC timestamp used for serialization to and from the plist date type.
 ///
@@ -18,7 +18,8 @@ pub struct Date {
 #[non_exhaustive]
 pub struct InvalidXmlDate;
 
-pub(crate) struct InfiniteOrNanDate;
+#[derive(Debug, PartialEq)]
+pub(crate) struct OverflowOrNanDate;
 
 impl Date {
     /// The unix timestamp of the plist epoch.
@@ -36,26 +37,21 @@ impl Date {
 
     /// Converts the `Date` to an XML plist date string.
     pub fn to_xml_format(&self) -> String {
-        let datetime: OffsetDateTime = self.inner.into();
+        let datetime = Date::to_utc_date_time(self.inner)
+            .expect("all constructors verify that date can be represented as a `UtcDateTime`");
         datetime.format(&Rfc3339).unwrap()
     }
 
     pub(crate) fn from_seconds_since_plist_epoch(
         timestamp: f64,
-    ) -> Result<Date, InfiniteOrNanDate> {
+    ) -> Result<Date, OverflowOrNanDate> {
+        let Ok(dur_since_plist_epoch) = Duration::try_from_secs_f64(timestamp.abs()) else {
+            return Err(OverflowOrNanDate);
+        };
+
         // `timestamp` is the number of seconds since the plist epoch of 1/1/2001 00:00:00.
         let plist_epoch = UNIX_EPOCH + Date::PLIST_EPOCH_UNIX_TIMESTAMP;
-
-        if !timestamp.is_finite() {
-            return Err(InfiniteOrNanDate);
-        }
-
         let is_negative = timestamp < 0.0;
-        let timestamp = timestamp.abs();
-        let seconds = timestamp.floor() as u64;
-        let subsec_nanos = (timestamp.fract() * 1e9) as u32;
-
-        let dur_since_plist_epoch = Duration::new(seconds, subsec_nanos);
 
         let inner = if is_negative {
             plist_epoch.checked_sub(dur_since_plist_epoch)
@@ -63,22 +59,29 @@ impl Date {
             plist_epoch.checked_add(dur_since_plist_epoch)
         };
 
-        let inner = inner.ok_or(InfiniteOrNanDate)?;
+        let inner = inner.ok_or(OverflowOrNanDate)?;
+
+        // `time` which we use for parsing and printing dates supports a smaller date range than
+        // `SystemTime`.
+        if Date::to_utc_date_time(inner).is_none() {
+            return Err(OverflowOrNanDate);
+        }
 
         Ok(Date { inner })
     }
 
     pub(crate) fn as_seconds_since_plist_epoch(&self) -> f64 {
-        // needed until #![feature(duration_float)] is stabilized
-        fn as_secs_f64(d: Duration) -> f64 {
-            const NANOS_PER_SEC: f64 = 1_000_000_000.00;
-            (d.as_secs() as f64) + f64::from(d.subsec_nanos()) / NANOS_PER_SEC
-        }
-
         let plist_epoch = UNIX_EPOCH + Date::PLIST_EPOCH_UNIX_TIMESTAMP;
         match self.inner.duration_since(plist_epoch) {
-            Ok(dur_since_plist_epoch) => as_secs_f64(dur_since_plist_epoch),
-            Err(err) => -as_secs_f64(err.duration()),
+            Ok(duration) => duration.as_secs_f64(),
+            Err(err) => -err.duration().as_secs_f64(),
+        }
+    }
+
+    fn to_utc_date_time(date: SystemTime) -> Option<UtcDateTime> {
+        match date.duration_since(UNIX_EPOCH) {
+            Ok(duration) => UtcDateTime::UNIX_EPOCH.checked_add(duration.try_into().ok()?),
+            Err(err) => UtcDateTime::UNIX_EPOCH.checked_sub(err.duration().try_into().ok()?),
         }
     }
 }
@@ -201,5 +204,38 @@ mod testing {
     fn far_past_date() {
         let date_str = "1920-01-01T00:00:00Z";
         Date::from_xml_format(date_str).expect("should parse");
+    }
+
+    #[test]
+    fn overflowing_binary_dates_dont_panic() {
+        assert_eq!(
+            Date::from_seconds_since_plist_epoch(f64::INFINITY),
+            Err(OverflowOrNanDate)
+        );
+
+        assert_eq!(
+            Date::from_seconds_since_plist_epoch(f64::NEG_INFINITY),
+            Err(OverflowOrNanDate)
+        );
+
+        assert_eq!(
+            Date::from_seconds_since_plist_epoch(f64::MAX),
+            Err(OverflowOrNanDate)
+        );
+
+        assert_eq!(
+            Date::from_seconds_since_plist_epoch(f64::MIN),
+            Err(OverflowOrNanDate)
+        );
+
+        assert_eq!(
+            Date::from_seconds_since_plist_epoch(1e12),
+            Err(OverflowOrNanDate)
+        );
+
+        assert_eq!(
+            Date::from_seconds_since_plist_epoch(-1e12),
+            Err(OverflowOrNanDate)
+        );
     }
 }
