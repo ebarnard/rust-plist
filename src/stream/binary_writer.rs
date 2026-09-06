@@ -612,7 +612,7 @@ fn write_plist_value_ty_and_size(
 fn plist_ref_size(max_value: usize) -> u8 {
     let significant_bits = 64 - (max_value as u64).leading_zeros() as u8;
     // Convert to number of bytes
-    let significant_bytes = (significant_bits + 7) / 8;
+    let significant_bytes = significant_bits.div_ceil(8);
     // Round up to the next integer byte size which must be power of two.
     significant_bytes.next_power_of_two()
 }

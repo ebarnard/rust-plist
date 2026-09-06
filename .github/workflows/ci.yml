@@ -83,6 +83,9 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v7
 
+      - name: Run clippy
+        run: cargo clippy --all-targets --all-features
+
       - name: Check for broken intra-doc links
         run: cargo doc --all-features --document-private-items --no-deps
 

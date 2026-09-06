@@ -311,7 +311,7 @@ impl From<XmlWriterError> for Error {
 #[cfg(feature = "serde")]
 pub(crate) fn encode_data_base64(data: &[u8]) -> String {
     // Pre-allocate space for the base64 encoded data.
-    let num_lines = (data.len() + DATA_MAX_LINE_BYTES - 1) / DATA_MAX_LINE_BYTES;
+    let num_lines = data.len().div_ceil(DATA_MAX_LINE_BYTES);
     let max_len = num_lines * (DATA_MAX_LINE_CHARS + 1);
 
     let mut base64 = Vec::with_capacity(max_len);

@@ -351,13 +351,10 @@ fn map_next_step_to_unicode(c: char) -> char {
         '\u{FFFD}',
     ];
 
-    let index = c as usize;
-
-    if index < 128 || index > 0xff {
-        return c;
+    match c as usize {
+        index @ 128..=255 => NEXT_UNICODE_MAPPING[index - 128],
+        _ => c,
     }
-
-    NEXT_UNICODE_MAPPING[index - 128]
 }
 
 #[cfg(test)]
