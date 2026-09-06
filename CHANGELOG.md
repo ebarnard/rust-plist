@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.10.1] - 2026-09-06
+
+### Changed
+- Update `base64` to v0.23.1 (#196).
+- Update `quick-xml` to v0.42.0 (#196).
+- Update `indexmap` to v2.14.0 (#196).
+- Update to Rust 2024 edition (#198).
+- Run clippy in CI (#200).
+
+### Fixed
+- Don't panic when binary plist dates are out of range (#199).
+
 ## [1.10.0] - 2026-07-04
 
 ### Changed
@@ -49,7 +61,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 - Update `quick-xml` to v0.37.
 
-[unreleased]: https://github.com/ebarnard/rust-plist/compare/v1.10.0...HEAD
+[unreleased]: https://github.com/ebarnard/rust-plist/compare/v1.10.1...HEAD
+[1.10.0]: https://github.com/ebarnard/rust-plist/compare/v1.10.0...v1.10.1
 [1.10.0]: https://github.com/ebarnard/rust-plist/compare/v1.9.0...v1.10.0
 [1.9.0]: https://github.com/ebarnard/rust-plist/compare/v1.8.0...v1.9.0
 [1.8.0]: https://github.com/ebarnard/rust-plist/compare/v1.7.4...v1.8.0
