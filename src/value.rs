@@ -45,12 +45,14 @@ impl Value {
 
     /// Reads a `Value` from a byte stream containing an ASCII encoded plist.
     pub fn from_reader_ascii<R: Read>(reader: R) -> Result<Value, Error> {
-        let reader = AsciiReader::new(reader);
+        // The ASCII reader reads one byte at a time, so always wrap in a `BufReader`.
+        let reader = AsciiReader::new(BufReader::new(reader));
         Value::from_events(reader)
     }
 
     /// Reads a `Value` from a byte stream containing an XML encoded plist.
     pub fn from_reader_xml<R: Read>(reader: R) -> Result<Value, Error> {
+        // `quick-xml::Reader` requires a `BufRead`.
         let reader = XmlReader::new(BufReader::new(reader));
         Value::from_events(reader)
     }
