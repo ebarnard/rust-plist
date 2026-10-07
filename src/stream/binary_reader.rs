@@ -424,9 +424,48 @@ impl<R: Read + Seek> Iterator for BinaryReader<R> {
 
 #[cfg(test)]
 mod tests {
-    use std::fs::File;
+    use std::{
+        fs::File,
+        io::{self, Cursor, Read, Seek, SeekFrom},
+    };
 
     use super::*;
+
+    /// Counts the number of calls to `Read::read` and `Seek::seek` made on the wrapped reader, and
+    /// the total number of bytes read.
+    pub struct IoCounter<R> {
+        inner: R,
+        pub reads: usize,
+        pub bytes_read: usize,
+        pub seeks: usize,
+    }
+
+    impl<R> IoCounter<R> {
+        pub fn new(inner: R) -> IoCounter<R> {
+            IoCounter {
+                inner,
+                reads: 0,
+                bytes_read: 0,
+                seeks: 0,
+            }
+        }
+    }
+
+    impl<R: Read> Read for IoCounter<R> {
+        fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
+            self.reads += 1;
+            let count = self.inner.read(buf)?;
+            self.bytes_read += count;
+            Ok(count)
+        }
+    }
+
+    impl<R: Seek> Seek for IoCounter<R> {
+        fn seek(&mut self, pos: SeekFrom) -> io::Result<u64> {
+            self.seeks += 1;
+            self.inner.seek(pos)
+        }
+    }
 
     #[test]
     fn streaming_parser() {
@@ -515,5 +554,36 @@ mod tests {
         assert_eq!(events[1], Event::String("data".into()));
         assert_eq!(events[2], Event::StartDictionary(Some(2199)));
         assert_eq!(events[3], Event::String("1838".into()));
+    }
+
+    #[test]
+    fn small_plist_read_and_seek_counts() {
+        let data = std::fs::read("./tests/data/binary.plist").unwrap();
+        assert!(data.len() < 512);
+        let mut reader = IoCounter::new(Cursor::new(data));
+
+        let streaming_parser = BinaryReader::new(&mut reader);
+        let events: Result<Vec<Event>, _> = streaming_parser.collect();
+
+        assert!(events.is_ok());
+        assert_eq!(reader.reads, 125);
+        assert_eq!(reader.seeks, 32);
+        assert_eq!(reader.bytes_read, 427);
+    }
+
+    #[test]
+    fn large_plist_read_and_seek_counts() {
+        let data =
+            std::fs::read("./tests/data/binary_three_byte_integer_offset_table.plist").unwrap();
+        assert!(data.len() > 512);
+        let mut reader = IoCounter::new(Cursor::new(data));
+
+        let streaming_parser = BinaryReader::new(&mut reader);
+        let events: Result<Vec<Event>, _> = streaming_parser.collect();
+
+        assert!(events.is_ok());
+        assert_eq!(reader.reads, 145938);
+        assert_eq!(reader.seeks, 47767);
+        assert_eq!(reader.bytes_read, 462033);
     }
 }

@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+- Add tests counting I/O operations when reading binary plists, as a baseline for optimisation.
+
 ## [1.10.2] - 2026-10-19
 
 ### Changed
