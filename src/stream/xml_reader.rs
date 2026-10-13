@@ -122,7 +122,7 @@ impl<R: BufRead> ReaderState<R> {
         let mut content = String::new();
         loop {
             match self.read_xml_event(buffer)? {
-                XmlEvent::Text(text) => content.push_str(text.as_ref()),
+                XmlEvent::Text(text) => content.push_str(&text.xml10_content()),
                 XmlEvent::GeneralRef(bytes) => {
                     if let Some(ch) = bytes
                         .resolve_char_ref()
@@ -296,6 +296,32 @@ mod tests {
         ];
 
         assert_eq!(events.unwrap(), comparison);
+    }
+
+    #[test]
+    fn eol_normalization() {
+        let plist = "<plist><dict>\
+            <key>a\r\nb</key><string>c\r\nd</string>\
+            <key>e\rf</key><string>g\r\r\nh\r</string>\
+            <key>i&#13;j</key><string>k&#xD;&#13;&#10;l\r&#10;m</string>\
+            </dict></plist>";
+        let comparison = &[
+            StartDictionary(None),
+            String("a\nb".into()),
+            String("c\nd".into()),
+            String("e\nf".into()),
+            String("g\n\nh\n".into()),
+            String("i\rj".into()),
+            String("k\r\r\nl\n\nm".into()),
+            EndCollection,
+        ];
+
+        // A one-byte buffer splits every `\r\n` across reads.
+        for capacity in [1, 8192] {
+            let reader = BufReader::with_capacity(capacity, plist.as_bytes());
+            let events: Vec<_> = XmlReader::new(reader).map(|e| e.unwrap()).collect();
+            assert_eq!(events, comparison);
+        }
     }
 
     #[test]

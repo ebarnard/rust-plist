@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- Normalize `\r\n` and `\r` line endings to `\n` in XML plist text content.
+
 ## [1.10.1] - 2026-09-06
 
 ### Changed
