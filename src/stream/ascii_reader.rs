@@ -198,7 +198,7 @@ impl<R: Read> AsciiReader<R> {
                 let c = self.advance_quoted_string()?;
 
                 match c {
-                    b'\\' | b'"' => c as char,
+                    b'\\' | b'"' | b'\'' => c as char,
                     b'a' => '\u{7}',
                     b'b' => '\u{8}',
                     b'f' => '\u{c}',
@@ -470,6 +470,8 @@ mod tests {
             key6 = "\UD83D\UDCA9";
             key7 = "\U0080";
             key8 = "\200\377";
+            key9 = "it\'s";
+            key10 = 'it\'s';
         }"#;
         let streaming_parser = AsciiReader::new(&plist[..]);
         let events: Vec<Event> = streaming_parser.map(|e| e.unwrap()).collect();
@@ -492,6 +494,10 @@ mod tests {
             String("\u{80}".into()),
             String("key8".into()),
             String("\u{a0}\u{fffd}".into()),
+            String("key9".into()),
+            String("it's".into()),
+            String("key10".into()),
+            String("it's".into()),
             EndCollection,
         ];
 
