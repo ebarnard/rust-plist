@@ -184,14 +184,19 @@ impl<R: Read> AsciiReader<R> {
         }
     }
 
+    /// Raw bytes are accumulated and decoded as UTF-8 once the string is closed
+    /// (as in `unquoted_string_literal`), so multi-byte characters survive;
+    /// escape sequences are appended already UTF-8 encoded.
     fn quoted_string_literal(&mut self, quote: u8) -> Result<Option<OwnedEvent>, Error> {
-        let mut acc = String::new();
+        let mut acc: Vec<u8> = Vec::new();
 
         loop {
             let c = self.advance_quoted_string()?;
 
             if c == quote {
-                return Ok(Some(Event::String(acc.into())));
+                let string_literal = String::from_utf8(acc)
+                    .map_err(|_e| self.error(ErrorKind::InvalidUtf8AsciiStream))?;
+                return Ok(Some(Event::String(string_literal.into())));
             }
 
             let replacement = if c == b'\\' {
@@ -207,7 +212,7 @@ impl<R: Read> AsciiReader<R> {
                     b't' => '\t',
                     b'U' => {
                         let utf8 = self.utf16_escape()?;
-                        acc.push_str(utf8.as_str());
+                        acc.extend_from_slice(utf8.as_bytes());
                         continue;
                     }
                     b'v' => '\u{b}',
@@ -234,10 +239,11 @@ impl<R: Read> AsciiReader<R> {
                     _ => return Err(self.error(ErrorKind::InvalidUtf8AsciiStream)),
                 }
             } else {
-                c as char
+                acc.push(c);
+                continue;
             };
 
-            acc.push(replacement);
+            acc.extend_from_slice(replacement.encode_utf8(&mut [0; 4]).as_bytes());
         }
     }
 
@@ -424,6 +430,37 @@ mod tests {
         ];
 
         assert_eq!(events, comparison);
+    }
+
+    #[test]
+    fn utf8_quoted_strings() {
+        let plist = r#"{ "名前" = ("Léa", 'François', "Żaklina 王芳", "a\U00e9b\012ü💩"); }"#;
+        let streaming_parser = AsciiReader::new(plist.as_bytes());
+        let events: Vec<Event> = streaming_parser.map(|e| e.unwrap()).collect();
+
+        let comparison = &[
+            StartDictionary(None),
+            String("名前".into()),
+            StartArray(None),
+            String("Léa".into()),
+            String("François".into()),
+            String("Żaklina 王芳".into()),
+            String("aéb\nü💩".into()),
+            EndCollection,
+            EndCollection,
+        ];
+
+        assert_eq!(events, comparison);
+    }
+
+    #[test]
+    fn invalid_utf8_in_quoted_string() {
+        let plist = b"{ key1 = \"a\xffb\"; }";
+        let streaming_parser = AsciiReader::new(&plist[..]);
+        let events: Vec<Result<Event, Error>> = streaming_parser.collect();
+
+        // key1's value
+        assert!(events[2].is_err());
     }
 
     #[test]
