@@ -428,12 +428,14 @@ pub fn from_reader<R: Read + Seek, T: de::DeserializeOwned>(reader: R) -> Result
 
 /// Deserializes an instance of type `T` from a byte stream containing an ASCII encoded plist.
 pub fn from_reader_ascii<R: Read, T: de::DeserializeOwned>(reader: R) -> Result<T, Error> {
-    let reader = stream::AsciiReader::new(reader);
+    // The ASCII reader reads one byte at a time, so always wrap in a `BufReader`.
+    let reader = stream::AsciiReader::new(BufReader::new(reader));
     from_stream(reader)
 }
 
 /// Deserializes an instance of type `T` from a byte stream containing an XML encoded plist.
 pub fn from_reader_xml<R: Read, T: de::DeserializeOwned>(reader: R) -> Result<T, Error> {
+    // `quick-xml::Reader` requires a `BufRead`.
     let reader = stream::XmlReader::new(BufReader::new(reader));
     from_stream(reader)
 }
