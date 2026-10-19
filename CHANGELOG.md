@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.10.2] - 2026-10-19
+
+### Changed
+- Always buffer ASCII plist reads, improving direct ASCII reader performance (#206).
+
+### Fixed
+- Accept `\'` escape in quoted ASCII plist strings (#204).
+- Decode quoted ASCII plist strings as UTF-8 (#203).
+
 ## [1.10.1] - 2026-09-06
 
 ### Changed
@@ -61,8 +70,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 - Update `quick-xml` to v0.37.
 
-[unreleased]: https://github.com/ebarnard/rust-plist/compare/v1.10.1...HEAD
-[1.10.0]: https://github.com/ebarnard/rust-plist/compare/v1.10.0...v1.10.1
+[unreleased]: https://github.com/ebarnard/rust-plist/compare/v1.10.2...HEAD
+[1.10.2]: https://github.com/ebarnard/rust-plist/compare/v1.10.1...v1.10.2
+[1.10.1]: https://github.com/ebarnard/rust-plist/compare/v1.10.0...v1.10.1
 [1.10.0]: https://github.com/ebarnard/rust-plist/compare/v1.9.0...v1.10.0
 [1.9.0]: https://github.com/ebarnard/rust-plist/compare/v1.8.0...v1.9.0
 [1.8.0]: https://github.com/ebarnard/rust-plist/compare/v1.7.4...v1.8.0
