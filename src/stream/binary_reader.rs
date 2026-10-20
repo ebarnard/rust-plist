@@ -8,30 +8,25 @@ use crate::{
     date::{Date, OverflowOrNanDate},
     error::{Error, ErrorKind},
     stream::{Event, OwnedEvent},
-    u64_to_usize,
 };
 
-struct StackItem {
-    object_ref: u64,
-    child_object_refs: Vec<u64>,
-    ty: StackType,
-}
-
-enum StackType {
-    Array,
-    Dict,
-}
+const IS_ON_STACK_MASK: u8 = 0b1000_0000;
 
 // https://opensource.apple.com/source/CF/CF-550/CFBinaryPList.c
 // https://hg.python.org/cpython/file/3.4/Lib/plistlib.py
 pub struct BinaryReader<R> {
     stack: Vec<StackItem>,
-    object_offsets: Vec<u64>,
-    object_on_stack: Vec<bool>,
+    object_tags: Vec<u8>,
+    object_contents: Vec<u64>,
     reader: PosReader<R>,
     ref_size: u8,
     root_object: u64,
     trailer_start_offset: u64,
+}
+
+struct StackItem {
+    object_index: usize,
+    child_object_refs: Vec<u64>,
 }
 
 struct PosReader<R> {
@@ -69,8 +64,8 @@ impl<R: Read + Seek> BinaryReader<R> {
     pub fn new(reader: R) -> BinaryReader<R> {
         BinaryReader {
             stack: Vec::new(),
-            object_offsets: Vec::new(),
-            object_on_stack: Vec::new(),
+            object_tags: Vec::new(),
+            object_contents: Vec::new(),
             reader: PosReader { reader, pos: 0 },
             ref_size: 0,
             root_object: 0,
@@ -128,33 +123,35 @@ impl<R: Read + Seek> BinaryReader<R> {
 
         // Read offset table
         self.reader.seek(SeekFrom::Start(offset_table_offset))?;
-        self.object_offsets = self.read_ints(num_objects, offset_size)?;
-        self.object_on_stack = vec![false; self.object_offsets.len()];
+        self.object_contents = self.read_ints(num_objects, offset_size)?;
+        // A tag of zero means content is an object offset and the `is_on_stack` flag is not set
+        self.object_tags = vec![0; self.object_contents.len()];
 
         Ok(())
     }
 
     /// Reads a list of `len` big-endian integers of `size` bytes from the reader.
     fn read_ints(&mut self, len: u64, size: u8) -> Result<Vec<u64>, Error> {
-        let mut ints = self.allocate_vec(len, size as usize)?;
+        let mut values = self.allocate_vec(len, usize::from(size))?;
         for _ in 0..len {
-            match size {
-                1 => ints.push(self.read_u8()?.into()),
-                2 => ints.push(self.read_be_u16()?.into()),
+            let value = match size {
+                1 => self.read_u8()?.into(),
+                2 => self.read_be_u16()?.into(),
                 // Encoders may use 24-bit integers in the object offset and reference tables.
                 // We never write 24-bit integers as not all decoders support them.
-                3 => ints.push(self.read_be_u24()?.into()),
-                4 => ints.push(self.read_be_u32()?.into()),
-                8 => ints.push(self.read_be_u64()?),
+                3 => self.read_be_u24()?.into(),
+                4 => self.read_be_u32()?.into(),
+                8 => self.read_be_u64()?,
                 _ => unreachable!(
                     "size is either self.ref_size or offset_size both of which are already validated"
                 ),
-            }
+            };
+            values.push(value)
         }
-        Ok(ints)
+        Ok(values)
     }
 
-    /// Reads a list of `len` offsets into the object table from the reader.
+    /// Reads a list of `len` indices into the object table from the reader.
     fn read_refs(&mut self, len: u64) -> Result<Vec<u64>, Error> {
         let ref_size = self.ref_size;
         self.read_ints(len, ref_size)
@@ -185,34 +182,21 @@ impl<R: Read + Seek> BinaryReader<R> {
         Ok(data)
     }
 
-    fn seek_to_object(&mut self, object_ref: u64) -> Result<u64, Error> {
-        let object_ref = u64_to_usize(object_ref)
-            .ok_or_else(|| self.with_pos(ErrorKind::ObjectReferenceTooLarge))?;
-        let offset = *self
-            .object_offsets
-            .get(object_ref)
-            .ok_or_else(|| self.with_pos(ErrorKind::ObjectReferenceTooLarge))?;
-        if offset >= self.trailer_start_offset {
-            return Err(self.with_pos(ErrorKind::ObjectOffsetTooLarge));
-        }
-        self.reader.seek(SeekFrom::Start(offset))
-    }
-
     fn push_stack_item_and_check_for_recursion(&mut self, item: StackItem) -> Result<(), Error> {
-        let object_ref = u64_to_usize(item.object_ref).expect("internal consistency error");
-        let is_on_stack = &mut self.object_on_stack[object_ref];
-        if *is_on_stack {
+        let object_tag = &mut self.object_tags[item.object_index];
+        if *object_tag & IS_ON_STACK_MASK != 0 {
             return Err(self.with_pos(ErrorKind::RecursiveObject));
         }
-        *is_on_stack = true;
+        // Set the `is_on_stack` flag
+        *object_tag |= IS_ON_STACK_MASK;
         self.stack.push(item);
         Ok(())
     }
 
     fn pop_stack_item(&mut self) -> StackItem {
         let item = self.stack.pop().expect("internal consistency error");
-        let object_ref = u64_to_usize(item.object_ref).expect("internal consistency error");
-        self.object_on_stack[object_ref] = false;
+        // Clear the `is_on_stack` flag
+        self.object_tags[item.object_index] &= !IS_ON_STACK_MASK;
         item
     }
 
@@ -233,51 +217,68 @@ impl<R: Read + Seek> BinaryReader<R> {
                 object_ref
             } else {
                 // We're at the end of an array or dict. Pop the top stack item and return.
-                let stack_item = self.pop_stack_item();
-                match stack_item.ty {
-                    StackType::Array | StackType::Dict => return Ok(Some(Event::EndCollection)),
-                }
+                self.pop_stack_item();
+                return Ok(Some(Event::EndCollection));
             }
         };
 
-        self.seek_to_object(object_ref)?;
+        let object_index = if let Ok(index) = usize::try_from(object_ref)
+            && index < self.object_tags.len()
+        {
+            index
+        } else {
+            return Err(self.with_pos(ErrorKind::ObjectReferenceTooLarge));
+        };
+
+        let object_tag = self.object_tags[object_index];
+        let object_content = self.object_contents[object_index];
+
+        let object_offset = match decode_event(object_tag, object_content) {
+            Ok(event) => return Ok(Some(event)),
+            Err(offset) => offset,
+        };
+
+        if object_offset >= self.trailer_start_offset {
+            return Err(self.with_pos(ErrorKind::ObjectOffsetTooLarge));
+        }
+        self.reader.seek(SeekFrom::Start(object_offset))?;
 
         let token = self.read_u8()?;
         let ty = (token & 0xf0) >> 4;
         let size = token & 0x0f;
 
-        let result = match (ty, size) {
+        let event = match (ty, size) {
             (0x0, 0x00) => return Err(self.with_pos(ErrorKind::NullObjectUnimplemented)),
-            (0x0, 0x08) => Some(Event::Boolean(false)),
-            (0x0, 0x09) => Some(Event::Boolean(true)),
+            (0x0, 0x08) => Event::Boolean(false),
+            (0x0, 0x09) => Event::Boolean(true),
             (0x0, 0x0f) => return Err(self.with_pos(ErrorKind::FillObjectUnimplemented)),
-            (0x1, 0) => Some(Event::Integer(self.read_u8()?.into())),
-            (0x1, 1) => Some(Event::Integer(self.read_be_u16()?.into())),
-            (0x1, 2) => Some(Event::Integer(self.read_be_u32()?.into())),
-            (0x1, 3) => Some(Event::Integer(self.read_be_i64()?.into())),
+            (0x1, 0) => Event::Integer(self.read_u8()?.into()),
+            (0x1, 1) => Event::Integer(self.read_be_u16()?.into()),
+            (0x1, 2) => Event::Integer(self.read_be_u32()?.into()),
+            (0x1, 3) => Event::Integer(self.read_be_i64()?.into()),
             (0x1, 4) => {
                 let value = self.read_be_i128()?;
                 if let Ok(value) = u64::try_from(value) {
-                    Some(Event::Integer(value.into()))
+                    Event::Integer(value.into())
                 } else {
                     return Err(self.with_pos(ErrorKind::IntegerOutOfRange));
                 }
             }
             (0x1, _) => return Err(self.with_pos(ErrorKind::UnknownObjectType(token))), // variable length int
-            (0x2, 2) => Some(Event::Real(f32::from_bits(self.read_be_u32()?).into())),
-            (0x2, 3) => Some(Event::Real(f64::from_bits(self.read_be_u64()?))),
+            (0x2, 2) => Event::Real(f32::from_bits(self.read_be_u32()?).into()),
+            (0x2, 3) => Event::Real(f64::from_bits(self.read_be_u64()?)),
             (0x2, _) => return Err(self.with_pos(ErrorKind::UnknownObjectType(token))), // odd length float
             (0x3, 3) => {
                 // Date. Seconds since 1/1/2001 00:00:00.
                 let secs = f64::from_bits(self.read_be_u64()?);
                 let date = Date::from_seconds_since_plist_epoch(secs)
                     .map_err(|OverflowOrNanDate| self.with_pos(ErrorKind::OverflowOrNanDate))?;
-                Some(Event::Date(date))
+                Event::Date(date)
             }
             (0x4, n) => {
                 // Data
                 let len = self.read_object_len(n)?;
-                Some(Event::Data(self.read_data(len)?.into()))
+                Event::Data(self.read_data(len)?.into())
             }
             (0x5, n) => {
                 // ASCII string
@@ -285,7 +286,7 @@ impl<R: Read + Seek> BinaryReader<R> {
                 let raw = self.read_data(len)?;
                 let string = String::from_utf8(raw)
                     .map_err(|_| self.with_pos(ErrorKind::InvalidUtf8String))?;
-                Some(Event::String(string.into()))
+                Event::String(string.into())
             }
             (0x6, n) => {
                 // UTF-16 string
@@ -298,7 +299,7 @@ impl<R: Read + Seek> BinaryReader<R> {
 
                 let string = String::from_utf16(&raw_utf16)
                     .map_err(|_| self.with_pos(ErrorKind::InvalidUtf16String))?;
-                Some(Event::String(string.into()))
+                Event::String(string.into())
             }
             (0x8, n) if n < 8 => {
                 // Uid
@@ -310,7 +311,7 @@ impl<R: Read + Seek> BinaryReader<R> {
                 self.reader.read_all(&mut buf[8 - len_bytes..])?;
                 let value = u64::from_be_bytes(buf);
 
-                Some(Event::Uid(Uid::new(value)))
+                Event::Uid(Uid::new(value))
             }
             (0xa, n) => {
                 // Array
@@ -320,12 +321,11 @@ impl<R: Read + Seek> BinaryReader<R> {
                 child_object_refs.reverse();
 
                 self.push_stack_item_and_check_for_recursion(StackItem {
-                    object_ref,
-                    ty: StackType::Array,
+                    object_index,
                     child_object_refs,
                 })?;
 
-                Some(Event::StartArray(Some(len)))
+                Event::StartArray(Some(len))
             }
             (0xd, n) => {
                 // Dict
@@ -346,17 +346,21 @@ impl<R: Read + Seek> BinaryReader<R> {
                 }
 
                 self.push_stack_item_and_check_for_recursion(StackItem {
-                    object_ref,
-                    ty: StackType::Dict,
+                    object_index,
                     child_object_refs,
                 })?;
 
-                Some(Event::StartDictionary(Some(len as u64)))
+                Event::StartDictionary(Some(len as u64))
             }
             (_, _) => return Err(self.with_pos(ErrorKind::UnknownObjectType(token))),
         };
 
-        Ok(result)
+        let (object_tag, object_content) =
+            encode_event(&event, self.object_tags[object_index], object_offset);
+        self.object_tags[object_index] = object_tag;
+        self.object_contents[object_index] = object_content;
+
+        Ok(Some(event))
     }
 
     fn read_u8(&mut self) -> Result<u8, Error> {
@@ -419,6 +423,72 @@ impl<R: Read + Seek> Iterator for BinaryReader<R> {
             }
             Ok(None) => None,
         }
+    }
+}
+
+fn encode_event(event: &Event, original_tag: u8, offset: u64) -> (u8, u64) {
+    fn to_content(bytes: &[u8]) -> u64 {
+        let mut buf = [0; 8];
+        buf[..bytes.len()].copy_from_slice(bytes);
+        u64::from_ne_bytes(buf)
+    }
+
+    let (tag, content) = match event {
+        Event::Boolean(false) => (1, 0),
+        Event::Boolean(true) => (2, 0),
+        // TODO: Use `if let` guards once the MSRV is at least 1.95:
+        // Event::Integer(value) if let Some(v) = value.as_unsigned() => (3, v),
+        // Event::Integer(value) if let Some(v) = value.as_signed() => (4, v.cast_unsigned()),
+        Event::Integer(value) => match value.as_unsigned() {
+            Some(v) => (3, v),
+            None => {
+                let v = value
+                    .as_signed()
+                    .expect("integer is either an i64 or a u64");
+                (4, v.cast_unsigned())
+            }
+        },
+        Event::Real(value) => (5, value.to_bits()),
+        // TODO: Dates currently contain a SystemTime which takes 12 bytes and does not round trip
+        // to an f64.
+        // Event::Date(_) => (6, ...),
+        Event::Uid(value) => (7, value.get()),
+        Event::Data(value) if value.len() <= 8 => (8 + value.len() as u8, to_content(value)),
+        Event::String(value) if value.len() <= 8 => {
+            (17 + value.len() as u8, to_content(value.as_bytes()))
+        }
+        _ => (0, offset),
+    };
+
+    (
+        (original_tag & IS_ON_STACK_MASK) | (tag & !IS_ON_STACK_MASK),
+        content,
+    )
+}
+
+fn decode_event(tag: u8, content: u64) -> Result<Event<'static>, u64> {
+    fn to_bytes(len: u8, content: u64) -> Vec<u8> {
+        content.to_ne_bytes()[..usize::from(len)].to_vec()
+    }
+
+    match tag & !IS_ON_STACK_MASK {
+        0 => Err(content),
+        1 => Ok(Event::Boolean(false)),
+        2 => Ok(Event::Boolean(true)),
+        3 => Ok(Event::Integer(content.into())),
+        4 => Ok(Event::Integer(content.cast_signed().into())),
+        5 => Ok(Event::Real(f64::from_bits(content))),
+        // TODO: Dates currently contain a SystemTime which takes 12 bytes and does not round trip
+        // to an f64.
+        // 6 => Ok(Event::Date(...)),
+        7 => Ok(Event::Uid(Uid::new(content))),
+        tag @ 8..=16 => Ok(Event::Data(to_bytes(tag - 8, content).into())),
+        tag @ 17..=25 => Ok(Event::String(
+            String::from_utf8(to_bytes(tag - 17, content))
+                .expect("cached string is valid UTF-8")
+                .into(),
+        )),
+        _ => unreachable!("invalid object tag"),
     }
 }
 
@@ -582,8 +652,93 @@ mod tests {
         let events: Result<Vec<Event>, _> = streaming_parser.collect();
 
         assert!(events.is_ok());
-        assert_eq!(reader.reads, 145938);
-        assert_eq!(reader.seeks, 47767);
-        assert_eq!(reader.bytes_read, 462033);
+        assert_eq!(reader.reads, 106322);
+        assert_eq!(reader.seeks, 27958);
+        assert_eq!(reader.bytes_read, 367251);
+    }
+
+    #[test]
+    fn cached_events_round_trip() {
+        let events = [
+            Event::Boolean(false),
+            Event::Boolean(true),
+            Event::Integer(0.into()),
+            Event::Integer(1.into()),
+            Event::Integer(u64::MAX.into()),
+            Event::Integer((-1).into()),
+            Event::Integer(i64::MIN.into()),
+            Event::Integer(i64::MAX.into()),
+            Event::Real(0.0),
+            Event::Real(-0.0),
+            Event::Real(1.6),
+            Event::Real(f32::MAX.into()),
+            Event::Real(f64::INFINITY),
+            Event::Real(f64::NAN),
+            Event::Uid(Uid::new(0)),
+            Event::Uid(Uid::new(u64::MAX)),
+            Event::Data(vec![].into()),
+            Event::Data(vec![0xff].into()),
+            Event::Data(vec![1, 2, 3, 4, 5, 6, 7, 8].into()),
+            Event::String("".into()),
+            Event::String("a".into()),
+            Event::String("12345678".into()),
+            // Multi-byte UTF-8 characters
+            Event::String("\u{2605}\u{e9}".into()),
+            Event::String("\u{1f600}\u{1f600}".into()),
+        ];
+
+        for event in events {
+            let offset = 1234;
+            let (tag, content) = encode_event(&event, 0, offset);
+            assert_ne!(tag, 0);
+            assert_eq!(tag & IS_ON_STACK_MASK, 0);
+
+            let decoded = decode_event(tag, content).unwrap();
+            match (&event, &decoded) {
+                // Compare bits so NaN round trips are checked too
+                (Event::Real(a), Event::Real(b)) => assert_eq!(a.to_bits(), b.to_bits()),
+                _ => assert_eq!(decoded, event),
+            }
+        }
+    }
+
+    #[test]
+    fn uncached_events_store_offset() {
+        let offset = 1234;
+        let events = [
+            Event::StartArray(Some(1)),
+            Event::StartDictionary(Some(1)),
+            Event::Date(super::Date::from_xml_format("1981-05-16T11:32:06Z").unwrap()),
+            Event::Data(vec![1, 2, 3, 4, 5, 6, 7, 8, 9].into()),
+            Event::String("123456789".into()),
+            // 3 characters but 9 bytes of UTF-8
+            Event::String("\u{2605}\u{2605}\u{2605}".into()),
+        ];
+
+        for event in events {
+            let (tag, content) = encode_event(&event, 0, offset);
+            assert_eq!(
+                (tag, content),
+                (0, offset),
+                "{event:?} should not be cached"
+            );
+            assert_eq!(decode_event(tag, content), Err(offset));
+        }
+    }
+
+    #[test]
+    fn encode_event_preserves_is_on_stack_flag() {
+        let offset = 1234;
+
+        // Containers are not cached but must keep their `is_on_stack` flag
+        let (tag, content) =
+            encode_event(&Event::StartDictionary(Some(1)), IS_ON_STACK_MASK, offset);
+        assert_eq!(tag, IS_ON_STACK_MASK);
+        assert_eq!(decode_event(tag, content), Err(offset));
+
+        // The flag is ignored when decoding cached events
+        let (tag, content) = encode_event(&Event::String("a".into()), IS_ON_STACK_MASK, offset);
+        assert_eq!(tag & IS_ON_STACK_MASK, IS_ON_STACK_MASK);
+        assert_eq!(decode_event(tag, content), Ok(Event::String("a".into())));
     }
 }

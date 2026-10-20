@@ -132,7 +132,3 @@ extern crate serde_derive;
 
 #[cfg(all(test, feature = "serde"))]
 mod serde_tests;
-
-fn u64_to_usize(len_u64: u64) -> Option<usize> {
-    usize::try_from(len_u64).ok()
-}
