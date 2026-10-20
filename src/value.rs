@@ -12,7 +12,6 @@ use crate::{
         AsciiReader, BinaryWriter, Event, Events, Reader, Writer, XmlReader, XmlWriteOptions,
         XmlWriter, private,
     },
-    u64_to_usize,
 };
 
 /// Represents any plist value.
@@ -713,7 +712,7 @@ impl Builder {
 
 impl Writer for Builder {
     fn write_start_array(&mut self, len: Option<u64>) -> Result<(), Error> {
-        let len = len.and_then(u64_to_usize).unwrap_or(0);
+        let len = len.and_then(|len| usize::try_from(len).ok()).unwrap_or(0);
         self.stack.push(StackItem::Array(Vec::with_capacity(len)));
         Ok(())
     }
