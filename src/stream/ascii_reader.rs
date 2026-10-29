@@ -288,7 +288,7 @@ impl<R: Read> AsciiReader<R> {
             Some(c) => match c {
                 b'/' => self.line_comment().map(|()| None),
                 b'*' => self.block_comment().map(|()| None),
-                _ => self.unquoted_string_literal(c),
+                _ => self.unquoted_string_literal(b'/'),
             },
             // EOF
             None => Err(self.error(ErrorKind::IncompleteComment)),
@@ -581,6 +581,24 @@ mod tests {
             String("not".into()),
             String("a".into()),
             String("plist".into()),
+        ];
+
+        assert_eq!(events, comparison);
+    }
+
+    #[test]
+    fn unquoted_strings_starting_with_slash() {
+        let plist = b"{ shellPath = /bin/sh; root = /; }";
+        let streaming_parser = AsciiReader::new(&plist[..]);
+        let events: Vec<Event> = streaming_parser.map(|e| e.unwrap()).collect();
+
+        let comparison = &[
+            StartDictionary(None),
+            String("shellPath".into()),
+            String("/bin/sh".into()),
+            String("root".into()),
+            String("/".into()),
+            EndCollection,
         ];
 
         assert_eq!(events, comparison);
