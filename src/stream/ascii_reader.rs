@@ -88,7 +88,13 @@ impl<R: Read> AsciiReader<R> {
         while {
             match self.peeked_char {
                 Some(c) => {
-                    c != b' ' && c != b')' && c != b'\r' && c != b'\t' && c != b';' && c != b','
+                    c != b' '
+                        && c != b')'
+                        && c != b'\r'
+                        && c != b'\n'
+                        && c != b'\t'
+                        && c != b';'
+                        && c != b','
                 }
                 None => false,
             }
@@ -553,6 +559,39 @@ mod tests {
             String("James".into()),
             String("age".into()),
             Integer(42.into()),
+            EndCollection,
+        ];
+
+        assert_eq!(events, comparison);
+    }
+
+    #[test]
+    fn unquoted_strings_end_at_newline() {
+        let plist = br#"{
+            langs = (
+                en,
+                ko
+            );
+            nums = (
+                1,
+                2
+            );
+        }"#;
+        let streaming_parser = AsciiReader::new(&plist[..]);
+        let events: Vec<Event> = streaming_parser.map(|e| e.unwrap()).collect();
+
+        let comparison = &[
+            StartDictionary(None),
+            String("langs".into()),
+            StartArray(None),
+            String("en".into()),
+            String("ko".into()),
+            EndCollection,
+            String("nums".into()),
+            StartArray(None),
+            Integer(1.into()),
+            Integer(2.into()),
+            EndCollection,
             EndCollection,
         ];
 
