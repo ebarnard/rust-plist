@@ -89,12 +89,16 @@ impl<R: Read> AsciiReader<R> {
             match self.peeked_char {
                 Some(c) => {
                     c != b' '
+                        && c != b'('
                         && c != b')'
+                        && c != b'{'
+                        && c != b'}'
                         && c != b'\r'
                         && c != b'\n'
                         && c != b'\t'
                         && c != b';'
                         && c != b','
+                        && c != b'='
                 }
                 None => false,
             }
@@ -637,6 +641,33 @@ mod tests {
             String("/bin/sh".into()),
             String("root".into()),
             String("/".into()),
+            EndCollection,
+        ];
+
+        assert_eq!(events, comparison);
+    }
+
+    #[test]
+    fn unquoted_strings_end_at_structural_characters() {
+        let plist = b"{a=b;c=1;d=(e);f={g=h}}";
+        let streaming_parser = AsciiReader::new(&plist[..]);
+        let events: Vec<Event> = streaming_parser.map(|e| e.unwrap()).collect();
+
+        let comparison = &[
+            StartDictionary(None),
+            String("a".into()),
+            String("b".into()),
+            String("c".into()),
+            Integer(1.into()),
+            String("d".into()),
+            StartArray(None),
+            String("e".into()),
+            EndCollection,
+            String("f".into()),
+            StartDictionary(None),
+            String("g".into()),
+            String("h".into()),
+            EndCollection,
             EndCollection,
         ];
 
