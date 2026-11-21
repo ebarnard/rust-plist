@@ -1,6 +1,7 @@
 use std::{
+    cmp,
     io::{self, Read, Seek, SeekFrom},
-    mem::size_of,
+    mem,
 };
 
 use crate::{
@@ -22,6 +23,7 @@ pub struct BinaryReader<R> {
     ref_size: u8,
     root_object: u64,
     trailer_start_offset: u64,
+    int_read_buf: Box<[u8]>,
 }
 
 struct StackItem {
@@ -70,13 +72,25 @@ impl<R: Read + Seek> BinaryReader<R> {
             ref_size: 0,
             root_object: 0,
             trailer_start_offset: 0,
+            int_read_buf: vec![0; 4096].into_boxed_slice(),
         }
     }
 
-    fn allocate_vec<T>(&self, len: u64, size: usize) -> Result<Vec<T>, Error> {
-        // Check we are not reading past the start of the plist trailer
+    /// Allocates storage for reading a list of `len` values of type `T` and checks that the read
+    /// is in bounds.
+    fn allocate_vec<T>(&self, len: u64) -> Result<Vec<T>, Error> {
+        self.check_read_is_in_bounds(len, mem::size_of::<T>())?;
+
+        let len = usize::try_from(len).map_err(|_| self.with_pos(ErrorKind::ObjectTooLarge))?;
+        Ok(Vec::with_capacity(len))
+    }
+
+    /// Checks whether reading `len` values of `size` bytes would read past the start of the plist
+    /// trailer.
+    fn check_read_is_in_bounds(&self, len: u64, size: usize) -> Result<(), Error> {
         let inner = |len: u64, size: usize| {
-            let byte_len = len.checked_mul(size as u64)?;
+            let size = u64::try_from(size).ok()?;
+            let byte_len = len.checked_mul(size)?;
             let end_offset = self.reader.pos.checked_add(byte_len)?;
             if end_offset <= self.trailer_start_offset {
                 Some(())
@@ -84,9 +98,7 @@ impl<R: Read + Seek> BinaryReader<R> {
                 None
             }
         };
-        inner(len, size).ok_or_else(|| self.with_pos(ErrorKind::ObjectOffsetTooLarge))?;
-
-        Ok(Vec::with_capacity(len as usize))
+        inner(len, size).ok_or_else(|| self.with_pos(ErrorKind::ObjectOffsetTooLarge))
     }
 
     fn read_trailer(&mut self) -> Result<(), Error> {
@@ -132,29 +144,51 @@ impl<R: Read + Seek> BinaryReader<R> {
 
     /// Reads a list of `len` big-endian integers of `size` bytes from the reader.
     fn read_ints(&mut self, len: u64, size: u8) -> Result<Vec<u64>, Error> {
-        let mut values = self.allocate_vec(len, usize::from(size))?;
-        for _ in 0..len {
-            let value = match size {
-                1 => self.read_u8()?.into(),
-                2 => self.read_be_u16()?.into(),
+        fn as_chunks<const N: usize>(buf: &[u8]) -> impl Iterator<Item = [u8; N]> {
+            let (chunks, remainder) = buf.as_chunks();
+            assert_eq!(remainder.len(), 0);
+            chunks.iter().copied()
+        }
+
+        let size = usize::from(size);
+        let max_block_len = self.int_read_buf.len() / size;
+
+        self.check_read_is_in_bounds(len, size)?;
+        let len = usize::try_from(len).map_err(|_| self.with_pos(ErrorKind::ObjectTooLarge))?;
+
+        let mut values = Vec::with_capacity(len);
+        let mut remaining_len = len;
+        while remaining_len > 0 {
+            let block_len = cmp::min(remaining_len, max_block_len);
+            remaining_len -= block_len;
+
+            let block_buf = &mut self.int_read_buf[..block_len * size];
+            self.reader.read_all(block_buf)?;
+
+            match size {
+                1 => values.extend(block_buf.iter().copied().map(u64::from)),
+                2 => values.extend(as_chunks(block_buf).map(u16::from_be_bytes).map(u64::from)),
                 // Encoders may use 24-bit integers in the object offset and reference tables.
                 // We never write 24-bit integers as not all decoders support them.
-                3 => self.read_be_u24()?.into(),
-                4 => self.read_be_u32()?.into(),
-                8 => self.read_be_u64()?,
+                3 => values.extend(
+                    as_chunks::<3>(block_buf)
+                        .map(|b| u32::from_be_bytes([0, b[0], b[1], b[2]]))
+                        .map(u64::from),
+                ),
+                4 => values.extend(as_chunks(block_buf).map(u32::from_be_bytes).map(u64::from)),
+                8 => values.extend(as_chunks(block_buf).map(u64::from_be_bytes)),
                 _ => unreachable!(
                     "size is either self.ref_size or offset_size both of which are already validated"
                 ),
-            };
-            values.push(value)
+            }
         }
+
         Ok(values)
     }
 
     /// Reads a list of `len` indices into the object table from the reader.
     fn read_refs(&mut self, len: u64) -> Result<Vec<u64>, Error> {
-        let ref_size = self.ref_size;
-        self.read_ints(len, ref_size)
+        self.read_ints(len, self.ref_size)
     }
 
     /// Reads a compressed value length from the reader. `len` must contain the low 4 bits of the
@@ -176,7 +210,7 @@ impl<R: Read + Seek> BinaryReader<R> {
 
     /// Reads `len` bytes from the reader.
     fn read_data(&mut self, len: u64) -> Result<Vec<u8>, Error> {
-        let mut data = self.allocate_vec(len, size_of::<u8>())?;
+        let mut data = self.allocate_vec(len)?;
         data.resize(len as usize, 0);
         self.reader.read_all(&mut data)?;
         Ok(data)
@@ -291,7 +325,7 @@ impl<R: Read + Seek> BinaryReader<R> {
             (0x6, n) => {
                 // UTF-16 string
                 let len_utf16_codepoints = self.read_object_len(n)?;
-                let mut raw_utf16 = self.allocate_vec(len_utf16_codepoints, size_of::<u16>())?;
+                let mut raw_utf16 = self.allocate_vec(len_utf16_codepoints)?;
 
                 for _ in 0..len_utf16_codepoints {
                     raw_utf16.push(self.read_be_u16()?);
@@ -316,6 +350,7 @@ impl<R: Read + Seek> BinaryReader<R> {
             (0xa, n) => {
                 // Array
                 let len = self.read_object_len(n)?;
+
                 let mut child_object_refs = self.read_refs(len)?;
                 // Reverse so we can pop off the end of the stack in order
                 child_object_refs.reverse();
@@ -330,19 +365,19 @@ impl<R: Read + Seek> BinaryReader<R> {
             (0xd, n) => {
                 // Dict
                 let len = self.read_object_len(n)?;
-                let key_refs = self.read_refs(len)?;
-                let value_refs = self.read_refs(len)?;
 
                 let keys_and_values_len = len
                     .checked_mul(2)
                     .ok_or_else(|| self.with_pos(ErrorKind::ObjectTooLarge))?;
-                let mut child_object_refs =
-                    self.allocate_vec(keys_and_values_len, self.ref_size as usize)?;
-                let len = key_refs.len();
-                for i in 1..=len {
+                let key_and_value_refs = self.read_refs(keys_and_values_len)?;
+                let (key_refs, value_refs) =
+                    key_and_value_refs.split_at(key_and_value_refs.len() / 2);
+
+                let mut child_object_refs = Vec::with_capacity(key_and_value_refs.len());
+                for i in (0..key_refs.len()).rev() {
                     // Reverse so we can pop off the end of the stack in order
-                    child_object_refs.push(value_refs[len - i]);
-                    child_object_refs.push(key_refs[len - i]);
+                    child_object_refs.push(value_refs[i]);
+                    child_object_refs.push(key_refs[i]);
                 }
 
                 self.push_stack_item_and_check_for_recursion(StackItem {
@@ -350,7 +385,7 @@ impl<R: Read + Seek> BinaryReader<R> {
                     child_object_refs,
                 })?;
 
-                Event::StartDictionary(Some(len as u64))
+                Event::StartDictionary(Some(len))
             }
             (_, _) => return Err(self.with_pos(ErrorKind::UnknownObjectType(token))),
         };
@@ -373,12 +408,6 @@ impl<R: Read + Seek> BinaryReader<R> {
         let mut buf = [0; 2];
         self.reader.read_all(&mut buf)?;
         Ok(u16::from_be_bytes(buf))
-    }
-
-    fn read_be_u24(&mut self) -> Result<u32, Error> {
-        let mut buf = [0; 4];
-        self.reader.read_all(&mut buf[1..])?;
-        Ok(u32::from_be_bytes(buf))
     }
 
     fn read_be_u32(&mut self) -> Result<u32, Error> {
@@ -636,7 +665,7 @@ mod tests {
         let events: Result<Vec<Event>, _> = streaming_parser.collect();
 
         assert!(events.is_ok());
-        assert_eq!(reader.reads, 125);
+        assert_eq!(reader.reads, 71);
         assert_eq!(reader.seeks, 32);
         assert_eq!(reader.bytes_read, 427);
     }
@@ -652,7 +681,7 @@ mod tests {
         let events: Result<Vec<Event>, _> = streaming_parser.collect();
 
         assert!(events.is_ok());
-        assert_eq!(reader.reads, 106322);
+        assert_eq!(reader.reads, 56214);
         assert_eq!(reader.seeks, 27958);
         assert_eq!(reader.bytes_read, 367251);
     }
