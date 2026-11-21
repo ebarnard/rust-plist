@@ -272,7 +272,9 @@ impl<W: Write> BinaryWriter<W> {
         // Write objects
         let mut events_vec = std::mem::take(&mut self.events);
         let mut events = &mut events_vec[..];
-        let ref_size = plist_ref_size(self.num_objects - 1);
+        // Apple's CFBinaryPList decoder requires `num_objects < 2^(8 * ref_size)`,
+        // so compute `ref_size` from `num_objects` rather than `num_objects - 1`.
+        let ref_size = plist_ref_size(self.num_objects);
         let mut offset_table = vec![0; self.num_objects];
 
         // Assign the first (root) event an object reference of zero.
@@ -733,5 +735,28 @@ mod tests {
     #[test]
     fn nskeyedarchiver_roundtrip() {
         test_roundtrip("./tests/data/binary_NSKeyedArchiver.plist")
+    }
+
+    #[test]
+    fn ref_size_at_power_of_two_object_counts() {
+        let cases = [(255, 1), (256, 2), (65_535, 2), (65_536, 4)];
+
+        for (num_objects, expected_ref_size) in cases {
+            // One root array object plus `num_objects - 1` unique integer objects.
+            let array = Value::Array((0..num_objects as u64 - 1).map(Value::from).collect());
+
+            let mut buf = Vec::new();
+            array.to_writer_binary(&mut buf).unwrap();
+
+            let trailer = &buf[buf.len() - 32..];
+            assert_eq!(trailer[7], expected_ref_size);
+            assert_eq!(
+                u64::from_be_bytes(trailer[8..16].try_into().unwrap()),
+                num_objects as u64
+            );
+
+            let decoded = Value::from_events(BinaryReader::new(Cursor::new(buf))).unwrap();
+            assert_eq!(decoded, array);
+        }
     }
 }
