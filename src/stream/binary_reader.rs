@@ -29,6 +29,13 @@ pub struct BinaryReader<R> {
 struct StackItem {
     object_index: usize,
     child_object_refs: Vec<u64>,
+    pos: StackPosition,
+}
+
+enum StackPosition {
+    ArrayValue(usize),
+    DictionaryKey(usize),
+    DictionaryValue(usize),
 }
 
 struct PosReader<R> {
@@ -240,20 +247,38 @@ impl<R: Read + Seek> BinaryReader<R> {
             self.read_trailer()?;
             self.root_object
         } else {
-            let maybe_object_ref = if let Some(stack_item) = self.stack.last_mut() {
-                stack_item.child_object_refs.pop()
-            } else {
+            let Some(stack_item) = self.stack.last_mut() else {
                 // Finished reading the plist
                 return Ok(None);
             };
 
-            if let Some(object_ref) = maybe_object_ref {
-                object_ref
-            } else {
-                // We're at the end of an array or dict. Pop the top stack item and return.
-                self.pop_stack_item();
-                return Ok(Some(Event::EndCollection));
-            }
+            let object_refs = &stack_item.child_object_refs;
+            let (object_ref, next_pos) = match stack_item.pos {
+                StackPosition::ArrayValue(pos) if pos == object_refs.len() => {
+                    // We're at the end of an array. Pop the top stack item and return.
+                    self.pop_stack_item();
+                    return Ok(Some(Event::EndCollection));
+                }
+                StackPosition::DictionaryKey(pos) if pos == object_refs.len() / 2 => {
+                    // We're at the end of a dictionary. Pop the top stack item and return.
+                    self.pop_stack_item();
+                    return Ok(Some(Event::EndCollection));
+                }
+
+                StackPosition::ArrayValue(pos) => {
+                    (object_refs[pos], StackPosition::ArrayValue(pos + 1))
+                }
+                StackPosition::DictionaryKey(pos) => {
+                    (object_refs[pos], StackPosition::DictionaryValue(pos))
+                }
+                StackPosition::DictionaryValue(pos) => (
+                    object_refs[object_refs.len() / 2 + pos],
+                    StackPosition::DictionaryKey(pos + 1),
+                ),
+            };
+            stack_item.pos = next_pos;
+
+            object_ref
         };
 
         let object_index = if let Ok(index) = usize::try_from(object_ref)
@@ -350,14 +375,12 @@ impl<R: Read + Seek> BinaryReader<R> {
             (0xa, n) => {
                 // Array
                 let len = self.read_object_len(n)?;
-
-                let mut child_object_refs = self.read_refs(len)?;
-                // Reverse so we can pop off the end of the stack in order
-                child_object_refs.reverse();
+                let child_object_refs = self.read_refs(len)?;
 
                 self.push_stack_item_and_check_for_recursion(StackItem {
                     object_index,
                     child_object_refs,
+                    pos: StackPosition::ArrayValue(0),
                 })?;
 
                 Event::StartArray(Some(len))
@@ -369,20 +392,12 @@ impl<R: Read + Seek> BinaryReader<R> {
                 let keys_and_values_len = len
                     .checked_mul(2)
                     .ok_or_else(|| self.with_pos(ErrorKind::ObjectTooLarge))?;
-                let key_and_value_refs = self.read_refs(keys_and_values_len)?;
-                let (key_refs, value_refs) =
-                    key_and_value_refs.split_at(key_and_value_refs.len() / 2);
-
-                let mut child_object_refs = Vec::with_capacity(key_and_value_refs.len());
-                for i in (0..key_refs.len()).rev() {
-                    // Reverse so we can pop off the end of the stack in order
-                    child_object_refs.push(value_refs[i]);
-                    child_object_refs.push(key_refs[i]);
-                }
+                let child_object_refs = self.read_refs(keys_and_values_len)?;
 
                 self.push_stack_item_and_check_for_recursion(StackItem {
                     object_index,
                     child_object_refs,
+                    pos: StackPosition::DictionaryKey(0),
                 })?;
 
                 Event::StartDictionary(Some(len))
