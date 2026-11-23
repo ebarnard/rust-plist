@@ -131,6 +131,11 @@ impl Error {
             Err(self)
         }
     }
+
+    #[cfg(test)]
+    pub(crate) fn kind(&self) -> &ErrorKind {
+        &self.inner.kind
+    }
 }
 
 impl error::Error for Error {
