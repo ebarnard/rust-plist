@@ -75,6 +75,47 @@ pub enum Event<'a> {
 /// keep that code a bit clearer.
 pub type OwnedEvent = Event<'static>;
 
+pub(crate) struct DepthLimited<I> {
+    iter: I,
+    depth: usize,
+    max_depth: Option<usize>,
+}
+
+impl<I> DepthLimited<I> {
+    pub(crate) fn new(iter: I, options: &crate::ReadOptions) -> Self {
+        Self {
+            iter,
+            depth: 0,
+            max_depth: options.max_depth,
+        }
+    }
+}
+
+impl<'a, I> Iterator for DepthLimited<I>
+where
+    I: Iterator<Item = Result<Event<'a>, Error>>,
+{
+    type Item = Result<Event<'a>, Error>;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        let event = self.iter.next()?;
+        let Some(max) = self.max_depth else {
+            return Some(event);
+        };
+        match &event {
+            Ok(Event::StartArray(_)) | Ok(Event::StartDictionary(_)) => {
+                if self.depth == max {
+                    return Some(Err(ErrorKind::DepthLimit { max }.without_position()));
+                }
+                self.depth += 1;
+            }
+            Ok(Event::EndCollection) => self.depth = self.depth.saturating_sub(1),
+            _ => {}
+        }
+        Some(event)
+    }
+}
+
 /// An `Event` stream returned by `Value::into_events`.
 pub struct Events<'a> {
     stack: Vec<StackItem<'a>>,

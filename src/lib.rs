@@ -88,6 +88,7 @@ mod date;
 mod error;
 mod integer;
 mod macros;
+mod read_options;
 mod uid;
 mod value;
 
@@ -97,6 +98,7 @@ pub use date::{Date, InvalidXmlDate};
 pub use dictionary::Dictionary;
 pub use error::Error;
 pub use integer::Integer;
+pub use read_options::ReadOptions;
 pub use stream::XmlWriteOptions;
 pub use uid::Uid;
 pub use value::Value;
@@ -119,7 +121,11 @@ mod ser;
 pub use self::{de::Deserializer, ser::Serializer};
 #[cfg(feature = "serde")]
 pub use self::{
-    de::{from_bytes, from_file, from_reader, from_reader_ascii, from_reader_xml, from_value},
+    de::{
+        from_bytes, from_bytes_with_options, from_file, from_file_with_options, from_reader,
+        from_reader_ascii, from_reader_ascii_with_options, from_reader_with_options,
+        from_reader_xml, from_reader_xml_with_options, from_value, from_value_with_options,
+    },
     ser::{
         to_file_binary, to_file_xml, to_value, to_writer_binary, to_writer_xml,
         to_writer_xml_with_options,
