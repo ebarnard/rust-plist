@@ -54,7 +54,7 @@ use crate::{
 #[derive(Clone, Debug, PartialEq)]
 #[non_exhaustive]
 pub enum Event<'a> {
-    // While the length of an array or dict cannot be feasably greater than max(usize) this better
+    // While the length of an array or dict cannot be feasibly greater than max(usize) this better
     // conveys the concept of an effectively unbounded event stream.
     StartArray(Option<u64>),
     StartDictionary(Option<u64>),
