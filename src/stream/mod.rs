@@ -126,7 +126,7 @@ impl XmlWriteOptions {
 
     /// Specifies the character and amount used for indentation.
     ///
-    /// `indent_char` must be a valid UTF8 character.
+    /// `indent_char` must be an ASCII character.
     ///
     /// The default is indenting with a single tab.
     pub fn indent(mut self, indent_char: u8, indent_count: usize) -> Self {
