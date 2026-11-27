@@ -13,6 +13,9 @@ use crate::{
 
 const IS_ON_STACK_MASK: u8 = 0b1000_0000;
 
+/// The size in bytes of the buffer used to read lists of values in chunks.
+const READ_BUF_LEN: usize = 4096;
+
 // https://opensource.apple.com/source/CF/CF-550/CFBinaryPList.c
 // https://hg.python.org/cpython/file/3.4/Lib/plistlib.py
 pub struct BinaryReader<R> {
@@ -23,7 +26,7 @@ pub struct BinaryReader<R> {
     ref_size: u8,
     root_object: u64,
     trailer_start_offset: u64,
-    int_read_buf: Box<[u8]>,
+    read_buf: Box<[u8; READ_BUF_LEN]>,
 }
 
 struct StackItem {
@@ -79,17 +82,25 @@ impl<R: Read + Seek> BinaryReader<R> {
             ref_size: 0,
             root_object: 0,
             trailer_start_offset: 0,
-            int_read_buf: vec![0; 4096].into_boxed_slice(),
+            read_buf: vec![0; READ_BUF_LEN]
+                .try_into()
+                .expect("vec has length READ_BUF_LEN"),
         }
     }
 
-    /// Allocates storage for reading a list of `len` values of type `T` and checks that the read
-    /// is in bounds.
-    fn allocate_vec<T>(&self, len: u64) -> Result<Vec<T>, Error> {
-        self.check_read_is_in_bounds(len, mem::size_of::<T>())?;
+    /// Checks whether reading `len` values of `size` bytes would read past the start of the plist
+    /// trailer, then allocates storage for a list of `len` values of type `T`.
+    fn allocate_vec_for_read<T>(&self, len: u64, size: usize) -> Result<(Vec<T>, usize), Error> {
+        self.check_read_is_in_bounds(len, size)?;
 
         let len = usize::try_from(len).map_err(|_| self.with_pos(ErrorKind::ObjectTooLarge))?;
-        Ok(Vec::with_capacity(len))
+
+        let mut values = Vec::new();
+        values
+            .try_reserve_exact(len)
+            .map_err(|_| self.with_pos(ErrorKind::ObjectTooLarge))?;
+
+        Ok((values, len))
     }
 
     /// Checks whether reading `len` values of `size` bytes would read past the start of the plist
@@ -151,44 +162,28 @@ impl<R: Read + Seek> BinaryReader<R> {
 
     /// Reads a list of `len` big-endian integers of `size` bytes from the reader.
     fn read_ints(&mut self, len: u64, size: u8) -> Result<Vec<u64>, Error> {
-        fn as_chunks<const N: usize>(buf: &[u8]) -> impl Iterator<Item = [u8; N]> {
-            let (chunks, remainder) = buf.as_chunks();
-            assert_eq!(remainder.len(), 0);
-            chunks.iter().copied()
-        }
-
         let size = usize::from(size);
-        let max_block_len = self.int_read_buf.len() / size;
+        let (mut values, len) = self.allocate_vec_for_read::<u64>(len, size)?;
 
-        self.check_read_is_in_bounds(len, size)?;
-        let len = usize::try_from(len).map_err(|_| self.with_pos(ErrorKind::ObjectTooLarge))?;
-
-        let mut values = Vec::with_capacity(len);
-        let mut remaining_len = len;
-        while remaining_len > 0 {
-            let block_len = cmp::min(remaining_len, max_block_len);
-            remaining_len -= block_len;
-
-            let block_buf = &mut self.int_read_buf[..block_len * size];
-            self.reader.read_all(block_buf)?;
-
+        self.read_chunked(len, size, |_, buf| {
             match size {
-                1 => values.extend(block_buf.iter().copied().map(u64::from)),
-                2 => values.extend(as_chunks(block_buf).map(u16::from_be_bytes).map(u64::from)),
+                1 => values.extend(buf.iter().copied().map(u64::from)),
+                2 => values.extend(as_chunks_exact(buf).map(u16::from_be_bytes).map(u64::from)),
                 // Encoders may use 24-bit integers in the object offset and reference tables.
                 // We never write 24-bit integers as not all decoders support them.
                 3 => values.extend(
-                    as_chunks::<3>(block_buf)
+                    as_chunks_exact::<3>(buf)
                         .map(|b| u32::from_be_bytes([0, b[0], b[1], b[2]]))
                         .map(u64::from),
                 ),
-                4 => values.extend(as_chunks(block_buf).map(u32::from_be_bytes).map(u64::from)),
-                8 => values.extend(as_chunks(block_buf).map(u64::from_be_bytes)),
+                4 => values.extend(as_chunks_exact(buf).map(u32::from_be_bytes).map(u64::from)),
+                8 => values.extend(as_chunks_exact(buf).map(u64::from_be_bytes)),
                 _ => unreachable!(
                     "size is either self.ref_size or offset_size both of which are already validated"
                 ),
             }
-        }
+            Ok(())
+        })?;
 
         Ok(values)
     }
@@ -217,10 +212,55 @@ impl<R: Read + Seek> BinaryReader<R> {
 
     /// Reads `len` bytes from the reader.
     fn read_data(&mut self, len: u64) -> Result<Vec<u8>, Error> {
-        let mut data = self.allocate_vec(len)?;
-        data.resize(len as usize, 0);
+        let (mut data, len) = self.allocate_vec_for_read(len, mem::size_of::<u8>())?;
+        data.resize(len, 0);
         self.reader.read_all(&mut data)?;
         Ok(data)
+    }
+
+    fn read_utf16_string(&mut self, len: u64) -> Result<String, Error> {
+        fn is_high_surrogate(unit: u16) -> bool {
+            (0xd800..=0xdbff).contains(&unit)
+        }
+
+        // Check that the read is in bounds and pre-allocate memory assuming the string is
+        // ASCII.
+        let (string, len) = self.allocate_vec_for_read(len, mem::size_of::<u16>())?;
+        let mut string = String::from_utf8(string).expect("string is pre-allocated but empty");
+
+        let mut pending = None;
+        self.read_chunked(len, mem::size_of::<u16>(), |this, buf| {
+            let mut extend = |pending: Option<u16>, buf| -> Result<(), Error> {
+                let units = as_chunks_exact(buf).map(u16::from_be_bytes);
+                for c in char::decode_utf16(pending.into_iter().chain(units)) {
+                    let c = c.map_err(|_| this.with_pos(ErrorKind::InvalidUtf16String))?;
+                    string.push(c);
+                }
+                Ok(())
+            };
+
+            let Some((head, &last)) = buf.split_last_chunk() else {
+                return Ok(());
+            };
+
+            let last = u16::from_be_bytes(last);
+            if is_high_surrogate(last) {
+                // Hold back an unpaired high surrogate.
+                extend(pending, head)?;
+                pending = Some(last);
+            } else {
+                extend(pending, buf)?;
+                pending = None;
+            }
+            Ok(())
+        })?;
+
+        // String ends with an unpaired high surrogate.
+        if pending.is_some() {
+            return Err(self.with_pos(ErrorKind::InvalidUtf16String));
+        }
+
+        Ok(string)
     }
 
     fn push_stack_item_and_check_for_recursion(&mut self, item: StackItem) -> Result<(), Error> {
@@ -349,16 +389,8 @@ impl<R: Read + Seek> BinaryReader<R> {
             }
             (0x6, n) => {
                 // UTF-16 string
-                let len_utf16_codepoints = self.read_object_len(n)?;
-                let mut raw_utf16 = self.allocate_vec(len_utf16_codepoints)?;
-
-                for _ in 0..len_utf16_codepoints {
-                    raw_utf16.push(self.read_be_u16()?);
-                }
-
-                let string = String::from_utf16(&raw_utf16)
-                    .map_err(|_| self.with_pos(ErrorKind::InvalidUtf16String))?;
-                Event::String(string.into())
+                let len = self.read_object_len(n)?;
+                Event::String(self.read_utf16_string(len)?.into())
             }
             (0x8, n) if n < 8 => {
                 // Uid
@@ -411,6 +443,27 @@ impl<R: Read + Seek> BinaryReader<R> {
         self.object_contents[object_index] = object_content;
 
         Ok(Some(event))
+    }
+
+    /// Reads `len` values of `size` bytes using an intermediate buffer to reduce calls to the
+    /// underlying reader.
+    fn read_chunked(
+        &mut self,
+        len: usize,
+        size: usize,
+        mut f: impl FnMut(&Self, &[u8]) -> Result<(), Error>,
+    ) -> Result<(), Error> {
+        let max_chunk_len = self.read_buf.len() / size;
+        let mut remaining_len = len;
+        while remaining_len > 0 {
+            let chunk_len = cmp::min(remaining_len, max_chunk_len);
+            remaining_len -= chunk_len;
+
+            let len = chunk_len * size;
+            self.reader.read_all(&mut self.read_buf[..len])?;
+            f(self, &self.read_buf[..len])?;
+        }
+        Ok(())
     }
 
     fn read_u8(&mut self) -> Result<u8, Error> {
@@ -536,6 +589,12 @@ fn decode_event(tag: u8, content: u64) -> Result<Event<'static>, u64> {
     }
 }
 
+fn as_chunks_exact<const N: usize>(buf: &[u8]) -> impl Iterator<Item = [u8; N]> {
+    let (chunks, remainder) = buf.as_chunks();
+    assert_eq!(remainder.len(), 0);
+    chunks.iter().copied()
+}
+
 #[cfg(test)]
 mod tests {
     use std::{
@@ -544,6 +603,16 @@ mod tests {
     };
 
     use super::*;
+
+    /// The number of UTF-16 code units `read_utf16_string` reads at a time.
+    const UTF16_CHUNK_LEN: usize = READ_BUF_LEN / mem::size_of::<u16>();
+
+    // U+1F600 GRINNING FACE as a surrogate pair.
+    const UTF16_GRINNING_FACE_HIGH: u16 = 0xd83d;
+    const UTF16_GRINNING_FACE_LOW: u16 = 0xde00;
+
+    const UTF16_A: u16 = b'a' as u16;
+    const UTF16_STAR: u16 = 0x2605;
 
     /// Counts the number of calls to `Read::read` and `Seek::seek` made on the wrapped reader, and
     /// the total number of bytes read.
@@ -579,6 +648,12 @@ mod tests {
             self.seeks += 1;
             self.inner.seek(pos)
         }
+    }
+
+    fn read_single_event(plist: &[u8]) -> Result<OwnedEvent, Error> {
+        let mut events: Vec<_> = BinaryReader::new(Cursor::new(plist)).collect();
+        assert!(matches!(&events[..], [_]));
+        events.pop().unwrap()
     }
 
     #[test]
@@ -643,6 +718,142 @@ mod tests {
         };
         assert_eq!(poem.len(), 643);
         assert_eq!(poem.to_mut().pop().unwrap(), '\u{2605}');
+    }
+
+    /// Builds a binary plist whose root object is a UTF-16 string made of `units`.
+    fn utf16_string_plist(units: &[u16]) -> Vec<u8> {
+        let mut plist = Vec::new();
+
+        // Header
+        plist.extend(b"bplist00");
+
+        // Object 0 (offset 8): UTF-16 string. The low 4 bits of the marker hold the length in
+        // code units, or 0xf if the length follows as an integer object (0x11 is a 2-byte integer).
+        let len = u16::try_from(units.len()).unwrap();
+        if len < 0xf {
+            plist.push(0x60 | len as u8);
+        } else {
+            plist.push(0x6f);
+            plist.push(0x11);
+            plist.extend(len.to_be_bytes());
+        }
+        for unit in units {
+            plist.extend(unit.to_be_bytes());
+        }
+
+        // Offset table: one 1-byte offset per object.
+        let offset_table_offset = plist.len() as u64;
+        plist.push(8);
+
+        // Trailer
+        plist.extend([0; 6]); // Padding
+        plist.push(1); // Offset table entry size
+        plist.push(1); // Object reference size
+        plist.extend(1u64.to_be_bytes()); // Number of objects
+        plist.extend(0u64.to_be_bytes()); // Root object
+        plist.extend(offset_table_offset.to_be_bytes()); // Offset table offset
+
+        plist
+    }
+
+    fn assert_utf16_string_ok(units: &[u16]) {
+        let expected = String::from_utf16(units).expect("test case should be valid UTF-16");
+        let event = read_single_event(&utf16_string_plist(units)).unwrap();
+        assert_eq!(event, Event::String(expected.into()));
+    }
+
+    fn assert_utf16_string_err(units: &[u16]) {
+        assert!(
+            String::from_utf16(units).is_err(),
+            "test case should be invalid UTF-16"
+        );
+        let err = read_single_event(&utf16_string_plist(units)).unwrap_err();
+        assert!(matches!(err.kind(), ErrorKind::InvalidUtf16String));
+    }
+
+    /// Returns `prefix_len` copies of 'a' followed by `tail`.
+    fn utf16_with_prefix(prefix_len: usize, tail: &[u16]) -> Vec<u16> {
+        let mut units = vec![UTF16_A; prefix_len];
+        units.extend(tail);
+        units
+    }
+
+    #[test]
+    fn utf16_string_lengths() {
+        for len in [
+            0,
+            1,
+            14,
+            15,
+            UTF16_CHUNK_LEN - 1,
+            UTF16_CHUNK_LEN,
+            UTF16_CHUNK_LEN + 1,
+            2 * UTF16_CHUNK_LEN + 5,
+        ] {
+            let units: Vec<u16> = (0..len)
+                .map(|i| if i % 3 == 0 { UTF16_STAR } else { UTF16_A })
+                .collect();
+            assert_utf16_string_ok(&units);
+        }
+    }
+
+    #[test]
+    fn utf16_string_surrogate_pairs() {
+        assert_utf16_string_ok(&[UTF16_GRINNING_FACE_HIGH, UTF16_GRINNING_FACE_LOW]);
+
+        // Pair ends the first chunk.
+        assert_utf16_string_ok(&utf16_with_prefix(
+            UTF16_CHUNK_LEN - 2,
+            &[UTF16_GRINNING_FACE_HIGH, UTF16_GRINNING_FACE_LOW, UTF16_A],
+        ));
+
+        // Pair split across the chunk boundary.
+        assert_utf16_string_ok(&utf16_with_prefix(
+            UTF16_CHUNK_LEN - 1,
+            &[UTF16_GRINNING_FACE_HIGH, UTF16_GRINNING_FACE_LOW, UTF16_A],
+        ));
+        assert_utf16_string_ok(&utf16_with_prefix(
+            UTF16_CHUNK_LEN - 1,
+            &[UTF16_GRINNING_FACE_HIGH, UTF16_GRINNING_FACE_LOW],
+        ));
+
+        // Pair starts the second chunk.
+        assert_utf16_string_ok(&utf16_with_prefix(
+            UTF16_CHUNK_LEN,
+            &[UTF16_GRINNING_FACE_HIGH, UTF16_GRINNING_FACE_LOW, UTF16_A],
+        ));
+    }
+
+    #[test]
+    fn utf16_string_unpaired_surrogates() {
+        // High surrogate ends the string.
+        assert_utf16_string_err(&[UTF16_GRINNING_FACE_HIGH]);
+        assert_utf16_string_err(&[UTF16_A, UTF16_GRINNING_FACE_HIGH]);
+        assert_utf16_string_err(&utf16_with_prefix(
+            UTF16_CHUNK_LEN - 1,
+            &[UTF16_GRINNING_FACE_HIGH],
+        ));
+
+        // High surrogate ends the first chunk but isn't followed by a low surrogate.
+        assert_utf16_string_err(&utf16_with_prefix(
+            UTF16_CHUNK_LEN - 1,
+            &[UTF16_GRINNING_FACE_HIGH, UTF16_A],
+        ));
+        assert_utf16_string_err(&utf16_with_prefix(
+            UTF16_CHUNK_LEN - 1,
+            &[
+                UTF16_GRINNING_FACE_HIGH,
+                UTF16_GRINNING_FACE_HIGH,
+                UTF16_GRINNING_FACE_LOW,
+            ],
+        ));
+
+        // Lone low surrogate
+        assert_utf16_string_err(&[UTF16_GRINNING_FACE_LOW]);
+        assert_utf16_string_err(&utf16_with_prefix(
+            UTF16_CHUNK_LEN,
+            &[UTF16_GRINNING_FACE_LOW, UTF16_A],
+        ));
     }
 
     #[test]
