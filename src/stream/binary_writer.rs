@@ -34,22 +34,22 @@ struct PosWriter<W: Write> {
 struct ObjectRef(NonZeroUsize);
 
 /// An array of `len` elements is stored as a `Collection` event followed by `skip` events
-/// containing the contents of the array. e.g.
+/// containing the contents of the array, e.g.
 ///
 /// Collection(ty: Array, len: 2, skip: 2)
 /// Value
 /// Value
 ///
-/// If the array contains another array or dictionary `len` and `skip` will differ. e.g.
+/// If the array contains another array or dictionary `len` and `skip` will differ, e.g.
 ///
 /// Collection(ty: Array, len: 2, skip: 3)
 /// Value
 /// Collection(ty: Array, len: 1, skip: 1)
 /// Value
 ///
-/// A dictionary of `len` (key, value) pairs is stored as a `Collection` event followed by
-/// `skip` events containing the contents of the dictionary. The dictionary values are stored
-/// first. These are followed by a `DictionaryKeys` event and then the keys themselves. e.g.
+/// A dictionary of `len` (key, value) pairs is stored as a `Collection` event followed by `skip`
+/// events containing the contents of the dictionary. The dictionary values are stored first. These
+/// are followed by a `DictionaryKeys` event and then the keys themselves, e.g.
 ///
 /// Collection(ty: Dictionary, len: 2, skip: 6)
 /// Value
