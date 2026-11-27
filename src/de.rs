@@ -13,10 +13,10 @@ use std::{
 };
 
 use crate::{
-    Value,
+    ReadOptions, Value,
     date::serde_impls::DATE_NEWTYPE_STRUCT_NAME,
     error::{self, Error, ErrorKind, EventKind},
-    stream::{self, Event},
+    stream::{self, DepthLimited, Event},
     uid::serde_impls::UID_NEWTYPE_STRUCT_NAME,
     value::serde_impls::VALUE_NEWTYPE_STRUCT_NAME,
 };
@@ -62,7 +62,7 @@ pub struct Deserializer<'event, I>
 where
     I: IntoIterator<Item = Result<Event<'event>, Error>>,
 {
-    events: Peekable<<I as IntoIterator>::IntoIter>,
+    events: Peekable<DepthLimited<<I as IntoIterator>::IntoIter>>,
     option_mode: OptionMode,
     in_plist_value: bool,
 }
@@ -72,8 +72,13 @@ where
     I: IntoIterator<Item = Result<Event<'event>, Error>>,
 {
     pub fn new(iter: I) -> Deserializer<'event, I> {
+        Self::new_with_options(iter, &ReadOptions::default())
+    }
+
+    /// Creates a deserializer with explicit read options.
+    pub fn new_with_options(iter: I, options: &ReadOptions) -> Deserializer<'event, I> {
         Deserializer {
-            events: iter.into_iter().peekable(),
+            events: DepthLimited::new(iter.into_iter(), options).peekable(),
             option_mode: OptionMode::Root,
             in_plist_value: false,
         }
@@ -409,46 +414,109 @@ where
 
 /// Deserializes an instance of type `T` from a byte slice.
 pub fn from_bytes<T: de::DeserializeOwned>(bytes: &[u8]) -> Result<T, Error> {
+    from_bytes_with_options(bytes, &ReadOptions::default())
+}
+
+/// Like [`from_bytes`], with explicit read options.
+pub fn from_bytes_with_options<T: de::DeserializeOwned>(
+    bytes: &[u8],
+    options: &ReadOptions,
+) -> Result<T, Error> {
     let cursor = Cursor::new(bytes);
-    from_reader(cursor)
+    from_reader_with_options(cursor, options)
 }
 
 /// Deserializes an instance of type `T` from a plist file of any encoding.
 pub fn from_file<P: AsRef<Path>, T: de::DeserializeOwned>(path: P) -> Result<T, Error> {
+    from_file_with_options(path, &ReadOptions::default())
+}
+
+/// Like [`from_file`], with explicit read options.
+pub fn from_file_with_options<P: AsRef<Path>, T: de::DeserializeOwned>(
+    path: P,
+    options: &ReadOptions,
+) -> Result<T, Error> {
     let file = File::open(path).map_err(error::from_io_without_position)?;
-    from_reader(BufReader::new(file))
+    from_reader_with_options(BufReader::new(file), options)
 }
 
 /// Deserializes an instance of type `T` from a seekable byte stream containing a plist of any encoding.
 pub fn from_reader<R: Read + Seek, T: de::DeserializeOwned>(reader: R) -> Result<T, Error> {
+    from_stream(stream::Reader::new(reader))
+}
+
+/// Like [`from_reader`], with explicit read options.
+pub fn from_reader_with_options<R: Read + Seek, T: de::DeserializeOwned>(
+    reader: R,
+    options: &ReadOptions,
+) -> Result<T, Error> {
     let reader = stream::Reader::new(reader);
-    from_stream(reader)
+    from_stream_with_options(reader, options)
 }
 
 /// Deserializes an instance of type `T` from a byte stream containing an ASCII encoded plist.
 pub fn from_reader_ascii<R: Read, T: de::DeserializeOwned>(reader: R) -> Result<T, Error> {
+    from_reader_ascii_with_options(reader, &ReadOptions::default())
+}
+
+/// Like [`from_reader_ascii`], with explicit read options.
+pub fn from_reader_ascii_with_options<R: Read, T: de::DeserializeOwned>(
+    reader: R,
+    options: &ReadOptions,
+) -> Result<T, Error> {
     // The ASCII reader reads one byte at a time, so always wrap in a `BufReader`.
     let reader = stream::AsciiReader::new(BufReader::new(reader));
-    from_stream(reader)
+    from_stream_with_options(reader, options)
 }
 
 /// Deserializes an instance of type `T` from a byte stream containing an XML encoded plist.
 pub fn from_reader_xml<R: Read, T: de::DeserializeOwned>(reader: R) -> Result<T, Error> {
+    from_reader_xml_with_options(reader, &ReadOptions::default())
+}
+
+/// Like [`from_reader_xml`], with explicit read options.
+pub fn from_reader_xml_with_options<R: Read, T: de::DeserializeOwned>(
+    reader: R,
+    options: &ReadOptions,
+) -> Result<T, Error> {
     // `quick-xml::Reader` requires a `BufRead`.
     let reader = stream::XmlReader::new(BufReader::new(reader));
-    from_stream(reader)
+    from_stream_with_options(reader, options)
 }
 
 /// Interprets a [`Value`] as an instance of type `T`.
 pub fn from_value<T: de::DeserializeOwned>(value: &Value) -> Result<T, Error> {
+    from_value_with_options(value, &ReadOptions::default())
+}
+
+/// Like [`from_value`], with explicit read options.
+pub fn from_value_with_options<T: de::DeserializeOwned>(
+    value: &Value,
+    options: &ReadOptions,
+) -> Result<T, Error> {
     let events = value.events().map(Ok);
-    from_stream(events)
+    from_stream_with_options(events, options)
 }
 
 pub(crate) fn from_stream<'event, T: de::DeserializeOwned>(
     stream: impl IntoIterator<Item = Result<Event<'event>, Error>>,
 ) -> Result<T, Error> {
-    let mut de = Deserializer::new(stream);
+    finish_deserialization(Deserializer::new(stream))
+}
+
+fn from_stream_with_options<'event, T: de::DeserializeOwned>(
+    stream: impl IntoIterator<Item = Result<Event<'event>, Error>>,
+    options: &ReadOptions,
+) -> Result<T, Error> {
+    finish_deserialization(Deserializer::new_with_options(stream, options))
+}
+
+fn finish_deserialization<'event, T: de::DeserializeOwned, I>(
+    mut de: Deserializer<'event, I>,
+) -> Result<T, Error>
+where
+    I: IntoIterator<Item = Result<Event<'event>, Error>>,
+{
     let value = de::Deserialize::deserialize(&mut de)?;
 
     // TODO: Ideally this check would be inside the `Deserializer` implementation.

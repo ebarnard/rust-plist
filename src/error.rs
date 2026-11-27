@@ -21,6 +21,9 @@ pub(crate) struct ErrorImpl {
 pub(crate) enum ErrorKind {
     UnexpectedEof,
     UnexpectedEndOfEventStream,
+    DepthLimit {
+        max: usize,
+    },
     UnexpectedEventType {
         // Used by the `Debug` implementation.
         #[allow(dead_code)]
@@ -102,6 +105,14 @@ pub(crate) enum EventKind {
 }
 
 impl Error {
+    /// Returns the exceeded depth limit, or `None` for other errors.
+    pub fn depth_limit(&self) -> Option<usize> {
+        match self.inner.kind {
+            ErrorKind::DepthLimit { max } => Some(max),
+            _ => None,
+        }
+    }
+
     /// Returns true if this error was caused by a failure to read or write bytes on an IO stream.
     pub fn is_io(&self) -> bool {
         self.as_io().is_some()

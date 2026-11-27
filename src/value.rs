@@ -6,11 +6,11 @@ use std::{
 };
 
 use crate::{
-    Date, Dictionary, Integer, Uid,
+    Date, Dictionary, Integer, ReadOptions, Uid,
     error::{self, Error, ErrorKind, EventKind},
     stream::{
-        AsciiReader, BinaryWriter, Event, Events, Reader, Writer, XmlReader, XmlWriteOptions,
-        XmlWriter, private,
+        AsciiReader, BinaryWriter, DepthLimited, Event, Events, Reader, Writer, XmlReader,
+        XmlWriteOptions, XmlWriter, private,
     },
 };
 
@@ -54,6 +54,39 @@ impl Value {
         // `quick-xml::Reader` requires a `BufRead`.
         let reader = XmlReader::new(BufReader::new(reader));
         Value::from_events(reader)
+    }
+
+    /// Like [`Value::from_file`], with explicit read options.
+    pub fn from_file_with_options<P: AsRef<Path>>(
+        path: P,
+        options: &ReadOptions,
+    ) -> Result<Value, Error> {
+        let file = File::open(path).map_err(error::from_io_without_position)?;
+        Self::from_reader_with_options(BufReader::new(file), options)
+    }
+
+    /// Like [`Value::from_reader`], with explicit read options.
+    pub fn from_reader_with_options<R: Read + Seek>(
+        reader: R,
+        options: &ReadOptions,
+    ) -> Result<Value, Error> {
+        Self::from_events_with_options(Reader::new(reader), options)
+    }
+
+    /// Like [`Value::from_reader_ascii`], with explicit read options.
+    pub fn from_reader_ascii_with_options<R: Read>(
+        reader: R,
+        options: &ReadOptions,
+    ) -> Result<Value, Error> {
+        Self::from_events_with_options(AsciiReader::new(BufReader::new(reader)), options)
+    }
+
+    /// Like [`Value::from_reader_xml`], with explicit read options.
+    pub fn from_reader_xml_with_options<R: Read>(
+        reader: R,
+        options: &ReadOptions,
+    ) -> Result<Value, Error> {
+        Self::from_events_with_options(XmlReader::new(BufReader::new(reader)), options)
     }
 
     /// Serializes a `Value` to a file as a binary encoded plist.
@@ -126,7 +159,7 @@ impl Value {
     where
         T: IntoIterator<Item = Result<Event<'event>, Error>>,
     {
-        Builder::build(events.into_iter())
+        Self::from_events_with_options(events, &ReadOptions::default())
     }
 
     /// Builds a single `Value` from an `Event` iterator.
@@ -136,7 +169,30 @@ impl Value {
     where
         T: IntoIterator<Item = Result<Event<'event>, Error>>,
     {
-        Builder::build(events.into_iter())
+        Self::from_events_with_options(events, &ReadOptions::default())
+    }
+
+    /// Like [`Value::from_events`], with explicit read options.
+    #[cfg(feature = "enable_unstable_features_that_may_break_with_minor_version_bumps")]
+    pub fn from_events_with_options<'event, T>(
+        events: T,
+        options: &ReadOptions,
+    ) -> Result<Value, Error>
+    where
+        T: IntoIterator<Item = Result<Event<'event>, Error>>,
+    {
+        Builder::build(DepthLimited::new(events.into_iter(), options))
+    }
+
+    #[cfg(not(feature = "enable_unstable_features_that_may_break_with_minor_version_bumps"))]
+    pub(crate) fn from_events_with_options<'event, T>(
+        events: T,
+        options: &ReadOptions,
+    ) -> Result<Value, Error>
+    where
+        T: IntoIterator<Item = Result<Event<'event>, Error>>,
+    {
+        Builder::build(DepthLimited::new(events.into_iter(), options))
     }
 
     /// Converts a `Value` into an `Event` iterator.
