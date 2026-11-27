@@ -30,7 +30,7 @@ enum OptionMode {
     Explicit,
 }
 
-/// A structure that serializes Rust values plist event streams.
+/// A structure that serializes Rust values to plist event streams.
 pub struct Serializer<W: Writer> {
     writer: W,
     option_mode: OptionMode,

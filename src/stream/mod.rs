@@ -54,7 +54,7 @@ use crate::{
 #[derive(Clone, Debug, PartialEq)]
 #[non_exhaustive]
 pub enum Event<'a> {
-    // While the length of an array or dict cannot be feasably greater than max(usize) this better
+    // While the length of an array or dict cannot be feasibly greater than max(usize) this better
     // conveys the concept of an effectively unbounded event stream.
     StartArray(Option<u64>),
     StartDictionary(Option<u64>),
@@ -126,7 +126,7 @@ impl XmlWriteOptions {
 
     /// Specifies the character and amount used for indentation.
     ///
-    /// `indent_char` must be a valid UTF8 character.
+    /// `indent_char` must be an ASCII character.
     ///
     /// The default is indenting with a single tab.
     pub fn indent(mut self, indent_char: u8, indent_count: usize) -> Self {

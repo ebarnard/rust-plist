@@ -192,7 +192,7 @@ impl Value {
         }
     }
 
-    /// If the `Value` is a Dictionary, returns the associated `BTreeMap`.
+    /// If the `Value` is a Dictionary, returns the associated `Dictionary`.
     ///
     /// Returns `None` otherwise.
     ///
@@ -205,7 +205,7 @@ impl Value {
         }
     }
 
-    /// If the `Value` is a Dictionary, returns the associated `BTreeMap`.
+    /// If the `Value` is a Dictionary, returns the associated `Dictionary`.
     ///
     /// Returns `None` otherwise.
     pub fn as_dictionary(&self) -> Option<&Dictionary> {
@@ -215,7 +215,7 @@ impl Value {
         }
     }
 
-    /// If the `Value` is a Dictionary, returns the associated mutable `BTreeMap`.
+    /// If the `Value` is a Dictionary, returns the associated mutable `Dictionary`.
     ///
     /// Returns `None` otherwise.
     pub fn as_dictionary_mut(&mut self) -> Option<&mut Dictionary> {
