@@ -5,7 +5,17 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [1.10.5] - 2026-11-27
+
+### Changed
+- Read binary object references in chunks rather than one at a time (#217).
+- Don't double-allocate when reading binary dictionaries (#218).
+- Read binary UTF-16 strings in chunks rather than one code unit at a time (#222).
+
+### Fixed
+- Write a large enough object reference size in binary plists with exactly 256 or 65,536 objects (#219).
+- End unquoted ASCII plist strings at `=`, `{`, `}` and `(` (#216).
+- Fix wording and typos in some doc comments (#221).
 
 ## [1.10.4] - 2026-11-16
 
@@ -82,7 +92,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 - Update `quick-xml` to v0.37.
 
-[unreleased]: https://github.com/ebarnard/rust-plist/compare/v1.10.4...HEAD
+[1.10.5]: https://github.com/ebarnard/rust-plist/compare/v1.10.4...v1.10.5
 [1.10.4]: https://github.com/ebarnard/rust-plist/compare/v1.10.3...v1.10.4
 [1.10.3]: https://github.com/ebarnard/rust-plist/compare/v1.10.2...v1.10.3
 [1.10.2]: https://github.com/ebarnard/rust-plist/compare/v1.10.1...v1.10.2
